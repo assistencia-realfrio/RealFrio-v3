@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-PT" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Real Frio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+      body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+      
+      /* Global Uppercase Rule - Exceto se marcado explicitamente */
+      *:not(.lowercase-container, .lowercase-container *) {
+        text-transform: uppercase;
+      }
+
+      /* Forçar peso normal (400) em toda a aplicação, removendo negritos */
+      * {
+        font-weight: 400 !important;
+      }
+
+      /* Preservamos apenas o peso leve para classes específicas que pedem explicitamente */
+      .font-light, 
+      .font-thin, 
+      .font-extralight {
+        font-weight: 300 !important;
+      }
+
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      
+      @keyframes timer-progress {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(0); }
+      }
+      .animate-timer-progress {
+        animation: timer-progress 2s infinite linear;
+      }
+      .animate-spin-slow {
+        animation: spin 3s linear infinite;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.86.0",
+    "jspdf": "https://aistudiocdn.com/jspdf@^2.5.2",
+    "jspdf-autotable": "https://aistudiocdn.com/jspdf-autotable@^3.8.3"
+  }
+}
+</script>
+</head>
+  <body class="h-full">
+    <div id="root" class="h-full"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
