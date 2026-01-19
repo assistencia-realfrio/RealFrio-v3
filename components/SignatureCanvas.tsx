@@ -1,5 +1,7 @@
+
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Maximize2, RotateCcw, Check, X } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface SignatureCanvasProps {
   label: string;
@@ -17,6 +19,8 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
   const [isDrawing, setIsDrawing] = useState(false);
   const [isEmpty, setIsEmpty] = useState(!initialValue);
   const [isExpanded, setIsExpanded] = useState(false);
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   // Sincronizar o estado de vazio quando o valor inicial mudar externamente
   useEffect(() => {
@@ -34,7 +38,7 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
           canvas.height = 160;
           const ctx = canvas.getContext('2d');
           if (ctx) {
-            ctx.strokeStyle = '#1e293b';
+            ctx.strokeStyle = isDark ? '#60a5fa' : '#1e293b'; // Tinta azul claro no dark mode
             ctx.lineWidth = 2.5;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
@@ -46,17 +50,17 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
       window.addEventListener('resize', resizeCanvas);
       return () => window.removeEventListener('resize', resizeCanvas);
     }
-  }, [readOnly, initialValue]);
+  }, [readOnly, initialValue, isDark]);
 
   const setupExpandedContext = useCallback((canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.strokeStyle = '#1e293b';
+      ctx.strokeStyle = isDark ? '#60a5fa' : '#1e293b';
       ctx.lineWidth = 3.5;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
     }
-  }, []);
+  }, [isDark]);
 
   useEffect(() => {
     if (isExpanded && expandedCanvasRef.current && containerRef.current) {
@@ -182,25 +186,25 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
 
   if (readOnly && initialValue) {
     return (
-      <div className={`border rounded-lg bg-gray-50 p-2 overflow-hidden flex flex-col items-center justify-center h-40 ${error ? 'border-red-500 bg-red-50/30' : 'border-gray-200'}`}>
-        <span className={`text-[10px] uppercase font-bold mb-1 ${error ? 'text-red-500' : 'text-gray-400'}`}>{label}</span>
-        <img src={initialValue} alt={`Assinatura ${label}`} className="max-h-full object-contain mix-blend-multiply" />
+      <div className={`border rounded-2xl bg-gray-50 dark:bg-slate-950 p-2 overflow-hidden flex flex-col items-center justify-center h-40 ${error ? 'border-red-500 bg-red-50/30' : 'border-gray-200 dark:border-slate-800'}`}>
+        <span className={`text-[10px] uppercase font-bold mb-1 ${error ? 'text-red-500' : 'text-gray-400 dark:text-slate-500'}`}>{label}</span>
+        <img src={initialValue} alt={`Assinatura ${label}`} className={`max-h-full object-contain ${isDark ? 'brightness-200 invert' : 'mix-blend-multiply'}`} />
       </div>
     );
   }
 
   return (
     <>
-      <div className={`border rounded-lg shadow-sm overflow-hidden group transition-colors ${error && isEmpty ? 'border-red-500 bg-red-50/20 ring-1 ring-red-500/20' : 'border-gray-300 bg-white'}`}>
-        <div className={`p-2 border-b text-xs font-bold uppercase tracking-wider flex justify-between items-center ${error && isEmpty ? 'bg-red-50 text-red-600 border-red-200' : 'bg-gray-50 text-gray-500'}`}>
+      <div className={`border rounded-2xl shadow-sm overflow-hidden group transition-colors ${error && isEmpty ? 'border-red-500 bg-red-50/20 ring-1 ring-red-500/20' : 'border-gray-300 dark:border-slate-800 bg-white dark:bg-slate-900'}`}>
+        <div className={`p-3 border-b text-[10px] font-black uppercase tracking-widest flex justify-between items-center ${error && isEmpty ? 'bg-red-50 text-red-600 border-red-200' : 'bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 border-slate-100 dark:border-slate-800'}`}>
           <span>{label}</span>
           <div className="flex gap-2">
             {!readOnly && (
               <button 
                 type="button"
                 onClick={handleClearAction} 
-                className={`transition-colors p-1 rounded-md ${error && isEmpty ? 'text-red-400 hover:text-red-600 hover:bg-red-100' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'}`}
-                title="Limpar Assinatura"
+                className={`transition-colors p-1.5 rounded-lg ${error && isEmpty ? 'text-red-400 hover:text-red-600 hover:bg-red-100' : 'text-gray-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10'}`}
+                title="Limpar"
               >
                 <RotateCcw size={14} />
               </button>
@@ -208,8 +212,8 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
             <button 
               type="button"
               onClick={() => setIsExpanded(true)}
-              className={`p-1 ${error && isEmpty ? 'text-red-600' : 'text-blue-500 hover:text-blue-700'}`}
-              title="Expandir para assinar"
+              className={`p-1.5 rounded-lg ${error && isEmpty ? 'text-red-600' : 'text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}
+              title="Expandir"
             >
               <Maximize2 size={14} />
             </button>
@@ -217,15 +221,12 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
         </div>
 
         <div 
-          className="w-full h-[160px] relative cursor-pointer touch-none"
+          className="w-full h-[160px] relative cursor-pointer touch-none bg-white dark:bg-slate-950"
           onClick={() => !isExpanded && setIsExpanded(true)}
         >
           {initialValue ? (
-            <div className={`w-full h-full flex items-center justify-center p-2 ${error ? 'bg-red-50/10' : 'bg-gray-50'}`}>
-               <img src={initialValue} className="max-h-full object-contain mix-blend-multiply" />
-               <div className="absolute top-1 right-1 bg-white/80 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Maximize2 size={12} className="text-gray-400" />
-               </div>
+            <div className={`w-full h-full flex items-center justify-center p-4`}>
+               <img src={initialValue} className={`max-h-full object-contain ${isDark ? 'brightness-200 invert' : 'mix-blend-multiply'}`} />
             </div>
           ) : (
             <canvas
@@ -237,11 +238,11 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
               onTouchStart={(e) => canvasRef.current && startDrawing(e, canvasRef.current)}
               onTouchMove={(e) => canvasRef.current && draw(e, canvasRef.current)}
               onTouchEnd={() => canvasRef.current && stopDrawing(canvasRef.current)}
-              className={`w-full h-full ${error && isEmpty ? 'bg-[radial-gradient(#fecaca_1px,transparent_1px)]' : 'bg-[radial-gradient(#e5e7eb_1px,transparent_1px)]'} [background-size:16px_16px]`}
+              className={`w-full h-full ${isDark ? 'bg-[radial-gradient(#1e293b_1.5px,transparent_1.5px)]' : 'bg-[radial-gradient(#e5e7eb_1.5px,transparent_1.5px)]'} [background-size:20px_20px]`}
             />
           )}
           {isEmpty && !initialValue && (
-            <div className={`absolute inset-0 flex items-center justify-center pointer-events-none text-sm italic ${error ? 'text-red-400' : 'text-gray-300'}`}>
+            <div className={`absolute inset-0 flex items-center justify-center pointer-events-none text-[10px] font-black uppercase tracking-[0.2em] ${error ? 'text-red-400' : 'text-slate-300 dark:text-slate-800'}`}>
               {error ? 'Assinatura Obrigatória' : 'Toque para assinar'}
             </div>
           )}
@@ -249,12 +250,12 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
       </div>
 
       {isExpanded && (
-        <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
-          <div className="w-full flex justify-between items-center px-2 mb-2 sm:mb-4">
-            <h3 className="text-white font-bold text-lg uppercase tracking-widest">Assinatura: {label}</h3>
-            <button onClick={() => setIsExpanded(false)} className="p-3 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors"><X size={24} /></button>
+        <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col items-center justify-center p-2 sm:p-6 animate-in fade-in duration-200">
+          <div className="w-full flex justify-between items-center px-4 mb-4">
+            <h3 className="text-white font-black text-sm uppercase tracking-[0.3em]">{label}</h3>
+            <button onClick={() => setIsExpanded(false)} className="p-4 bg-white/5 text-white rounded-full hover:bg-white/10 transition-colors backdrop-blur-xl border border-white/10"><X size={28} /></button>
           </div>
-          <div ref={containerRef} className="relative bg-white rounded-2xl shadow-2xl overflow-hidden w-full flex-1 touch-none">
+          <div ref={containerRef} className="relative bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl overflow-hidden w-full flex-1 touch-none border border-white/5">
             <canvas
               ref={expandedCanvasRef}
               onMouseDown={(e) => expandedCanvasRef.current && startDrawing(e, expandedCanvasRef.current)}
@@ -264,11 +265,11 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
               onTouchStart={(e) => expandedCanvasRef.current && startDrawing(e, expandedCanvasRef.current)}
               onTouchMove={(e) => expandedCanvasRef.current && draw(e, expandedCanvasRef.current)}
               onTouchEnd={() => expandedCanvasRef.current && stopDrawing(expandedCanvasRef.current)}
-              className="w-full h-full bg-[radial-gradient(#e5e7eb_1.5px,transparent_1.5px)] [background-size:24px_24px] cursor-crosshair block"
+              className={`w-full h-full ${isDark ? 'bg-[radial-gradient(#1e293b_2px,transparent_2px)]' : 'bg-[radial-gradient(#e5e7eb_2px,transparent_2px)]'} [background-size:32px_32px] cursor-crosshair block`}
             />
-            <div className="absolute bottom-6 right-6 flex gap-4 z-10">
-              <button type="button" onClick={handleClearExpanded} className="bg-gray-100 text-gray-700 px-6 py-4 rounded-2xl font-black flex items-center gap-2 hover:bg-gray-200 transition-all shadow-md active:scale-95"><RotateCcw size={20} /> <span className="hidden sm:inline">LIMPAR</span></button>
-              <button type="button" onClick={confirmExpandedSignature} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-2 hover:bg-blue-700 shadow-xl transform active:scale-95 transition-all"><Check size={20} /> <span>CONFIRMAR</span></button>
+            <div className="absolute bottom-8 right-8 flex gap-4 z-10">
+              <button type="button" onClick={handleClearExpanded} className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-8 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all shadow-xl active:scale-95"><RotateCcw size={18} /> LIMPAR</button>
+              <button type="button" onClick={confirmExpandedSignature} className="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 shadow-2xl shadow-blue-500/20 transform active:scale-95 transition-all"><Check size={20} /> CONFIRMAR</button>
             </div>
           </div>
         </div>

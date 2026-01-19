@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = 'admin',
   BACKOFFICE = 'backoffice',
@@ -64,7 +63,6 @@ export interface Establishment {
   notes?: string;
 }
 
-// Added EquipmentAttachment interface
 export interface EquipmentAttachment {
   id: string;
   name: string;
@@ -82,7 +80,6 @@ export interface Equipment {
   serial_number: string;
   install_date?: string;
   nameplate_url?: string;
-  // Updated to use EquipmentAttachment
   attachments?: EquipmentAttachment[];
 }
 
@@ -156,9 +153,9 @@ export interface Profile {
   email: string;
   full_name: string;
   role: UserRole;
+  store: string; // CR ou PM
 }
 
-// Added TimeEntry interface
 export interface TimeEntry {
   id: string;
   os_id: string;

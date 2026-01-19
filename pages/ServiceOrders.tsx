@@ -36,9 +36,7 @@ const ServiceOrders: React.FC = () => {
   const [allOrders, setAllOrders] = useState<ServiceOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  // Por defeito: Todas as Ativas
   const [statusFilter, setStatusFilter] = useState<OSStatus | 'all'>('all');
-  // Por defeito: vista compacta
   const [viewMode, setViewMode] = useState<'compact' | 'complete'>('compact');
   const navigate = useNavigate();
   const { currentStore, setStore } = useStore();
@@ -63,14 +61,12 @@ const ServiceOrders: React.FC = () => {
     e.stopPropagation();
     const newStatus = e.target.value as OSStatus;
     
-    // Validação de conclusão na listagem
     if (newStatus === OSStatus.CONCLUIDA) {
       const osToUpdate = allOrders.find(o => o.id === osId);
       const hasAnomaly = osToUpdate?.anomaly_detected && osToUpdate.anomaly_detected.trim().length > 0;
       const hasSignatures = osToUpdate?.client_signature && osToUpdate?.technician_signature;
 
       if (!hasAnomaly || !hasSignatures) {
-        // Redireciona para detalhes com flag de validação
         navigate(`/os/${osId}?validate=true`);
         return;
       }
@@ -79,7 +75,6 @@ const ServiceOrders: React.FC = () => {
     setUpdatingId(osId);
     try {
       await mockData.updateServiceOrder(osId, { status: newStatus });
-      // Adicionar log de atividade para alteração rápida de estado
       await mockData.addOSActivity(osId, {
         description: `ALTEROU ESTADO DA OS PARA ${getStatusLabelText(newStatus).toUpperCase()} (VIA LISTAGEM GERAL)`
       });
@@ -108,15 +103,12 @@ const ServiceOrders: React.FC = () => {
         const matchesStatus = statusFilter === 'all' 
           ? (os.status !== OSStatus.CONCLUIDA && os.status !== OSStatus.CANCELADA)
           : os.status === statusFilter;
-
         return matchesStatus;
       })
       .sort((a, b) => {
         const weightA = STATUS_ORDER_WEIGHT[a.status] ?? 99;
         const weightB = STATUS_ORDER_WEIGHT[b.status] ?? 99;
         if (weightA !== weightB) return weightA - weightB;
-        
-        // Ordenação temporal robusta pela data de criação
         const timeA = new Date(a.created_at).getTime();
         const timeB = new Date(b.created_at).getTime();
         return timeB - timeA;
@@ -132,7 +124,7 @@ const ServiceOrders: React.FC = () => {
   const getStoreTextColorClass = (store: string) => {
     if (store === 'Caldas da Rainha') return 'text-blue-600';
     if (store === 'Porto de Mós') return 'text-red-600';
-    return 'text-slate-600';
+    return 'text-slate-600 dark:text-slate-400';
   };
 
   const formatScheduledInfo = (scheduledStr: string) => {
@@ -146,22 +138,20 @@ const ServiceOrders: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0 px-1">
         <div className="w-full sm:w-auto flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight leading-tight uppercase">Ordens de Serviço</h1>
+            <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Ordens de Serviço</h1>
             <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-0.5">Gestão de Intervenções</p>
           </div>
 
-          <div className="flex items-center bg-white border border-gray-200 rounded-full p-1 shadow-sm">
+          <div className="flex items-center bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-full p-1 shadow-sm transition-colors">
              <button 
                onClick={() => setViewMode('complete')}
-               className={`p-2 rounded-full transition-all ${viewMode === 'complete' ? 'bg-emerald-50 text-emerald-600' : 'text-gray-400 hover:text-gray-600'}`}
-               title="Vista Completa"
+               className={`p-2 rounded-full transition-all ${viewMode === 'complete' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600' : 'text-gray-400 hover:text-gray-600'}`}
              >
                <LayoutList size={16} />
              </button>
              <button 
                onClick={() => setViewMode('compact')}
-               className={`p-2 rounded-full transition-all ${viewMode === 'compact' ? 'bg-emerald-50 text-emerald-600' : 'text-gray-400 hover:text-gray-600'}`}
-               title="Vista Compacta"
+               className={`p-2 rounded-full transition-all ${viewMode === 'compact' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600' : 'text-gray-400 hover:text-gray-600'}`}
              >
                <StretchHorizontal size={16} />
              </button>
@@ -173,7 +163,7 @@ const ServiceOrders: React.FC = () => {
             <select
               value={currentStore}
               onChange={(e) => setStore(e.target.value as any)}
-              className="w-full bg-white border border-gray-200 shadow-sm rounded-full pl-8 pr-8 py-2 text-[10px] font-black text-gray-600 appearance-none cursor-pointer focus:ring-4 focus:ring-blue-500/10 transition-all outline-none uppercase tracking-tight"
+              className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm rounded-full pl-8 pr-8 py-2 text-[10px] font-black text-gray-600 dark:text-slate-300 appearance-none cursor-pointer focus:ring-4 focus:ring-blue-500/10 transition-all outline-none uppercase tracking-tight"
             >
               <option value="Todas">LOJA: TODAS</option>
               <option value="Caldas da Rainha">CALDAS DA RAINHA</option>
@@ -187,7 +177,7 @@ const ServiceOrders: React.FC = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as OSStatus | 'all')}
-              className="w-full bg-white border border-gray-200 shadow-sm rounded-full pl-8 pr-8 py-2 text-[10px] font-black text-gray-600 appearance-none cursor-pointer focus:ring-4 focus:ring-blue-500/10 transition-all outline-none uppercase tracking-tight"
+              className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm rounded-full pl-8 pr-8 py-2 text-[10px] font-black text-gray-600 dark:text-slate-300 appearance-none cursor-pointer focus:ring-4 focus:ring-blue-500/10 transition-all outline-none uppercase tracking-tight"
             >
               <option value="all">ESTADO: ATIVAS</option>
               {Object.values(OSStatus).map((status) => (
@@ -209,9 +199,9 @@ const ServiceOrders: React.FC = () => {
       ) : (
         <div className="space-y-3 overflow-y-auto pb-10 px-1 flex-1 no-scrollbar">
           {sortedAndFilteredOrders.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-3xl border-2 border-dashed border-gray-100">
-               <Filter size={32} className="mx-auto text-gray-300 mb-2" />
-               <p className="text-gray-400 font-black italic text-xs px-4 uppercase tracking-widest">
+            <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border-2 border-dashed border-gray-100 dark:border-slate-800">
+               <Filter size={32} className="mx-auto text-gray-300 dark:text-slate-700 mb-2" />
+               <p className="text-gray-400 dark:text-slate-600 font-black italic text-xs px-4 uppercase tracking-widest">
                  Nenhuma OS encontrada.
                </p>
             </div>
@@ -220,10 +210,9 @@ const ServiceOrders: React.FC = () => {
               <div 
                 key={os.id} 
                 onClick={() => navigate(`/os/${os.id}`)}
-                className={`group bg-white rounded-2xl border border-gray-200 border-l-4 hover:shadow-lg transition-all duration-200 block cursor-pointer ${getStoreColorClass(os.store)} ${viewMode === 'compact' ? 'p-3' : 'p-5'}`}
+                className={`group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 border-l-4 hover:shadow-lg transition-all duration-200 block cursor-pointer ${getStoreColorClass(os.store)} ${viewMode === 'compact' ? 'p-3' : 'p-5'}`}
               >
                 {viewMode === 'compact' ? (
-                  /* Vista Compacta: ID no topo com cor da loja */
                   <div className="flex flex-col gap-1.5">
                     <div className="flex justify-between items-center">
                       <span className={`text-[10px] font-mono font-black uppercase tracking-tighter ${getStoreTextColorClass(os.store)}`}>
@@ -238,10 +227,10 @@ const ServiceOrders: React.FC = () => {
                             <select
                               value={os.status}
                               onChange={(e) => handleQuickStatusChange(e, os.id)}
-                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full bg-white dark:bg-slate-900"
                             >
                               {Object.values(OSStatus).map((status) => (
-                                <option key={status} value={status}>
+                                <option key={status} value={status} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
                                   {getStatusLabelText(status).toUpperCase()}
                                 </option>
                               ))}
@@ -252,10 +241,10 @@ const ServiceOrders: React.FC = () => {
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-black text-slate-900 uppercase truncate">
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase truncate">
                         {os.client?.name}
                       </h3>
-                      <div className="text-[10px] font-black text-slate-500 uppercase tracking-tight truncate mt-0.5 flex items-center gap-1.5">
+                      <div className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-tight truncate mt-0.5 flex items-center gap-1.5">
                         <span>{os.equipment?.type}</span>
                         <span className="opacity-20">|</span>
                         <span>{os.equipment?.brand}</span>
@@ -263,7 +252,6 @@ const ServiceOrders: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  /* Vista Completa: ID com cor da loja */
                   <>
                     <div className="flex justify-between items-center mb-1 gap-2">
                       <div className="flex items-center gap-2 min-w-0">
@@ -273,7 +261,7 @@ const ServiceOrders: React.FC = () => {
                       </div>
                       <div className="relative flex-shrink-0 mr-1" onClick={(e) => e.stopPropagation()}>
                         {updatingId === os.id ? (
-                          <div className="bg-gray-100 px-3 py-1 rounded-full flex items-center gap-2">
+                          <div className="bg-gray-100 dark:bg-slate-800 px-3 py-1 rounded-full flex items-center gap-2">
                             <RefreshCw size={12} className="animate-spin text-blue-600" />
                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">...</span>
                           </div>
@@ -283,11 +271,10 @@ const ServiceOrders: React.FC = () => {
                             <select
                               value={os.status}
                               onChange={(e) => handleQuickStatusChange(e, os.id)}
-                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                              title="Alterar estado"
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full bg-white dark:bg-slate-900"
                             >
                               {Object.values(OSStatus).map((status) => (
-                                <option key={status} value={status}>
+                                <option key={status} value={status} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
                                   {getStatusLabelText(status).toUpperCase()}
                                 </option>
                               ))}
@@ -297,21 +284,21 @@ const ServiceOrders: React.FC = () => {
                       </div>
                     </div>
 
-                    <h3 className="text-xl font-black text-slate-900 leading-tight uppercase group-hover:text-blue-600 transition-colors truncate mb-2">
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight uppercase group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate mb-2">
                       {os.client?.name}
                     </h3>
 
-                    <div className="text-base font-black text-slate-900 uppercase tracking-tight mb-2">
+                    <div className="text-base font-black text-slate-900 dark:text-slate-200 uppercase tracking-tight mb-2">
                        {os.equipment?.type} <span className="mx-1 opacity-20">|</span> {os.equipment?.brand}
                     </div>
 
-                    <div className="pt-3 border-t border-gray-50 space-y-2">
-                      <p className="text-sm font-normal text-slate-900 uppercase leading-relaxed">
+                    <div className="pt-3 border-t border-gray-50 dark:border-slate-800 space-y-2">
+                      <p className="text-sm font-normal text-slate-900 dark:text-slate-300 uppercase leading-relaxed">
                         "{os.description}"
                       </p>
                       
                       {os.scheduled_date && (
-                        <div className="flex items-center gap-2 text-slate-900 mt-1">
+                        <div className="flex items-center gap-2 text-slate-900 dark:text-slate-400 mt-1">
                           <Calendar size={12} className="text-blue-500" />
                           <span className="text-[10px] font-normal uppercase tracking-widest">
                             Agendamento: {formatScheduledInfo(os.scheduled_date)}

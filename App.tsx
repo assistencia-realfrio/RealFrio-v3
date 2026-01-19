@@ -22,6 +22,7 @@ import Profile from './pages/Profile';
 import Users from './pages/Users';
 import { UserRole } from './types';
 import { StoreProvider } from './contexts/StoreContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 function App() {
   const [user, setUser] = useState<any>(null);
@@ -49,39 +50,41 @@ function App() {
   };
 
   if (loading) {
-    return <div className="h-screen flex items-center justify-center bg-gray-50 text-gray-500 uppercase font-black text-[10px] tracking-widest">A iniciar aplicação...</div>;
+    return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 text-gray-500 uppercase font-black text-[10px] tracking-widest">A iniciar aplicação...</div>;
   }
   
   return (
-    <StoreProvider>
-      <HashRouter>
-        <Routes>
-          <Route path="/login" element={!user ? <Login onLogin={handleLogin} /> : <Navigate to="/" />} />
-          
-          <Route path="/" element={user ? <Layout user={user} onLogout={handleLogout}><Dashboard /></Layout> : <Navigate to="/login" />} />
-          <Route path="/os" element={user ? <Layout user={user} onLogout={handleLogout}><ServiceOrders /></Layout> : <Navigate to="/login" />} />
-          <Route path="/os/new" element={user ? <Layout user={user} onLogout={handleLogout}><NewServiceOrder /></Layout> : <Navigate to="/login" />} />
-          <Route path="/os/:id" element={user ? <Layout user={user} onLogout={handleLogout}><ServiceOrderDetail /></Layout> : <Navigate to="/login" />} />
-          <Route path="/appointments" element={user ? <Layout user={user} onLogout={handleLogout}><Appointments /></Layout> : <Navigate to="/login" />} />
-          <Route path="/vacations" element={user ? <Layout user={user} onLogout={handleLogout}><Vacations /></Layout> : <Navigate to="/login" />} />
-          
-          <Route path="/clients" element={user ? <Layout user={user} onLogout={handleLogout}><Clients /></Layout> : <Navigate to="/login" />} />
-          <Route path="/clients/new" element={user ? <Layout user={user} onLogout={handleLogout}><NewClient /></Layout> : <Navigate to="/login" />} />
-          <Route path="/clients/:id" element={user ? <Layout user={user} onLogout={handleLogout}><ClientDetail /></Layout> : <Navigate to="/login" />} />
-          
-          <Route path="/equipments" element={user ? <Layout user={user} onLogout={handleLogout}><Equipments /></Layout> : <Navigate to="/login" />} />
-          <Route path="/equipments/:id" element={user ? <Layout user={user} onLogout={handleLogout}><EquipmentDetail /></Layout> : <Navigate to="/login" />} />
-          <Route path="/clients/:clientId/equipments/new" element={user ? <Layout user={user} onLogout={handleLogout}><NewEquipment /></Layout> : <Navigate to="/login" />} />
-          <Route path="/equipments/:id/edit" element={user ? <Layout user={user} onLogout={handleLogout}><EditEquipment /></Layout> : <Navigate to="/login" />} />
-          
-          <Route path="/inventory" element={user ? <Layout user={user} onLogout={handleLogout}><Inventory /></Layout> : <Navigate to="/login" />} />
-          <Route path="/users" element={user ? <Layout user={user} onLogout={handleLogout}><Users /></Layout> : <Navigate to="/login" />} />
-          <Route path="/profile" element={user ? <Layout user={user} onLogout={handleLogout}><Profile /></Layout> : <Navigate to="/login" />} />
-          
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </HashRouter>
-    </StoreProvider>
+    <ThemeProvider>
+      <StoreProvider>
+        <HashRouter>
+          <Routes>
+            <Route path="/login" element={!user ? <Login onLogin={handleLogin} /> : <Navigate to="/" />} />
+            
+            <Route path="/" element={user ? <Layout user={user} onLogout={handleLogout}><Dashboard /></Layout> : <Navigate to="/login" />} />
+            <Route path="/os" element={user ? <Layout user={user} onLogout={handleLogout}><ServiceOrders /></Layout> : <Navigate to="/login" />} />
+            <Route path="/os/new" element={user ? <Layout user={user} onLogout={handleLogout}><NewServiceOrder /></Layout> : <Navigate to="/login" />} />
+            <Route path="/os/:id" element={user ? <Layout user={user} onLogout={handleLogout}><ServiceOrderDetail /></Layout> : <Navigate to="/login" />} />
+            <Route path="/appointments" element={user ? <Layout user={user} onLogout={handleLogout}><Appointments /></Layout> : <Navigate to="/login" />} />
+            <Route path="/vacations" element={user ? <Layout user={user} onLogout={handleLogout}><Vacations /></Layout> : <Navigate to="/login" />} />
+            
+            <Route path="/clients" element={user ? <Layout user={user} onLogout={handleLogout}><Clients /></Layout> : <Navigate to="/login" />} />
+            <Route path="/clients/new" element={user ? <Layout user={user} onLogout={handleLogout}><NewClient /></Layout> : <Navigate to="/login" />} />
+            <Route path="/clients/:id" element={user ? <Layout user={user} onLogout={handleLogout}><ClientDetail /></Layout> : <Navigate to="/login" />} />
+            
+            <Route path="/equipments" element={user ? <Layout user={user} onLogout={handleLogout}><Equipments /></Layout> : <Navigate to="/login" />} />
+            <Route path="/equipments/:id" element={user ? <Layout user={user} onLogout={handleLogout}><EquipmentDetail /></Layout> : <Navigate to="/login" />} />
+            <Route path="/clients/:clientId/equipments/new" element={user ? <Layout user={user} onLogout={handleLogout}><NewEquipment /></Layout> : <Navigate to="/login" />} />
+            <Route path="/equipments/:id/edit" element={user ? <Layout user={user} onLogout={handleLogout}><EditEquipment /></Layout> : <Navigate to="/login" />} />
+            
+            <Route path="/inventory" element={user ? <Layout user={user} onLogout={handleLogout}><Inventory /></Layout> : <Navigate to="/login" />} />
+            <Route path="/users" element={user ? <Layout user={user} onLogout={handleLogout}><Users /></Layout> : <Navigate to="/login" />} />
+            <Route path="/profile" element={user ? <Layout user={user} onLogout={handleLogout}><Profile /></Layout> : <Navigate to="/login" />} />
+            
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </HashRouter>
+      </StoreProvider>
+    </ThemeProvider>
   );
 }
 

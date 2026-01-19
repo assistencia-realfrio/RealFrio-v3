@@ -1,4 +1,3 @@
-
 import { supabase } from '../supabaseClient';
 import { 
   Client, Establishment, Equipment, ServiceOrder, OSStatus, OSType, 
@@ -6,14 +5,14 @@ import {
   OSActivity, Vacation, VacationStatus, OSNote, Profile, TimeEntry
 } from '../types';
 
-const SESSION_KEY = 'rf_active_session_v2';
+const SESSION_KEY = 'rf_active_session_v3';
 
 export const mockData = {
   // --- AUTH ---
   signIn: async (email: string, password: string) => {
     const normalizedEmail = email.toLowerCase().trim();
     if (normalizedEmail === 'admin@realfrio.pt' && password === 'admin123') {
-      const demoUser = { id: 'demo-id', email: normalizedEmail, full_name: 'Administrador Demo', role: UserRole.ADMIN };
+      const demoUser = { id: 'demo-id', email: normalizedEmail, full_name: 'Administrador Demo', role: UserRole.ADMIN, store: 'Todas' };
       localStorage.setItem(SESSION_KEY, JSON.stringify(demoUser));
       return { user: demoUser, error: null };
     }
@@ -25,7 +24,7 @@ export const mockData = {
       localStorage.setItem(SESSION_KEY, JSON.stringify(fullUser));
       return { user: fullUser, error: null };
     }
-    return { user: null, error: { message: "Invalid login" } };
+    return { user: null, error: { message: "Login inválido" } };
   },
 
   getSession: () => {
@@ -38,17 +37,44 @@ export const mockData = {
     await supabase.auth.signOut();
   },
 
-  signUp: async (email: string, password: string, fullName: string, role: UserRole) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+  signUp: async (email: string, password: string, fullName: string, role: UserRole, store: string) => {
+    // 1. Criar o utilizador na autenticação do Supabase
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          role: role,
+          store: store
+        }
+      }
+    });
+
     if (error) return { data: null, error };
+
     if (data.user) {
-      const { error: profileError } = await supabase.from('profiles').insert({
+      // 2. Tentar inserir no perfil. Usamos upsert para evitar erros se o trigger de DB já tiver criado o perfil.
+      const { error: profileError } = await supabase.from('profiles').upsert({
         id: data.user.id,
         email: email,
         full_name: fullName,
-        role: role
+        role: role,
+        store: store
       });
-      if (profileError) return { data, error: profileError };
+      
+      if (profileError) {
+        // Se o erro for sobre a coluna 'store', damos uma dica clara
+        if (profileError.message.includes('column "store" of relation "profiles" does not exist')) {
+          return { 
+            data, 
+            error: { 
+              message: "Erro de Base de Dados: A coluna 'store' não existe na tabela 'profiles'. Por favor, execute o script SQL de atualização no painel do Supabase." 
+            } 
+          };
+        }
+        return { data, error: profileError };
+      }
     }
     return { data, error: null };
   },
@@ -60,6 +86,11 @@ export const mockData = {
   },
 
   updateProfile: async (id: string, updates: Partial<Profile>) => {
+    const session = mockData.getSession();
+    if (session && session.id === id) {
+      const newSession = { ...session, ...updates };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
+    }
     return supabase.from('profiles').update(updates).eq('id', id);
   },
 
@@ -342,7 +373,7 @@ export const mockData = {
     const results = await Promise.all(tables.map(t => supabase.from(t).select('*')));
     const data: any = {};
     tables.forEach((t, i) => { data[t] = results[i].data || []; });
-    return { version: "2.2", data };
+    return { version: "3.0", data };
   },
 
   importFullSystemData: async (backup: any, onProgress?: (msg: string) => void) => {
