@@ -38,7 +38,11 @@ export const mockData = {
   },
 
   signUp: async (email: string, password: string, fullName: string, role: UserRole, store: string) => {
-    // 1. Criar o utilizador na autenticação do Supabase
+    /**
+     * IMPORTANTE: Estamos a passar os dados no campo 'data' (user_metadata).
+     * O Trigger que configurámos no Supabase SQL vai detetar este novo utilizador
+     * e inserir automaticamente na tabela 'profiles' usando estes valores.
+     */
     const { data, error } = await supabase.auth.signUp({ 
       email, 
       password,
@@ -53,29 +57,9 @@ export const mockData = {
 
     if (error) return { data: null, error };
 
-    if (data.user) {
-      // 2. Tentar inserir no perfil. Usamos upsert para evitar erros se o trigger de DB já tiver criado o perfil.
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        id: data.user.id,
-        email: email,
-        full_name: fullName,
-        role: role,
-        store: store
-      });
-      
-      if (profileError) {
-        // Se o erro for sobre a coluna 'store', damos uma dica clara
-        if (profileError.message.includes('column "store" of relation "profiles" does not exist')) {
-          return { 
-            data, 
-            error: { 
-              message: "Erro de Base de Dados: A coluna 'store' não existe na tabela 'profiles'. Por favor, execute o script SQL de atualização no painel do Supabase." 
-            } 
-          };
-        }
-        return { data, error: profileError };
-      }
-    }
+    // Não precisamos mais de fazer insert manual em 'profiles' aqui no frontend.
+    // O Gatilho de Base de Dados (Trigger) trata disso de forma síncrona e segura.
+    
     return { data, error: null };
   },
 
