@@ -1,4 +1,3 @@
-
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -6,7 +5,6 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    // Permite que o código continue a usar process.env em vez de import.meta.env
-    'process.env': process.env
+    'process.env': {}
   }
 });
