@@ -76,16 +76,15 @@ const ClientDetail: React.FC = () => {
       // Limpar o payload para evitar conflitos com a chave primária
       const { id: clientID, ...updates } = editForm;
       
-      const payload = {
+      const payload: Partial<Client> = {
         ...updates,
-        google_drive_link: editForm.google_drive_link?.trim() || null
+        google_drive_link: editForm.google_drive_link?.trim() || undefined
       };
       
       await mockData.updateClient(id, payload);
       setClient(JSON.parse(JSON.stringify({ ...payload, id: clientID })));
       setIsEditing(false);
     } catch (error: any) {
-      // O erro agora virá formatado corretamente pela handleError do mockData
       alert("ERRO AO ATUALIZAR CLIENTE: " + (error.message || String(error)));
     } finally {
       setIsSubmitting(false);

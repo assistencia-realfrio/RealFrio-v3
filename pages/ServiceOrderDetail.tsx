@@ -65,6 +65,7 @@ const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => 
       const newScale = Math.min(Math.max(1, touchStartRef.current.scale * ratio), 6);
       setScale(newScale);
     } else if (e.touches.length === 1 && scale > 1) {
+      touchStartRef.current.x = touchStartRef.current.x || 0; // Fallback
       const dx = e.touches[0].pageX - touchStartRef.current.x;
       const dy = e.touches[0].pageY - touchStartRef.current.y;
       const limit = (scale - 1) * 200;
@@ -122,13 +123,11 @@ type TabType = 'info' | 'notas' | 'tecnico' | 'fotos' | 'finalizar';
 export const ServiceOrderDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [os, setOs] = useState<ServiceOrder | null>(null);
   const [partsUsed, setPartsUsed] = useState<PartUsed[]>([]);
   const [photos, setPhotos] = useState<OSPhoto[]>([]);
   const [notesList, setNotesList] = useState<OSNote[]>([]);
-  const [catalog, setCatalog] = useState<PartCatalogItem[]>([]);
   const [activities, setActivities] = useState<OSActivity[]>([]);
   const [showAllActivities, setShowAllActivities] = useState(false);
   const [description, setDescription] = useState('');
@@ -142,31 +141,21 @@ export const ServiceOrderDetail: React.FC = () => {
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [loading, setLoading] = useState(true);
-  const [showPartModal, setShowPartModal] = useState(false);
-  const [showEditPartModal, setShowEditPartModal] = useState(false);
   const [showDeletePartModal, setShowDeletePartModal] = useState(false);
   const [showDeletePhotoModal, setShowDeletePhotoModal] = useState(false);
   const [showValidationErrorModal, setShowValidationErrorModal] = useState(false);
   const [showFinalizeModal, setShowFinalizeModal] = useState(false);
-  const [showReopenModal, setShowReopenModal] = useState(false);
   const [partToDelete, setPartToDelete] = useState<PartUsed | null>(null);
-  const [partToEdit, setPartToEdit] = useState<PartUsed | null>(null);
-  const [editPartQty, setEditPartQty] = useState(1);
   const [photoToDelete, setPhotoToDelete] = useState<OSPhoto | null>(null);
   const [selectedPhotoForView, setSelectedPhotoForView] = useState<OSPhoto | null>(null);
-  const [catalogSearch, setCatalogSearch] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
-  const [pendingPart, setPendingPart] = useState<{ item: PartCatalogItem, qty: number } | null>(null);
-  const [isCreatingNewPart, setIsCreatingNewPart] = useState(false);
-  const [newPartName, setNewPartName] = useState('');
-  const [newPartRef, setNewPartRef] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showPartModal, setShowPartModal] = useState(false);
 
   useEffect(() => {
     fetchOSDetails();
-    fetchCatalog();
   }, [id]);
 
   const missingFields = useMemo(() => {
@@ -201,15 +190,6 @@ export const ServiceOrderDetail: React.FC = () => {
       currentTechSig !== originalTechSig
     );
   }, [os, description, anomaly, resolutionNotes, observations, scheduledDate, scheduledTime, clientSignature, technicianSignature]);
-
-  const fetchCatalog = async () => {
-    try {
-      const data = await mockData.getCatalog();
-      setCatalog(data);
-    } catch (error: any) {
-      console.error("ERRO AO CARREGAR CATÁLOGO:", error.message || error);
-    }
-  };
 
   const fetchOSDetails = async (showLoader = true) => {
     if (!id) return;
@@ -277,14 +257,14 @@ export const ServiceOrderDetail: React.FC = () => {
     if (!id || !os) return;
     setActionLoading(true);
     try {
-      const finalScheduled = scheduledDate ? `${scheduledDate}T${scheduledTime || '00:00'}:00` : null;
+      const finalScheduled = scheduledDate ? `${scheduledDate}T${scheduledTime || '00:00'}:00` : undefined;
       await mockData.updateServiceOrder(id, {
         description: description,
         anomaly_detected: anomaly,
         resolution_notes: resolutionNotes,
         observations: observations,
-        client_signature: clientSignature || null as any,
-        technician_signature: technicianSignature || null as any,
+        client_signature: clientSignature || undefined,
+        technician_signature: technicianSignature || undefined,
         scheduled_date: finalScheduled
       });
       await mockData.addOSActivity(id, {
@@ -345,11 +325,6 @@ export const ServiceOrderDetail: React.FC = () => {
     }
   };
 
-  const filteredCatalog = catalog.filter(item => 
-    item.name.toLowerCase().includes(catalogSearch.toLowerCase()) || 
-    item.reference.toLowerCase().includes(catalogSearch.toLowerCase())
-  );
-
   if (loading) return (
     <div className="h-full flex flex-col items-center justify-center p-20">
       <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
@@ -357,7 +332,6 @@ export const ServiceOrderDetail: React.FC = () => {
     </div>
   );
 
-  const isInterventionDifferent = os?.establishment_id && os?.establishment?.address && os?.client?.address && os.establishment.address.trim().toUpperCase() !== os.client.address.trim().toUpperCase();
   const displayedActivities = showAllActivities ? activities : activities.slice(0, 5);
 
   return (
@@ -593,7 +567,7 @@ export const ServiceOrderDetail: React.FC = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-8">
                    {photos.map(photo => (
                      <div key={photo.id} className="relative aspect-square animate-in zoom-in-95 duration-200 group">
-                        <img src={photo.url} onClick={() => setSelectedPhotoForView(photo)} className="w-full h-full object-cover rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 group-hover:ring-4 group-hover:ring-blue-100 cursor-zoom-in" />
+                        <img src={photo.url} onClick={() => setSelectedPhotoForView(photo)} className="w-full h-full object-cover rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 group-hover:ring-4 group-hover:ring-blue-100 cursor-zoom-in" alt="Evidência" />
                         <button onClick={() => { setPhotoToDelete(photo); setShowDeletePhotoModal(true); }} className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={12} /></button>
                      </div>
                    ))}
@@ -647,14 +621,14 @@ export const ServiceOrderDetail: React.FC = () => {
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase">TODOS OS DADOS SERÃO BLOQUEADOS E O RELATÓRIO SERÁ GERADO.</p>
                 <div className="grid grid-cols-2 gap-4">
                   <button onClick={() => setShowFinalizeModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button>
-                  <button onClick={async () => { await mockData.updateServiceOrder(id!, { status: OSStatus.CONCLUIDA, anomaly_detected: anomaly, resolution_notes: resolutionNotes, client_signature: clientSignature as any, technician_signature: technicianSignature as any }); navigate('/os'); }} className="py-4 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">CONFIRMAR</button>
+                  <button onClick={async () => { await mockData.updateServiceOrder(id!, { status: OSStatus.CONCLUIDA, anomaly_detected: anomaly, resolution_notes: resolutionNotes, client_signature: clientSignature || undefined, technician_signature: technicianSignature || undefined }); navigate('/os'); }} className="py-4 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">CONFIRMAR</button>
                 </div>
               </div>
            </div>
         </div>
       )}
       
-      {/* MODAL VIEW PHOTO (Ajustado para ocupar tela cheia e fundo escuro) */}
+      {/* MODAL VIEW PHOTO */}
       {selectedPhotoForView && (
         <div className="fixed inset-0 z-[300] bg-slate-950 flex flex-col animate-in fade-in duration-300">
            <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 z-[310] bg-gradient-to-b from-black/80 to-transparent">
