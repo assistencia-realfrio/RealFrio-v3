@@ -10,15 +10,14 @@ import {
   Send, AlertCircle, Sparkles, ShieldAlert, Loader2, Eye, History, Clock,
   User, ChevronRight, ChevronDown, ChevronUp, Calendar, RotateCcw,
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
-  RotateCw, Cloud, Edit2
+  RotateCw, Cloud, Edit2, Layers, Tag, Hash
 } from 'lucide-react';
 import SignatureCanvas from '../components/SignatureCanvas';
 import OSStatusBadge from '../components/OSStatusBadge';
 import { OSStatus, ServiceOrder, PartUsed, PartCatalogItem, OSPhoto, OSNote, OSActivity } from '../types';
 import { generateOSReportSummary } from '../services/geminiService';
 import { mockData } from '../services/mockData';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { normalizeString } from '../utils';
 import FloatingEditBar from '../components/FloatingEditBar';
 
 const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
@@ -65,7 +64,7 @@ const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => 
       const newScale = Math.min(Math.max(1, touchStartRef.current.scale * ratio), 6);
       setScale(newScale);
     } else if (e.touches.length === 1 && scale > 1) {
-      touchStartRef.current.x = touchStartRef.current.x || 0; // Fallback
+      touchStartRef.current.x = touchStartRef.current.x || 0;
       const dx = e.touches[0].pageX - touchStartRef.current.x;
       const dy = e.touches[0].pageY - touchStartRef.current.y;
       const limit = (scale - 1) * 200;
@@ -129,7 +128,8 @@ export const ServiceOrderDetail: React.FC = () => {
   const [photos, setPhotos] = useState<OSPhoto[]>([]);
   const [notesList, setNotesList] = useState<OSNote[]>([]);
   const [activities, setActivities] = useState<OSActivity[]>([]);
-  const [showAllActivities, setShowAllActivities] = useState(false);
+  const [catalog, setCatalog] = useState<PartCatalogItem[]>([]);
+  
   const [description, setDescription] = useState('');
   const [anomaly, setAnomaly] = useState('');
   const [resolutionNotes, setResolutionNotes] = useState('');
@@ -141,22 +141,62 @@ export const ServiceOrderDetail: React.FC = () => {
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [loading, setLoading] = useState(true);
+  
+  // Modais
   const [showDeletePartModal, setShowDeletePartModal] = useState(false);
   const [showDeletePhotoModal, setShowDeletePhotoModal] = useState(false);
   const [showValidationErrorModal, setShowValidationErrorModal] = useState(false);
   const [showFinalizeModal, setShowFinalizeModal] = useState(false);
+  const [showPartModal, setShowPartModal] = useState(false);
+  const [showEditQuantityModal, setShowEditQuantityModal] = useState(false);
+  
   const [partToDelete, setPartToDelete] = useState<PartUsed | null>(null);
+  const [partToEditQuantity, setPartToEditQuantity] = useState<PartUsed | null>(null);
+  
+  // Estados para Quantidade com suporte Decimal
+  const [partQuantity, setPartQuantity] = useState<number>(1);
+  const [partQuantityStr, setPartQuantityStr] = useState<string>("1");
+  const [tempQuantity, setTempQuantity] = useState<number>(1);
+  const [tempQuantityStr, setTempQuantityStr] = useState<string>("1");
+
   const [photoToDelete, setPhotoToDelete] = useState<OSPhoto | null>(null);
   const [selectedPhotoForView, setSelectedPhotoForView] = useState<OSPhoto | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [showPartModal, setShowPartModal] = useState(false);
+
+  // Estados para Adição de Peças
+  const [partSearchTerm, setPartSearchTerm] = useState('');
+  const [selectedPartId, setSelectedPartId] = useState('');
+  const [isCreatingNewPart, setIsCreatingNewPart] = useState(false);
+  const [newPartForm, setNewPartForm] = useState({ name: '', reference: '' });
+
+  // Estados para cartões colapsáveis
+  const [expandedClient, setExpandedClient] = useState(false);
+  const [expandedEquip, setExpandedEquip] = useState(false);
+  const [expandedPlanning, setExpandedPlanning] = useState(false);
+  const [expandedLog, setExpandedLog] = useState(false);
+
+  const descTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     fetchOSDetails();
   }, [id]);
+
+  useEffect(() => {
+    if (activeTab === 'info' && descTextareaRef.current) {
+      descTextareaRef.current.style.height = 'auto';
+      descTextareaRef.current.style.height = `${descTextareaRef.current.scrollHeight}px`;
+    }
+  }, [description, activeTab, loading]);
+
+  // Carregar catálogo ao abrir modal de material
+  useEffect(() => {
+    if (showPartModal && catalog.length === 0) {
+      mockData.getCatalog().then(setCatalog);
+    }
+  }, [showPartModal]);
 
   const missingFields = useMemo(() => {
     const list = [];
@@ -257,15 +297,20 @@ export const ServiceOrderDetail: React.FC = () => {
     if (!id || !os) return;
     setActionLoading(true);
     try {
-      const finalScheduled = scheduledDate ? `${scheduledDate}T${scheduledTime || '00:00'}:00` : undefined;
+      // Importante: se a data estiver vazia, enviamos null para limpar na DB
+      const finalScheduled = scheduledDate 
+        ? `${scheduledDate}T${scheduledTime || '00:00'}:00` 
+        : null;
+
       await mockData.updateServiceOrder(id, {
         description: description,
         anomaly_detected: anomaly,
         resolution_notes: resolutionNotes,
         observations: observations,
-        client_signature: clientSignature || undefined,
-        technician_signature: technicianSignature || undefined,
-        scheduled_date: finalScheduled
+        // CORREÇÃO: Passar o estado diretamente. Se for null, o banco de dados limpa o campo.
+        client_signature: clientSignature,
+        technician_signature: technicianSignature,
+        scheduled_date: finalScheduled as any
       });
       await mockData.addOSActivity(id, {
         description: 'GUARDOU ALTERAÇÕES NA ORDEM DE SERVIÇO'
@@ -306,6 +351,145 @@ export const ServiceOrderDetail: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
+  const handleDeletePhoto = async () => {
+    if (!photoToDelete) return;
+    setActionLoading(true);
+    try {
+      await mockData.deleteOSPhoto(photoToDelete.id);
+      await mockData.addOSActivity(id!, {
+        description: `REMOVEU FOTO (${photoToDelete.type.toUpperCase()})`
+      });
+      setShowDeletePhotoModal(false);
+      setPhotoToDelete(null);
+      fetchOSDetails(false);
+    } catch (e: any) {
+      setErrorMessage("ERRO AO REMOVER FOTO.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAddPart = async () => {
+    if (!id || !selectedPartId) return;
+    const part = catalog.find(p => p.id === selectedPartId);
+    if (!part) return;
+
+    setActionLoading(true);
+    try {
+      const numericQuantity = parseFloat(partQuantityStr.replace(',', '.'));
+      if (isNaN(numericQuantity)) throw new Error("Quantidade inválida.");
+
+      await mockData.addOSPart(id, {
+        part_id: part.id,
+        name: part.name,
+        reference: part.reference,
+        quantity: numericQuantity
+      });
+      await mockData.addOSActivity(id, {
+        description: `APLICOU MATERIAL: ${numericQuantity.toLocaleString('pt-PT')}x ${part.name}`
+      });
+      setShowPartModal(false);
+      setSelectedPartId('');
+      setPartQuantity(1);
+      setPartQuantityStr("1");
+      setPartSearchTerm('');
+      fetchOSDetails(false);
+    } catch (e: any) {
+      console.error(e);
+      if (e.message?.includes('400')) {
+        setErrorMessage("ERRO BD: A TABELA OS_PARTS PRECISA DE SER ALTERADA PARA 'NUMERIC' NO SUPABASE.");
+      } else {
+        setErrorMessage("ERRO AO ADICIONAR MATERIAL.");
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCreateAndAddPart = async () => {
+    if (!id || !newPartForm.name) return;
+    setActionLoading(true);
+    try {
+      const finalReference = newPartForm.reference.trim() 
+        ? newPartForm.reference.replace(/\D/g, '') 
+        : Math.floor(1000000 + Math.random() * 9000000).toString();
+
+      const numericQuantity = parseFloat(partQuantityStr.replace(',', '.'));
+      if (isNaN(numericQuantity)) throw new Error("Quantidade inválida.");
+
+      const createdPart = await mockData.addCatalogItem({
+        name: newPartForm.name.toUpperCase(),
+        reference: finalReference,
+        stock: 0
+      });
+      
+      await mockData.addOSPart(id, {
+        part_id: createdPart.id,
+        name: createdPart.name,
+        reference: createdPart.reference,
+        quantity: numericQuantity
+      });
+
+      await mockData.addOSActivity(id, {
+        description: `REGISTOU E APLICOU NOVO MATERIAL: ${numericQuantity.toLocaleString('pt-PT')}x ${createdPart.name}`
+      });
+
+      setShowPartModal(false);
+      setIsCreatingNewPart(false);
+      setNewPartForm({ name: '', reference: '' });
+      setSelectedPartId('');
+      setPartQuantity(1);
+      setPartQuantityStr("1");
+      setPartSearchTerm('');
+      fetchOSDetails(false);
+      const newCatalog = await mockData.getCatalog();
+      setCatalog(newCatalog);
+    } catch (e: any) {
+      console.error(e);
+      if (e.status === 400 || e.message?.includes('400')) {
+        setErrorMessage("ERRO BD: A COLUNA 'QUANTITY' NA TABELA 'OS_PARTS' DEVE SER DO TIPO 'NUMERIC'.");
+      } else {
+        setErrorMessage("ERRO AO CRIAR MATERIAL: " + e.message);
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUpdatePartQuantity = async (partUsedId: string, newQuantityStr: string) => {
+    const numericQuantity = parseFloat(newQuantityStr.replace(',', '.'));
+    if (isNaN(numericQuantity) || numericQuantity < 0 || !id) return;
+    
+    setActionLoading(true);
+    try {
+      await mockData.updateOSPart(partUsedId, { quantity: numericQuantity });
+      fetchOSDetails(false);
+    } catch (e: any) {
+      console.error("Erro na atualização:", e);
+      if (e.status === 400 || e.message?.includes('400')) {
+        setErrorMessage("ERRO: A SUA BASE DE DADOS AINDA NÃO ACEITA DECIMAIS. ALTERE A COLUNA 'QUANTITY' PARA 'NUMERIC'.");
+      } else {
+        setErrorMessage("ERRO AO ATUALIZAR QUANTIDADE.");
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeletePart = async () => {
+    if (!partToDelete) return;
+    setActionLoading(true);
+    try {
+      await mockData.removeOSPart(partToDelete.id);
+      await mockData.addOSActivity(id!, { description: `REMOVEU MATERIAL: ${partToDelete.name}` });
+      setShowDeletePartModal(false);
+      setPartToDelete(null);
+      fetchOSDetails(false);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleGenerateAISummary = async () => {
     if (!anomaly || !anomaly.trim()) {
       setErrorMessage("DESCREVA A ANOMALIA PRIMEIRO.");
@@ -313,7 +497,7 @@ export const ServiceOrderDetail: React.FC = () => {
     }
     setIsGenerating(true);
     try {
-      const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity}x ${p.name}`), "INTERVENÇÃO TÉCNICA");
+      const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity.toLocaleString('pt-PT')}x ${p.name}`), "INTERVENÇÃO TÉCNICA");
       if (summary) {
         setResolutionNotes(summary.toUpperCase());
         await mockData.addOSActivity(id!, { description: "GEROU RESUMO VIA IA" });
@@ -325,14 +509,49 @@ export const ServiceOrderDetail: React.FC = () => {
     }
   };
 
+  const handleResetAnomaly = () => {
+    if (confirm("Deseja limpar o campo de anomalia?")) setAnomaly('');
+  };
+
+  const handleResetResolution = () => {
+    if (confirm("Deseja limpar as notas de resolução?")) setResolutionNotes('');
+  };
+
+  const handleResetSignatures = () => {
+    if (confirm("Deseja limpar ambas as assinaturas?")) {
+      setClientSignature(null);
+      setTechnicianSignature(null);
+    }
+  };
+
+  const filteredCatalog = useMemo(() => {
+    const term = normalizeString(partSearchTerm);
+    if (!term) return catalog;
+    return catalog.filter(p => normalizeString(p.name).includes(term) || normalizeString(p.reference).includes(term));
+  }, [catalog, partSearchTerm]);
+
+  // Agrupar fotos por tipo para a visualização
+  const groupedPhotos = useMemo(() => {
+    const groups: Record<string, OSPhoto[]> = {
+      antes: [],
+      depois: [],
+      peca: [],
+      geral: []
+    };
+    photos.forEach(photo => {
+      if (groups[photo.type]) {
+        groups[photo.type].push(photo);
+      }
+    });
+    return groups;
+  }, [photos]);
+
   if (loading) return (
     <div className="h-full flex flex-col items-center justify-center p-20">
       <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-4">A CARREGAR OS...</p>
     </div>
   );
-
-  const displayedActivities = showAllActivities ? activities : activities.slice(0, 5);
 
   return (
     <div className="max-w-4xl mx-auto pb-32 relative px-1 sm:px-0 space-y-4">
@@ -388,14 +607,15 @@ export const ServiceOrderDetail: React.FC = () => {
 
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {activeTab === 'info' && (
-          <div className="space-y-4">
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-colors">
-              <div className="flex items-center gap-3 mb-4">
+          <div className="space-y-3">
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
+              <div className="flex items-center gap-3 mb-3">
                  <AlertCircle size={18} className="text-orange-500" />
-                 <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">PEDIDO DO CLIENTE / AVARIA</h3>
+                 <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest leading-none">PEDIDO DO CLIENTE / AVARIA</h3>
               </div>
               <textarea 
-                className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-3xl px-5 py-4 text-xs text-slate-700 dark:text-slate-300 italic leading-relaxed outline-none focus:ring-4 focus:ring-blue-500/5 transition-all min-h-[100px] resize-none"
+                ref={descTextareaRef}
+                className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-xs text-slate-700 dark:text-slate-300 italic font-medium leading-relaxed outline-none focus:ring-4 focus:ring-blue-500/5 transition-all resize-none overflow-hidden"
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 readOnly={os?.status === OSStatus.CONCLUIDA}
@@ -403,74 +623,113 @@ export const ServiceOrderDetail: React.FC = () => {
               />
             </div>
 
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm space-y-4 transition-colors">
-               <div className="flex items-center gap-3 mb-2">
-                  <Building2 size={18} className="text-blue-500" />
-                  <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Cliente & Contactos</h3>
-               </div>
-               <div className="flex flex-col gap-3">
-                  <button onClick={() => navigate(`/clients/${os?.client_id}`)} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 px-4 py-2.5 rounded-full transition-all hover:bg-blue-100 dark:hover:bg-blue-900/40 w-full">
-                    <User size={14} />
-                    <span className="text-xs font-black uppercase tracking-tight truncate">{os?.client?.name}</span>
-                  </button>
-                  <a href={getMapLink(os?.client?.address || '')} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-800 px-4 py-2.5 rounded-full transition-all hover:border-blue-200 dark:hover:border-blue-700 w-full">
-                    <MapPin size={14} className="text-slate-400" />
-                    <span className="text-[10px] font-black uppercase tracking-tight truncate">{os?.client?.address}</span>
-                  </a>
-                  <a href={`tel:${os?.client?.phone}`} className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30 px-4 py-2.5 rounded-full transition-all hover:bg-emerald-100 dark:hover:bg-emerald-900/40 w-full">
-                    <Phone size={14} />
-                    <span className="text-xs font-black uppercase tracking-tight">{os?.client?.phone}</span>
-                  </a>
-               </div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm space-y-4 transition-colors">
-               <div className="flex items-center gap-3">
-                  <Calendar size={18} className="text-emerald-500" />
-                  <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Planeamento & Agendamento</h3>
-               </div>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                 <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-2.5 text-xs font-black dark:text-white outline-none focus:ring-4 focus:ring-blue-500/5 transition-all" />
-                 <input type="time" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-2.5 text-xs font-black dark:text-white outline-none focus:ring-4 focus:ring-blue-500/5 transition-all" />
-               </div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm space-y-4 transition-colors">
-               <div className="flex items-center gap-3">
-                  <HardDrive size={18} className="text-slate-400" />
-                  <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Equipamento Vinculado</h3>
-               </div>
-               {os?.equipment ? (
-                 <button onClick={() => navigate(`/equipments/${os.equipment_id}`)} className="w-full text-left p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-900 transition-all group">
-                    <p className="text-sm font-black text-slate-900 dark:text-white uppercase group-hover:text-blue-600 transition-colors">{os.equipment.type} - {os.equipment.brand}</p>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mt-0.5">S/N: {os.equipment.serial_number}</p>
-                 </button>
-               ) : (
-                 <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest">Sem equipamento registado</div>
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
+               <button onClick={() => setExpandedEquip(!expandedEquip)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                 <div className="flex items-center gap-3">
+                    <HardDrive size={18} className="text-slate-400" />
+                    <div className="text-left">
+                       <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Equipamento Vinculado</h3>
+                       {!expandedEquip && os?.equipment && (
+                         <p className="text-[11px] font-bold text-blue-600 uppercase tracking-tight mt-0.5">{os.equipment.type} - {os.equipment.brand}</p>
+                       )}
+                    </div>
+                 </div>
+                 {expandedEquip ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
+               </button>
+               {expandedEquip && (
+                 <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-200">
+                    {os?.equipment ? (
+                      <button onClick={() => navigate(`/equipments/${os.equipment_id}`)} className="w-full text-left p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-900 transition-all group">
+                         <p className="text-sm font-black text-slate-900 dark:text-white uppercase group-hover:text-blue-600 transition-colors">{os.equipment.type} - {os.equipment.brand}</p>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mt-1">S/N: {os.equipment.serial_number}</p>
+                         <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest mt-2">Ver Ficha Técnica Integral ➜</p>
+                      </button>
+                    ) : <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest">Sem equipamento registado</div>}
+                 </div>
                )}
             </div>
 
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm space-y-4 transition-colors">
-               <div className="flex items-center justify-between">
-                 <div className="flex items-center gap-3 text-slate-400">
-                    <History size={18} />
-                    <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Auditoria & Log</h3>
-                 </div>
-                 <button onClick={() => setShowAllActivities(!showAllActivities)} className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">{showAllActivities ? 'VER MENOS' : 'VER TUDO'}</button>
-               </div>
-               <div className="space-y-4 relative ml-2">
-                  <div className="absolute left-0 top-2 bottom-2 w-px bg-slate-100 dark:bg-slate-800"></div>
-                  {displayedActivities.map((act) => (
-                    <div key={act.id} className="relative pl-6">
-                       <div className="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-blue-500 border-2 border-white dark:border-slate-900 shadow-sm"></div>
-                       <div className="flex justify-between items-start">
-                          <p className="text-[10px] font-black text-slate-900 dark:text-slate-200 uppercase">{act.user_name}</p>
-                          <span className="text-[8px] font-black text-slate-300 dark:text-slate-500 uppercase tracking-tighter ml-4">{new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                       </div>
-                       <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-tight mt-1 leading-relaxed">{act.description}</p>
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
+               <button onClick={() => setExpandedClient(!expandedClient)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                 <div className="flex items-center gap-3">
+                    <Building2 size={18} className="text-blue-500" />
+                    <div className="text-left">
+                       <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Cliente & Contactos</h3>
+                       {!expandedClient && os?.client && <p className="text-[11px] font-bold text-blue-600 uppercase tracking-tight mt-0.5">{os.client.name}</p>}
                     </div>
-                  ))}
-               </div>
+                 </div>
+                 {expandedClient ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
+               </button>
+               {expandedClient && (
+                 <div className="px-6 pb-6 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                    <button onClick={() => navigate(`/clients/${os?.client_id}`)} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 px-4 py-2.5 rounded-full transition-all hover:bg-blue-100 dark:hover:bg-blue-900/40 w-full"><User size={14} /><span className="text-xs font-black uppercase tracking-tight truncate">{os?.client?.name}</span></button>
+                    <a href={getMapLink(os?.client?.address || '')} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-800 px-4 py-2.5 rounded-full transition-all hover:border-blue-200 dark:hover:border-blue-700 w-full"><MapPin size={14} className="text-slate-400" /><span className="text-[10px] font-black uppercase tracking-tight truncate">{os?.client?.address}</span></a>
+                    <a href={`tel:${os?.client?.phone}`} className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30 px-4 py-2.5 rounded-full transition-all hover:bg-emerald-100 dark:hover:bg-emerald-900/40 w-full"><Phone size={14} /><span className="text-xs font-black uppercase tracking-tight">{os?.client?.phone}</span></a>
+                 </div>
+               )}
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
+               <button onClick={() => setExpandedPlanning(!expandedPlanning)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                 <div className="flex items-center gap-3">
+                    <Calendar size={18} className="text-blue-500" />
+                    <div className="text-left">
+                       <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Planeamento / Agendamento</h3>
+                       {!expandedPlanning && (scheduledDate || scheduledTime) && (
+                         <p className="text-[11px] font-bold text-blue-600 uppercase tracking-tight mt-0.5">
+                           {scheduledDate ? new Date(scheduledDate).toLocaleDateString() : ''} {scheduledTime ? ` às ${scheduledTime}` : ''}
+                         </p>
+                       )}
+                    </div>
+                 </div>
+                 <div className="flex items-center gap-4">
+                    {expandedPlanning ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
+                 </div>
+               </button>
+               {expandedPlanning && (
+                 <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-200">
+                    <div className="grid grid-cols-2 gap-4">
+                       <div>
+                          <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Data</label>
+                          <input 
+                            type="date" 
+                            value={scheduledDate} 
+                            onChange={e => setScheduledDate(e.target.value)}
+                            disabled={os?.status === OSStatus.CONCLUIDA}
+                            className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/5 transition-all"
+                          />
+                       </div>
+                       <div>
+                          <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Hora</label>
+                          <input 
+                            type="time" 
+                            value={scheduledTime} 
+                            onChange={e => setScheduledTime(e.target.value)}
+                            disabled={os?.status === OSStatus.CONCLUIDA}
+                            className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/5 transition-all"
+                          />
+                       </div>
+                    </div>
+                 </div>
+               )}
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
+               <button onClick={() => setExpandedLog(!expandedLog)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"><div className="flex items-center gap-3"><History size={18} className="text-slate-400" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Log de Atividade</h3></div>{expandedLog ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}</button>
+               {expandedLog && (
+                 <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-200">
+                    <div className="space-y-4 relative ml-2">
+                       <div className="absolute left-0 top-2 bottom-2 w-px bg-slate-100 dark:border-slate-800"></div>
+                       {activities.length === 0 ? <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic py-4 text-center">Sem registos.</p> : activities.map((act) => (
+                           <div key={act.id} className="relative pl-6">
+                              <div className="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-blue-500 border-2 border-white dark:border-slate-900 shadow-sm"></div>
+                              <div className="flex justify-between items-start"><p className="text-[10px] font-black text-slate-900 dark:text-slate-200 uppercase">{act.user_name}</p><span className="text-[8px] font-black text-slate-300 dark:text-slate-500 uppercase tracking-tighter ml-4">{new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-tight mt-1 leading-relaxed">{act.description}</p>
+                           </div>
+                        ))}
+                    </div>
+                 </div>
+               )}
             </div>
           </div>
         )}
@@ -478,30 +737,14 @@ export const ServiceOrderDetail: React.FC = () => {
         {activeTab === 'notas' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm min-h-[400px] flex flex-col transition-colors">
-                <div className="flex items-center gap-3 mb-6">
-                   <MessageSquare size={18} className="text-blue-500" />
-                   <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Mensagens & Notas Internas</h3>
-                </div>
+                <div className="flex items-center gap-3 mb-6"><MessageSquare size={18} className="text-blue-500" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Notas Internas</h3></div>
                 <div className="flex-1 space-y-4 overflow-y-auto max-h-[500px] no-scrollbar mb-6">
-                   {notesList.length === 0 ? (
-                     <div className="h-full flex flex-col items-center justify-center opacity-30 py-20 text-slate-400">
-                        <MessageSquare size={32} className="mb-2" />
-                        <p className="text-[10px] font-black uppercase tracking-widest">Sem mensagens.</p>
-                     </div>
-                   ) : (
-                     notesList.map((note) => (
+                   {notesList.length === 0 ? <div className="h-full flex flex-col items-center justify-center opacity-30 py-20 text-slate-400"><MessageSquare size={32} className="mb-2" /><p className="text-[10px] font-black uppercase tracking-widest">Sem mensagens.</p></div> : notesList.map((note) => (
                        <div key={note.id} className={`flex flex-col ${note.user_id === 'current' ? 'items-end' : 'items-start'}`}>
-                          <div className={`max-w-[85%] p-4 rounded-3xl text-sm font-medium ${note.user_id === 'current' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-tl-none'}`}>
-                             <p className="leading-relaxed">{note.content}</p>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1.5 px-2 text-[8px] font-black text-slate-400 uppercase">
-                             <span>{note.user_name}</span>
-                             <span className="text-[7px] text-slate-300 dark:text-slate-600">•</span>
-                             <span>{new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                          </div>
+                          <div className={`max-w-[85%] p-4 rounded-3xl text-sm font-medium ${note.user_id === 'current' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-tl-none'}`}><p className="leading-relaxed">{note.content}</p></div>
+                          <div className="flex items-center gap-2 mt-1.5 px-2 text-[8px] font-black text-slate-400 uppercase"><span>{note.user_name}</span><span className="text-[7px] text-slate-300 dark:text-slate-600">•</span><span>{new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
                        </div>
-                     ))
-                   )}
+                    ))}
                 </div>
                 <div className="relative">
                    <textarea value={newNoteContent} onChange={e => setNewNoteContent(e.target.value)} placeholder="ESCREVA UMA NOTA..." className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-3xl pl-5 pr-14 py-4 text-sm font-medium text-slate-800 dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all resize-none h-20" />
@@ -515,29 +758,41 @@ export const ServiceOrderDetail: React.FC = () => {
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-colors">
                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                     <Package size={18} className="text-slate-400" />
-                     <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Material Aplicado</h3>
-                  </div>
-                  <button onClick={() => setShowPartModal(true)} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 active:scale-95 disabled:opacity-50">
-                    <Plus size={14} /> ADICIONAR
-                  </button>
+                  <div className="flex items-center gap-3"><Package size={18} className="text-slate-400" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Material Aplicado</h3></div>
+                  <button onClick={() => { setShowPartModal(true); setIsCreatingNewPart(false); setPartQuantity(1); setPartQuantityStr("1"); }} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 active:scale-95 disabled:opacity-50"><Plus size={14} /> ADICIONAR</button>
                </div>
-               <div className="space-y-3">
-                  {partsUsed.map((part) => (
-                    <div key={part.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 group transition-all">
-                       <div className="flex items-center gap-4 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0 group-hover:text-blue-500 transition-all">
-                             <Package size={18} />
-                          </div>
-                          <div className="min-w-0">
-                             <p className="text-sm font-black text-slate-900 dark:text-white uppercase truncate">{part.name}</p>
-                             <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono leading-none mt-0.5">REF: {part.reference}</p>
-                          </div>
+               <div className="space-y-2">
+                  {partsUsed.length === 0 ? <div className="text-center py-10 opacity-20"><Package size={32} className="mx-auto mb-2" /><p className="text-[10px] font-black uppercase tracking-widest">Nenhum material registado</p></div> : partsUsed.map((part) => (
+                    <div key={part.id} className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center gap-3 transition-all hover:border-blue-100 dark:hover:border-blue-900/30 group">
+                       <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 text-slate-300 dark:text-slate-600 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:text-blue-500 group-hover:bg-blue-50 transition-all"><Package size={14} /></div>
+                       <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase leading-tight truncate">{part.name}</p>
+                          <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mt-0.5">REF: {part.reference} • <span className="text-blue-600 dark:text-blue-400 font-black">{part.quantity.toLocaleString('pt-PT', { maximumFractionDigits: 3 })} UN</span></p>
                        </div>
-                       <div className="flex items-center gap-3">
-                          <p className="text-xs font-black text-slate-900 dark:text-white">{part.quantity} UN</p>
-                          <button onClick={() => { setPartToDelete(part); setShowDeletePartModal(true); }} disabled={os?.status === OSStatus.CONCLUIDA} className="p-2 text-slate-300 hover:text-red-500 disabled:opacity-30"><Trash2 size={16} /></button>
+                       
+                       <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-200/60 dark:border-slate-700 shadow-sm flex-shrink-0">
+                          <button 
+                            onClick={() => { 
+                              setPartToEditQuantity(part); 
+                              setTempQuantity(part.quantity); 
+                              setTempQuantityStr(part.quantity.toString().replace('.', ',')); 
+                              setShowEditQuantityModal(true); 
+                            }}
+                            disabled={os?.status === OSStatus.CONCLUIDA} 
+                            className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"
+                            title="Editar Quantidade"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <div className="w-px h-3 bg-slate-100 dark:bg-slate-700"></div>
+                          <button 
+                            onClick={() => { setPartToDelete(part); setShowDeletePartModal(true); }} 
+                            disabled={os?.status === OSStatus.CONCLUIDA} 
+                            className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                            title="Remover"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                        </div>
                     </div>
                   ))}
@@ -549,28 +804,44 @@ export const ServiceOrderDetail: React.FC = () => {
         {activeTab === 'fotos' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-colors">
-                <div className="flex items-center justify-between mb-6">
-                   <div className="flex items-center gap-3">
-                      <ImageIcon size={18} className="text-slate-400" />
-                      <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Evidências Fotográficas</h3>
-                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center justify-between mb-6"><div className="flex items-center gap-3"><ImageIcon size={18} className="text-slate-400" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Carregamento de Evidências</h3></div></div>
+                <div className="grid grid-cols-2 gap-3 mb-8">
                    {['antes', 'depois', 'peca', 'geral'].map((type) => (
                      <label key={type} className="flex flex-col items-center justify-center py-6 bg-slate-50 dark:bg-slate-950 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:border-blue-200 transition-all group">
-                        <Camera size={24} className="text-slate-300 group-hover:text-blue-500 mb-2" />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{type.toUpperCase()}</span>
+                        <Camera size={24} className="text-slate-300 group-hover:text-blue-500 mb-2" /><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{type.toUpperCase()}</span>
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadPhoto(e, type as any)} disabled={os?.status === OSStatus.CONCLUIDA} />
                      </label>
                    ))}
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-8">
-                   {photos.map(photo => (
-                     <div key={photo.id} className="relative aspect-square animate-in zoom-in-95 duration-200 group">
-                        <img src={photo.url} onClick={() => setSelectedPhotoForView(photo)} className="w-full h-full object-cover rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 group-hover:ring-4 group-hover:ring-blue-100 cursor-zoom-in" alt="Evidência" />
-                        <button onClick={() => { setPhotoToDelete(photo); setShowDeletePhotoModal(true); }} className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={12} /></button>
+
+                <div className="space-y-10">
+                   {/* Fix: Explicitly cast Object.entries to resolve 'unknown' type errors for categoryPhotos */}
+                   {(Object.entries(groupedPhotos) as [string, OSPhoto[]][]).map(([category, categoryPhotos]) => {
+                     if (categoryPhotos.length === 0) return null;
+                     return (
+                       <div key={category} className="space-y-4 animate-in fade-in duration-500">
+                          <div className="flex items-center gap-3 border-b border-slate-50 dark:border-slate-800 pb-2">
+                             <h4 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-[0.2em]">{category}</h4>
+                             <span className="bg-slate-100 dark:bg-slate-800 text-slate-400 text-[9px] px-2 py-0.5 rounded-full font-black">{categoryPhotos.length}</span>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                             {categoryPhotos.map(photo => (
+                               <div key={photo.id} className="relative aspect-square animate-in zoom-in-95 duration-200 group">
+                                  <img src={photo.url} onClick={() => setSelectedPhotoForView(photo)} className="w-full h-full object-cover rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 group-hover:ring-4 group-hover:ring-blue-100 cursor-zoom-in transition-all" alt="Evidência" />
+                                  <button onClick={(e) => { e.stopPropagation(); setPhotoToDelete(photo); setShowDeletePhotoModal(true); }} className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={12} /></button>
+                               </div>
+                             ))}
+                          </div>
+                       </div>
+                     );
+                   })}
+                   
+                   {photos.length === 0 && (
+                     <div className="text-center py-10 opacity-30">
+                        <ImageIcon size={32} className="mx-auto mb-2 text-slate-300" />
+                        <p className="text-[9px] font-black uppercase tracking-widest">Ainda não foram carregadas fotografias</p>
                      </div>
-                   ))}
+                   )}
                 </div>
              </div>
           </div>
@@ -579,41 +850,243 @@ export const ServiceOrderDetail: React.FC = () => {
         {activeTab === 'finalizar' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 transition-colors">
-                <div className="flex items-center gap-3 mb-6">
-                   <AlertTriangle size={18} className="text-orange-500" />
-                   <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Anomalia Detetada *</h3>
+                <div className="flex items-center justify-between mb-6">
+                   <div className="flex items-center gap-3"><AlertTriangle size={18} className="text-orange-500" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Anomalia Detetada *</h3></div>
+                   <button onClick={handleResetAnomaly} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors p-2" title="Limpar"><RotateCcw size={12} /> <span className="text-[9px] font-black uppercase">LIMPAR</span></button>
                 </div>
-                <input type="text" placeholder="EX: COMPRESSOR BLOQUEADO..." className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-xs font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" value={anomaly} onChange={e => setAnomaly(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} />
+                <input type="text" placeholder="..." className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-xs font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" value={anomaly} onChange={e => setAnomaly(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} />
              </div>
 
              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 transition-colors">
                 <div className="flex items-center justify-between mb-6">
-                   <div className="flex items-center gap-3 text-blue-500">
-                      <Sparkles size={18} />
-                      <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Resumo da Intervenção (IA)</h3>
+                   <div className="flex items-center gap-3 text-blue-500"><Sparkles size={18} /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Resumo da Intervenção (IA)</h3></div>
+                   <div className="flex items-center gap-2">
+                     <button onClick={handleResetResolution} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors p-2"><RotateCcw size={12} /> <span className="text-[9px] font-black uppercase">LIMPAR</span></button>
+                     <button onClick={handleGenerateAISummary} disabled={isGenerating || os?.status === OSStatus.CONCLUIDA} className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-[9px] font-black uppercase hover:bg-blue-100 transition-all disabled:opacity-50">{isGenerating ? <RefreshCw size={12} className="animate-spin" /> : <Sparkle size={12} />} GERAR IA</button>
                    </div>
-                   <button onClick={handleGenerateAISummary} disabled={isGenerating || os?.status === OSStatus.CONCLUIDA} className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-[9px] font-black uppercase hover:bg-blue-100 transition-all disabled:opacity-50">
-                     {isGenerating ? <RefreshCw size={12} className="animate-spin" /> : <Sparkle size={12} />} GERAR IA
-                   </button>
                 </div>
-                <textarea className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-[2rem] px-6 py-5 text-sm text-slate-800 dark:text-slate-200 leading-relaxed outline-none focus:ring-4 focus:ring-blue-500/10 transition-all min-h-[160px] resize-none" value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} placeholder="DESCREVA O TRABALHO EFETUADO..." />
+                <textarea className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-[2rem] px-6 py-5 text-sm text-slate-800 dark:text-slate-200 leading-relaxed outline-none focus:ring-4 focus:ring-blue-500/10 transition-all min-h-[160px] resize-none" value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} placeholder="..." />
              </div>
 
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-               <SignatureCanvas label="Assinatura Cliente" onSave={setClientSignature} onClear={() => setClientSignature(null)} initialValue={clientSignature} readOnly={os?.status === OSStatus.CONCLUIDA} error={showValidationErrors && !clientSignature} />
-               <SignatureCanvas label="Assinatura Técnico" onSave={setTechnicianSignature} onClear={() => setTechnicianSignature(null)} initialValue={technicianSignature} readOnly={os?.status === OSStatus.CONCLUIDA} error={showValidationErrors && !technicianSignature} />
+             <div className="space-y-4">
+               <div className="flex items-center justify-between px-2"><h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Validação de Trabalho</h3><button onClick={handleResetSignatures} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors p-2"><RotateCcw size={12} /> <span className="text-[9px] font-black uppercase">LIMPAR ASSINATURAS</span></button></div>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 <SignatureCanvas label="Assinatura Cliente" onSave={setClientSignature} onClear={() => setClientSignature(null)} initialValue={clientSignature} readOnly={os?.status === OSStatus.CONCLUIDA} error={showValidationErrors && !clientSignature} />
+                 <SignatureCanvas label="Assinatura Técnico" onSave={setTechnicianSignature} onClear={() => setTechnicianSignature(null)} initialValue={technicianSignature} readOnly={os?.status === OSStatus.CONCLUIDA} error={showValidationErrors && !technicianSignature} />
+               </div>
              </div>
 
-             <div className="pt-6">
-               <button onClick={async () => { if (missingFields.length > 0) { setShowValidationErrors(true); setShowValidationErrorModal(true); return; } setShowFinalizeModal(true); }} disabled={os?.status === OSStatus.CONCLUIDA || actionLoading} className="w-full py-5 bg-blue-600 text-white rounded-[2rem] text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 disabled:opacity-50">CONCLUIR ORDEM DE SERVIÇO</button>
-             </div>
+             <div className="pt-6"><button onClick={async () => { if (missingFields.length > 0) { setShowValidationErrors(true); setShowValidationErrorModal(true); return; } setShowFinalizeModal(true); }} disabled={os?.status === OSStatus.CONCLUIDA || actionLoading} className="w-full py-5 bg-blue-600 text-white rounded-[2rem] text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 disabled:opacity-50">CONCLUIR ORDEM DE SERVIÇO</button></div>
           </div>
         )}
       </div>
 
+      {/* MODAL ADICIONAR MATERIAL */}
+      {showPartModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
+              <div className="p-8 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                 <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                   {isCreatingNewPart ? 'Novo Artigo Catálogo' : 'Aplicar Material'}
+                 </h3>
+                 <button onClick={() => { setShowPartModal(false); setIsCreatingNewPart(false); }} className="text-gray-400 hover:text-gray-600 p-2"><X size={24}/></button>
+              </div>
+              
+              <div className="p-8 space-y-6">
+                {!isCreatingNewPart ? (
+                  <>
+                    <div className="relative">
+                       <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                       <input type="text" placeholder="Pesquisar catálogo..." value={partSearchTerm} onChange={e => setPartSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                    </div>
+                    <div className="max-h-60 overflow-y-auto no-scrollbar space-y-2">
+                       {filteredCatalog.length === 0 ? (
+                         <div className="text-center py-6 space-y-4">
+                            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">Nenhum artigo encontrado.</p>
+                            <button 
+                             onClick={() => {
+                               setIsCreatingNewPart(true);
+                               setNewPartForm({ name: partSearchTerm, reference: '' });
+                             }}
+                             className="flex items-center gap-2 mx-auto bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-6 py-3 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 transition-all"
+                            >
+                              <Plus size={14} /> REGISTAR NOVO ARTIGO NO CATÁLOGO
+                            </button>
+                         </div>
+                       ) : filteredCatalog.map(p => (
+                          <button key={p.id} onClick={() => { setSelectedPartId(p.id); setPartQuantity(1); setPartQuantityStr("1"); }} className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between group ${selectedPartId === p.id ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' : 'bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800 hover:border-blue-100 dark:hover:border-blue-900/50'}`}>
+                             <div className="min-w-0 pr-4">
+                                <p className={`text-sm font-black uppercase truncate ${selectedPartId === p.id ? 'text-blue-600' : 'text-slate-900 dark:text-white'}`}>{p.name}</p>
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">REF: {p.reference}</p>
+                             </div>
+                             {selectedPartId === p.id && <CheckCircle2 size={18} className="text-blue-600 flex-shrink-0" />}
+                          </button>
+                       ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-4 animate-in slide-in-from-right-2 duration-300">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Designação do Artigo *</label>
+                      <input 
+                        type="text" 
+                        value={newPartForm.name} 
+                        onChange={e => setNewPartForm({...newPartForm, name: e.target.value})} 
+                        className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                        placeholder="EX: FILTRO DESIDRATADOR"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Referência / Código (Numérico)</label>
+                      <div className="relative">
+                        <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                        <input 
+                          type="text" 
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={newPartForm.reference} 
+                          onChange={e => setNewPartForm({...newPartForm, reference: e.target.value.replace(/\D/g, '')})} 
+                          className="w-full pl-11 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-mono font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                          placeholder="EX: 102030 (GERAR AUTO SE VAZIO)"
+                        />
+                      </div>
+                    </div>
+                    <button onClick={() => setIsCreatingNewPart(false)} className="text-[9px] font-black text-slate-400 uppercase hover:text-blue-600 transition-all flex items-center gap-1.5">
+                      <ArrowLeft size={10} /> Voltar para Pesquisa
+                    </button>
+                  </div>
+                )}
+
+                 {(selectedPartId || isCreatingNewPart) && (
+                   <div className="pt-4 flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-6 rounded-3xl animate-in slide-in-from-top-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantidade:</span>
+                      <div className="flex items-center gap-4">
+                         <button onClick={() => { 
+                           const currentVal = parseFloat(partQuantityStr.replace(',', '.'));
+                           const newVal = Math.max(0.1, Number((currentVal - 1).toFixed(3))); 
+                           setPartQuantityStr(newVal.toString().replace('.', ','));
+                         }} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-slate-900 dark:text-white shadow-sm active:scale-90 transition-all"><Minus size={18} /></button>
+                         <input 
+                          type="text" 
+                          inputMode="decimal"
+                          value={partQuantityStr} 
+                          onChange={e => {
+                            const val = e.target.value.replace(',', '.');
+                            if (/^\d*[.]?\d*$/.test(val) || val === '') {
+                              setPartQuantityStr(e.target.value);
+                            }
+                          }}
+                          className="w-16 bg-transparent text-lg font-black text-slate-900 dark:text-white text-center outline-none border-b-2 border-transparent focus:border-blue-500 transition-all"
+                         />
+                         <button onClick={() => {
+                           const currentVal = parseFloat(partQuantityStr.replace(',', '.')) || 0;
+                           const newVal = Number((currentVal + 1).toFixed(3));
+                           setPartQuantityStr(newVal.toString().replace('.', ','));
+                         }} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-slate-900 dark:text-white shadow-sm active:scale-90 transition-all"><Plus size={18} /></button>
+                      </div>
+                   </div>
+                 )}
+
+                 <button 
+                  onClick={isCreatingNewPart ? handleCreateAndAddPart : handleAddPart} 
+                  disabled={(isCreatingNewPart ? !newPartForm.name : !selectedPartId) || actionLoading} 
+                  className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 transition-all"
+                 >
+                    {actionLoading ? <Loader2 size={20} className="animate-spin mx-auto" /> : isCreatingNewPart ? 'REGISTAR E APLICAR' : 'CONFIRMAR APLICAÇÃO'}
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL AJUSTAR QUANTIDADE MATERIAL */}
+      {showEditQuantityModal && partToEditQuantity && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
+              <div className="p-8 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                 <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Ajustar Quantidade</h3>
+                 <button onClick={() => setShowEditQuantityModal(false)} className="text-gray-400 hover:text-gray-600 p-2"><X size={24}/></button>
+              </div>
+              <div className="p-8 space-y-8">
+                 <div className="text-center">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 px-4 line-clamp-2">{partToEditQuantity.name}</p>
+                    <div className="flex items-center justify-center gap-6">
+                       <button onClick={() => {
+                         const currentVal = parseFloat(tempQuantityStr.replace(',', '.'));
+                         const newVal = Math.max(0.1, Number((currentVal - 1).toFixed(3)));
+                         setTempQuantityStr(newVal.toString().replace('.', ','));
+                       }} className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-900 dark:text-white shadow-sm active:scale-90 transition-all"><Minus size={28} /></button>
+                       <input 
+                        type="text" 
+                        inputMode="decimal"
+                        value={tempQuantityStr} 
+                        onChange={e => {
+                          const val = e.target.value.replace(',', '.');
+                          if (/^\d*[.]?\d*$/.test(val) || val === '') {
+                            setTempQuantityStr(e.target.value);
+                          }
+                        }}
+                        className="w-24 bg-transparent text-5xl font-black text-slate-900 dark:text-white text-center outline-none border-b-4 border-transparent focus:border-blue-500 transition-all"
+                       />
+                       <button onClick={() => {
+                         const currentVal = parseFloat(tempQuantityStr.replace(',', '.')) || 0;
+                         const newVal = Number((currentVal + 1).toFixed(3));
+                         setTempQuantityStr(newVal.toString().replace('.', ','));
+                       }} className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center text-slate-900 dark:text-white shadow-sm active:scale-90 transition-all"><Plus size={28} /></button>
+                    </div>
+                 </div>
+                 <button 
+                  onClick={async () => { 
+                    await handleUpdatePartQuantity(partToEditQuantity.id, tempQuantityStr); 
+                    setShowEditQuantityModal(false); 
+                  }} 
+                  disabled={actionLoading}
+                  className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-[0.98] transition-all"
+                 >
+                    {actionLoading ? <Loader2 size={20} className="animate-spin mx-auto" /> : 'CONFIRMAR AJUSTE'}
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL ELIMINAR MATERIAL */}
+      {showDeletePartModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center">
+              <div className="p-8">
+                <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Trash2 size={32}/></div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Remover Material?</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">Deseja retirar "{partToDelete?.name}" desta Ordem de Serviço?</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => setShowDeletePartModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button>
+                  <button onClick={handleDeletePart} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">REMOVER</button>
+                </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL ELIMINAR FOTO */}
+      {showDeletePhotoModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center">
+              <div className="p-8">
+                <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Camera size={32}/></div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Eliminar Foto?</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">Deseja apagar definitivamente esta evidência fotográfica?</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => setShowDeletePhotoModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button>
+                  <button onClick={handleDeletePhoto} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ELIMINAR</button>
+                </div>
+              </div>
+           </div>
+        </div>
+      )}
+
       {/* MODAL FINALIZE CONFIRMATION */}
       {showFinalizeModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
               <div className="p-8">
                 <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><CheckCircle size={32}/></div>
@@ -621,7 +1094,17 @@ export const ServiceOrderDetail: React.FC = () => {
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase">TODOS OS DADOS SERÃO BLOQUEADOS E O RELATÓRIO SERÁ GERADO.</p>
                 <div className="grid grid-cols-2 gap-4">
                   <button onClick={() => setShowFinalizeModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button>
-                  <button onClick={async () => { await mockData.updateServiceOrder(id!, { status: OSStatus.CONCLUIDA, anomaly_detected: anomaly, resolution_notes: resolutionNotes, client_signature: clientSignature || undefined, technician_signature: technicianSignature || undefined }); navigate('/os'); }} className="py-4 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">CONFIRMAR</button>
+                  <button onClick={async () => { 
+                    // CORREÇÃO: Passar o estado diretamente aqui também
+                    await mockData.updateServiceOrder(id!, { 
+                      status: OSStatus.CONCLUIDA, 
+                      anomaly_detected: anomaly, 
+                      resolution_notes: resolutionNotes, 
+                      client_signature: clientSignature, 
+                      technician_signature: technicianSignature 
+                    }); 
+                    navigate('/os'); 
+                  }} className="py-4 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">CONFIRMAR</button>
                 </div>
               </div>
            </div>

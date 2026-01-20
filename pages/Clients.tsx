@@ -65,6 +65,15 @@ const Clients: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Botão Flutuante para Novo Cliente */}
+      <button 
+        onClick={() => navigate('/clients/new')}
+        className="fixed bottom-6 right-6 p-5 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-600/40 hover:bg-blue-700 hover:scale-110 transition-all transform flex items-center justify-center active:scale-95 z-40"
+        title="Novo Cliente"
+      >
+        <Plus size={28} />
+      </button>
     </div>
   );
 };

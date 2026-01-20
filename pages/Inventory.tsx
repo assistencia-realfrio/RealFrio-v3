@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Package, Plus, Edit2, Search, Tag, X, Trash2, ChevronRight, AlertCircle, Layers, Sparkles, Hash } from 'lucide-react';
+import { Package, Plus, Edit2, Search, Tag, X, Trash2, ChevronRight, AlertCircle, Layers, Sparkles, Hash, Loader2, Check } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { PartCatalogItem } from '../types';
 import { normalizeString } from '../utils';
@@ -38,6 +38,34 @@ const Inventory: React.FC = () => {
       setFormData({ name: '', reference: '', stock: '0' });
     }
     setShowModal(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.reference) return;
+    setIsSubmitting(true);
+    try {
+      if (editingItem) {
+        await mockData.updateCatalogItem(editingItem.id, {
+          name: formData.name.toUpperCase(),
+          reference: formData.reference.toUpperCase(),
+          stock: parseFloat(formData.stock) || 0
+        });
+      } else {
+        await mockData.addCatalogItem({
+          name: formData.name.toUpperCase(),
+          reference: formData.reference.toUpperCase(),
+          stock: parseFloat(formData.stock) || 0
+        });
+      }
+      setShowModal(false);
+      fetchCatalog();
+    } catch (error) {
+      console.error(error);
+      alert("ERRO AO GUARDAR ARTIGO.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getStockStatus = (stock: number) => {
@@ -85,6 +113,75 @@ const Inventory: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Botão Flutuante para Novo Artigo */}
+      <button 
+        onClick={() => handleOpenModal()}
+        className="fixed bottom-6 right-6 p-5 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-600/40 hover:bg-blue-700 hover:scale-110 transition-all transform flex items-center justify-center active:scale-95 z-40"
+        title="Novo Artigo"
+      >
+        <Plus size={28} />
+      </button>
+
+      {/* Modal de Gestão de Artigo */}
+      {showModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col transition-colors">
+            <div className="p-8 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+              <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                {editingItem ? 'Editar Artigo' : 'Novo Artigo'}
+              </h3>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 p-2"><X size={24}/></button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="p-8 space-y-6">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Designação do Artigo *</label>
+                <div className="relative">
+                  <Layers className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                  <input 
+                    required type="text" 
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase"
+                    value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
+                    placeholder="EX: FILTRO DESIDRATADOR"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Referência / Código *</label>
+                <div className="relative">
+                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                  <input 
+                    required type="text" 
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-mono font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase"
+                    value={formData.reference} onChange={e => setFormData({...formData, reference: e.target.value})}
+                    placeholder="EX: 102030"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Stock em Armazém</label>
+                <input 
+                  type="number" 
+                  step="0.001"
+                  className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                  value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})}
+                />
+              </div>
+
+              <button 
+                type="submit" disabled={isSubmitting}
+                className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
+                {editingItem ? 'GUARDAR ALTERAÇÕES' : 'CRIAR ARTIGO NO CATÁLOGO'}
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </div>
