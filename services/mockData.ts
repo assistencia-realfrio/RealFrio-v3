@@ -182,9 +182,26 @@ export const mockData = {
   },
 
   createServiceOrder: async (os: Partial<ServiceOrder>) => {
-    const countResponse = await supabase.from('service_orders').select('id', { count: 'exact', head: true });
-    const nextNum = (countResponse.count || 0) + 1;
-    const code = `OS-${nextNum.toString().padStart(5, '0')}`;
+    // Nova Lógica de ID: [LOJA]-[DATA]-[HORA]
+    // Caldas da Rainha -> CR
+    // Porto de Mós -> PM
+    // Outros -> GL (Geral)
+    
+    const now = new Date();
+    const datePart = now.getFullYear().toString() + 
+                     (now.getMonth() + 1).toString().padStart(2, '0') + 
+                     now.getDate().toString().padStart(2, '0');
+    
+    const timePart = now.getHours().toString().padStart(2, '0') + 
+                     now.getMinutes().toString().padStart(2, '0') +
+                     now.getSeconds().toString().padStart(2, '0');
+    
+    let storePrefix = 'GL';
+    if (os.store === 'Caldas da Rainha') storePrefix = 'CR';
+    else if (os.store === 'Porto de Mós') storePrefix = 'PM';
+
+    const code = `${storePrefix}-${datePart}-${timePart}`;
+
     const { data, error } = await supabase.from('service_orders').insert({ ...os, code }).select().single();
     if (error) throw error;
     return data;
