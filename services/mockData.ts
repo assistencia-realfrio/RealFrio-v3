@@ -1,3 +1,4 @@
+
 import { supabase } from '../supabaseClient';
 import { 
   Client, Establishment, Equipment, ServiceOrder, OSStatus, OSType, 
@@ -6,6 +7,47 @@ import {
 } from '../types';
 
 const SESSION_KEY = 'rf_active_session_v3';
+
+// Helper para validar UUID
+const isValidUUID = (uuid: string) => {
+  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuid && regex.test(uuid);
+};
+
+// Helper para normalizar e VALIDAR datas (converte DD/MM/AAAA para AAAA-MM-DD e rejeita lixo)
+const normalizeDateForDB = (dateStr: any) => {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  
+  let clean = dateStr.trim().replace(/^"|"$/g, '');
+  if (!clean || clean.toLowerCase() === 'null') return null;
+
+  // Caso 1: Formato DD/MM/AAAA (Comum em PT)
+  if (clean.includes('/')) {
+    const parts = clean.split('/');
+    if (parts.length === 3) {
+      const d = parts[0].padStart(2, '0');
+      const m = parts[1].padStart(2, '0');
+      const y = parts[2];
+      // Verifica se são números antes de montar
+      if (!isNaN(Number(d)) && !isNaN(Number(m)) && !isNaN(Number(y))) {
+        clean = `${y}-${m}-${d}`;
+      }
+    }
+  }
+
+  // Caso 2: Formato AAAA-MM-DD (ISO)
+  const isoRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (isoRegex.test(clean)) {
+    const d = new Date(clean);
+    // Verifica se a data é real (ex: evita 2023-13-45)
+    if (!isNaN(d.getTime())) {
+      return clean;
+    }
+  }
+
+  // Se chegou aqui, o dado não é uma data válida (ex: "brimbote")
+  return null;
+};
 
 export const mockData = {
   // --- AUTH ---
@@ -38,11 +80,6 @@ export const mockData = {
   },
 
   signUp: async (email: string, password: string, fullName: string, role: UserRole, store: string) => {
-    /**
-     * IMPORTANTE: Estamos a passar os dados no campo 'data' (user_metadata).
-     * O Trigger que configurámos no Supabase SQL vai detetar este novo utilizador
-     * e inserir automaticamente na tabela 'profiles' usando estes valores.
-     */
     const { data, error } = await supabase.auth.signUp({ 
       email, 
       password,
@@ -54,13 +91,15 @@ export const mockData = {
         }
       }
     });
-
     if (error) return { data: null, error };
-
-    // Não precisamos mais de fazer insert manual em 'profiles' aqui no frontend.
-    // O Gatilho de Base de Dados (Trigger) trata disso de forma síncrona e segura.
-    
     return { data, error: null };
+  },
+
+  updatePassword: async (newPassword: string) => {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+    return { data, error };
   },
 
   // --- PROFILES ---
@@ -182,11 +221,6 @@ export const mockData = {
   },
 
   createServiceOrder: async (os: Partial<ServiceOrder>) => {
-    // Nova Lógica de ID: [LOJA]-[DATA]-[HORA]
-    // Caldas da Rainha -> CR
-    // Porto de Mós -> PM
-    // Outros -> GL (Geral)
-    
     const now = new Date();
     const datePart = now.getFullYear().toString() + 
                      (now.getMonth() + 1).toString().padStart(2, '0') + 
@@ -314,45 +348,77 @@ export const mockData = {
   },
 
   createVacation: async (v: Partial<Vacation>) => {
-    return supabase.from('vacations').insert(v);
+    const { error } = await supabase.from('vacations').insert(v);
+    if (error) throw error;
+    return true;
   },
 
   updateVacation: async (id: string, updates: Partial<Vacation>) => {
-    return supabase.from('vacations').update(updates).eq('id', id);
+    const { error } = await supabase.from('vacations').update(updates).eq('id', id);
+    if (error) throw error;
+    return true;
   },
 
   deleteVacation: async (id: string) => {
-    return supabase.from('vacations').delete().eq('id', id);
-  },
-
-  exportUserVacationsCSV: async (userName: string) => {
-    const { data } = await supabase.from('vacations').select('*').eq('user_name', userName);
-    if (!data || data.length === 0) return "DATA_INICIO,DATA_FIM,NOTAS,LOJA\n";
-    const rows = data.map(v => `${v.start_date},${v.end_date},"${v.notes || ''}",${v.store}`);
-    return "DATA_INICIO,DATA_FIM,NOTAS,LOJA\n" + rows.join("\n");
-  },
-
-  importUserVacationsCSV: async (userId: string, userName: string, csvContent: string) => {
-    const lines = csvContent.split('\n').filter(line => line.trim() && !line.startsWith('DATA_INICIO'));
-    let imported = 0;
-    let skipped = 0;
-    for (const line of lines) {
-      const parts = line.split(',');
-      if (parts.length < 4) continue;
-      const [start_date, end_date, notes, store] = parts.map(s => s.trim().replace(/"/g, ''));
-      const { error } = await supabase.from('vacations').insert({
-        user_id: userId,
-        user_name: userName,
-        start_date,
-        end_date,
-        notes,
-        store,
-        status: VacationStatus.APROVADA
-      });
-      if (!error) imported++;
-      else skipped++;
+    if (!id) {
+      console.error("Tentativa de eliminar férias sem ID.");
+      throw new Error("ID de férias inválido para deleção.");
     }
-    return { imported, skipped };
+    const { error } = await supabase.from('vacations').delete().eq('id', id);
+    if (error) {
+      console.error("Erro Supabase deleteVacation:", error);
+      throw error;
+    }
+    return true;
+  },
+
+  // Importar múltiplas férias (Append/Upsert) com Deteção de Duplicados
+  importVacations: async (vacationList: any[]) => {
+    const session = mockData.getSession();
+    
+    // 1. Obter férias atuais para comparar e evitar duplicados
+    const { data: existingVacations } = await supabase.from('vacations').select('user_name, start_date, end_date');
+    const existingKeys = new Set((existingVacations || []).map(v => 
+      `${v.user_name?.trim().toLowerCase()}|${v.start_date}|${v.end_date}`
+    ));
+
+    // 2. Filtrar e normalizar dados
+    const toInsert = vacationList
+      .map(v => {
+        const rawStart = v.start_date || v.inicio || v.data_inicio;
+        const rawEnd = v.end_date || v.fim || v.data_fim;
+        const userName = v.user_name || v.utilizador || v.nome || 'Colaborador Desconhecido';
+        
+        const startDate = normalizeDateForDB(rawStart);
+        const endDate = normalizeDateForDB(rawEnd);
+        
+        if (!startDate || !endDate) return null;
+
+        // Gerar chave única para este registo do CSV
+        const key = `${userName.trim().toLowerCase()}|${startDate}|${endDate}`;
+        
+        // Se já existe na DB, ignoramos
+        if (existingKeys.has(key)) return null;
+
+        return {
+          user_id: isValidUUID(v.user_id) ? v.user_id : session?.id, 
+          user_name: userName,
+          start_date: startDate,
+          end_date: endDate,
+          status: v.status || VacationStatus.APROVADA,
+          store: v.store || v.loja || 'Caldas da Rainha',
+          notes: v.notes || v.notas || v.observacoes || ''
+        };
+      })
+      .filter(v => v !== null) as any[];
+    
+    if (toInsert.length === 0) {
+      return { count: 0, message: "Todos os registos já existem ou são inválidos." };
+    }
+
+    const { error } = await supabase.from('vacations').insert(toInsert);
+    if (error) throw error;
+    return { count: toInsert.length };
   },
 
   // --- TIME ENTRIES ---
