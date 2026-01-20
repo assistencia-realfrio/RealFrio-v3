@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = 'admin',
   BACKOFFICE = 'backoffice',
@@ -140,8 +141,8 @@ export interface ServiceOrder {
   anomaly_detected?: string;
   resolution_notes?: string;
   observations?: string;
-  client_signature?: string;
-  technician_signature?: string; 
+  client_signature?: string | null;
+  technician_signature?: string | null; 
   client?: Client;
   establishment?: Establishment;
   equipment?: Equipment;
