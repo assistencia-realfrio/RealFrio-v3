@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon } from 'lucide-react';
@@ -236,6 +237,22 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           </nav>
 
           <div className="bg-white dark:bg-slate-900 p-4 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
+            <button 
+              onClick={toggleTheme}
+              className="flex items-center w-full px-4 py-3.5 text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors mb-2 group"
+            >
+              {theme === 'light' ? (
+                <>
+                  <Moon className="mr-3 h-4 w-4 text-slate-400 group-hover:text-blue-500" />
+                  Modo Escuro
+                </>
+              ) : (
+                <>
+                  <Sun className="mr-3 h-4 w-4 text-slate-400 group-hover:text-yellow-500" />
+                  Modo Claro
+                </>
+              )}
+            </button>
             <Link 
               to="/profile"
               onClick={() => setSidebarOpen(false)}
@@ -264,8 +281,8 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         <header className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 transition-colors duration-300 z-50 flex-shrink-0">
-          <div className="flex items-center h-20 px-4 md:px-8">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center h-20 px-4 md:px-8 relative">
+            <div className="flex items-center">
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="p-3 -ml-2 text-slate-600 dark:text-slate-400 lg:hidden hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full transition-all active:scale-90"
@@ -273,22 +290,15 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               >
                 <Menu size={26} />
               </button>
+            </div>
+
+            <div className="absolute left-1/2 -translate-x-1/2">
               <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
-                <BrandLogo variant={theme === 'dark' ? 'light' : 'dark'} size="sm" className="!items-start" />
+                <BrandLogo variant={theme === 'dark' ? 'light' : 'dark'} size="sm" className="!items-center" />
               </Link>
             </div>
 
-            <div className="flex-1"></div>
-
-            <div className="flex items-center gap-1 sm:gap-2">
-               <button 
-                 onClick={toggleTheme}
-                 className="p-3 rounded-2xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-90"
-                 title={theme === 'light' ? 'Modo Escuro' : 'Modo Claro'}
-               >
-                 {theme === 'light' ? <Moon size={22} /> : <Sun size={22} />}
-               </button>
-
+            <div className="flex-1 flex justify-end items-center gap-1 sm:gap-2">
                <div className="relative" ref={searchRef}>
                  <button 
                    onClick={() => setSearchOpen(!searchOpen)}
