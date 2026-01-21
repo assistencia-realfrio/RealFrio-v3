@@ -8,28 +8,29 @@ export const generateOSReportSummary = async (
   duration: string
 ): Promise<string> => {
   try {
-    // Verificação de segurança: se o process.env.API_KEY não foi substituído pelo Vite
-    if (!process.env.API_KEY || process.env.API_KEY === "" || process.env.API_KEY === "undefined") {
+    /* The API key must be obtained exclusively from process.env.API_KEY and used directly in the named parameter. */
+    if (!process.env.API_KEY || process.env.API_KEY === 'undefined') {
       throw new Error("API_KEY_MISSING");
     }
 
-    // Inicialização direta conforme as regras da SDK
+    /* Instantiate right before making an API call to ensure it uses the most up-to-date API key. */
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const prompt = `
-      Atua como um assistente administrativo técnico sénior da Real Frio.
-      Gera um resumo profissional, formal e extremamente conciso (em Português de Portugal) para um Relatório de Ordem de Serviço com base nos seguintes dados:
+      Atua como um assistente administrativo técnico sénior.
+      Gera um resumo profissional e conciso (em Português de Portugal) para um Relatório de Ordem de Serviço com base nos seguintes dados:
       
-      PEDIDO/PROBLEMA: ${description}
-      ANOMALIA DETETADA: ${anomaly || 'Não especificada'}
-      TRABALHO/NOTAS: ${notes}
-      MATERIAL: ${parts.join(', ') || 'Nenhum'}
-      TIPO: ${duration}
+      Problema Inicial (Cliente): ${description}
+      Anomalia Detetada pelo Técnico: ${anomaly || 'Não especificada'}
+      Trabalho Efetuado / Resolução: ${notes}
+      Peças Utilizadas: ${parts.join(', ') || 'Nenhuma'}
+      Duração do Trabalho: ${duration}
 
-      REGRAS:
-      1. Linguagem técnica e formal.
-      2. RETORNA APENAS O TEXTO DO RESUMO FINAL.
-      3. Proibido introduções como "Aqui está o resumo" ou "Resumo:".
+      REGRAS CRÍTICAS:
+      1. O resumo deve ser formal e focar na relação entre a anomalia encontrada e a solução aplicada.
+      2. RETORNA APENAS O TEXTO DO RESUMO. 
+      3. NÃO incluas introduções ou explicações periféricas.
+      4. O resultado deve estar pronto a ser colado diretamente no relatório oficial.
     `;
 
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -37,16 +38,16 @@ export const generateOSReportSummary = async (
       contents: prompt,
     });
 
-    // Acesso direto à propriedade .text (getter)
-    return response.text?.trim() || "Erro: Resumo vazio.";
+    /* Directly access the .text property of GenerateContentResponse. Do not call .text() as it is a getter. */
+    return response.text?.trim() || "Não foi possível gerar o resumo.";
   } catch (error: any) {
-    console.error("Erro Crítico Gemini:", error);
+    console.error("Erro ao gerar resumo com Gemini:", error);
     if (error.message === "API_KEY_MISSING") {
-      throw new Error("Chave de API não detetada. Configure GEMINI_API_KEY no painel da Vercel e faça redeploy.");
+      throw new Error("Chave de API não configurada no ambiente.");
     }
     if (error.message?.includes("Requested entity was not found")) {
-      throw new Error("Chave de API inválida ou sem permissão para este modelo.");
+      throw new Error("API_KEY_INVALID");
     }
-    throw new Error("Falha na comunicação com o motor de IA.");
+    throw error;
   }
 };
