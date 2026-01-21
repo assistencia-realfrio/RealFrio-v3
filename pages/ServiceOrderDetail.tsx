@@ -1076,13 +1076,13 @@ export const ServiceOrderDetail: React.FC = () => {
                        <div key={category} className="space-y-4 animate-in fade-in duration-500">
                           <div className="flex items-center gap-3 border-b border-slate-50 dark:border-slate-800 pb-2">
                              <h4 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-[0.2em]">{category}</h4>
-                             <span className="bg-slate-100 dark:bg-slate-800 text-slate-400 text-[9px] px-2 py-0.5 rounded-full font-black">{categoryPhotos.length}</span>
+                             <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[9px] px-2 py-0.5 rounded-full font-black">{categoryPhotos.length}</span>
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                              {categoryPhotos.map(photo => (
                                <div key={photo.id} className="relative aspect-square animate-in zoom-in-95 duration-200 group">
                                   <img src={photo.url} onClick={() => setSelectedPhotoForView(photo)} className="w-full h-full object-cover rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 group-hover:ring-4 group-hover:ring-blue-100 cursor-zoom-in transition-all" alt="Evidência" />
-                                  <button onClick={(e) => { e.stopPropagation(); setPhotoToDelete(photo); setShowDeletePhotoModal(true); }} className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={12} /></button>
+                                  <button onClick={(e) => { e.stopPropagation(); setPhotoToDelete(photo); setShowDeletePhotoModal(true); }} className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full shadow-lg transition-opacity z-10"><Trash2 size={12} /></button>
                                </div>
                              ))}
                           </div>
@@ -1138,8 +1138,8 @@ export const ServiceOrderDetail: React.FC = () => {
         )}
       </div>
 
-      {/* BARRA DE NAVEGAÇÃO FLUTUANTE INFERIOR */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-gray-200 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
+      {/* BARRA DE NAVEGAÇÃO FLUTUANTE INFERIOR COM BORDA INSTITUCIONAL FINA */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-[#9d1c24] dark:border-[#9d1c24]/60 shadow-[0_12px_40px_rgba(157,28,36,0.15)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
         {[
           { id: 'info', icon: Info, label: 'INFO' },
           { id: 'notas', icon: MessageSquare, label: 'NOTAS' },

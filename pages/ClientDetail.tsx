@@ -204,11 +204,14 @@ const ClientDetail: React.FC = () => {
         </div>
 
         {!isEditing && (
-          <div className="bg-white dark:bg-slate-900 shadow-xl rounded-[2.5rem] p-8 border border-gray-100 dark:border-slate-800 text-center animate-in fade-in duration-300 relative group transition-colors">
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight mb-2">
+          /* Quadro Superior Compactado para consistência */
+          <div className="bg-white dark:bg-slate-900 shadow-xl rounded-[2rem] p-6 border border-gray-100 dark:border-slate-800 text-center animate-in fade-in duration-300 relative group transition-colors">
+            <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight">
               {client.name}
             </h1>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Sede Social | Loja: {client.store}</p>
+            <p className="text-[8px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.4em] mt-1.5">
+              Sede Social | Loja: {client.store}
+            </p>
           </div>
         )}
 
@@ -497,9 +500,9 @@ const ClientDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* BARRA DE NAVEGAÇÃO FLUTUANTE INFERIOR */}
+      {/* BARRA DE NAVEGAÇÃO FLUTUANTE INFERIOR COM BORDA INSTITUCIONAL FINA */}
       {!isEditing && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-gray-200 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-[#9d1c24] dark:border-[#9d1c24]/60 shadow-[0_12px_40px_rgba(157,28,36,0.15)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
           {[
             { id: 'info', icon: User, label: 'DADOS' },
             { id: 'establishments', icon: Building2, label: 'LOCAIS' },

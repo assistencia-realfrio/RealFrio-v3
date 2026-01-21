@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, HardDrive, Edit2, History, Image as ImageIcon, 
   Paperclip, Plus, Trash2, Camera, MapPin, Building2, ExternalLink,
-  ChevronRight, Download, FileText, X, Eye, Activity
+  ChevronRight, Download, FileText, X, Eye, Activity, Tag
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { Equipment, ServiceOrder, EquipmentAttachment, OSStatus } from '../types';
@@ -116,11 +116,12 @@ const EquipmentDetail: React.FC = () => {
           </button>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 shadow-xl rounded-[2.5rem] p-8 border border-gray-100 dark:border-slate-800 text-center animate-in fade-in duration-300 relative transition-colors">
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight mb-1">
+        {/* Quadro Superior Compactado */}
+        <div className="bg-white dark:bg-slate-900 shadow-xl rounded-[2rem] p-6 border border-gray-100 dark:border-slate-800 text-center animate-in fade-in duration-300 relative transition-colors">
+          <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight">
             {equipment.type}
           </h1>
-          <p className="text-[10px] font-bold text-blue-600 uppercase tracking-[0.2em]">{equipment.brand} | {equipment.model}</p>
+          <p className="text-[8px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.4em] mt-1.5">Ficha de Identificação do Ativo</p>
         </div>
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -133,7 +134,7 @@ const EquipmentDetail: React.FC = () => {
                    </div>
                    <div className="min-w-0">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Proprietário / Cliente</p>
-                      <button onClick={() => navigate(`/clients/${equipment.client_id}`)} className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase truncate hover:text-blue-600 text-left">
+                      <button onClick={() => navigate(`/clients/${equipment.client_id}`)} className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase truncate hover:text-blue-600 text-left transition-colors">
                         {clientName}
                       </button>
                    </div>
@@ -148,12 +149,21 @@ const EquipmentDetail: React.FC = () => {
                    </div>
                 </div>
                 <div className="p-6 flex items-center gap-4">
+                   <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                      <Tag size={22} />
+                   </div>
+                   <div className="min-w-0">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Marca / Modelo</p>
+                      <p className="text-sm font-black text-blue-600 dark:text-blue-400 uppercase truncate">{equipment.brand} <span className="text-slate-300 dark:text-slate-700 mx-1">|</span> {equipment.model || '---'}</p>
+                   </div>
+                </div>
+                <div className="p-6 flex items-center gap-4">
                    <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0">
                       <FileText size={22} />
                    </div>
                    <div className="min-w-0">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Número de Série (S/N)</p>
-                      <p className="text-sm font-black text-slate-900 dark:text-slate-100 font-mono uppercase">{equipment.serial_number}</p>
+                      <p className="text-sm font-black text-slate-900 dark:text-slate-100 font-mono uppercase">{equipment.serial_number || '---'}</p>
                    </div>
                 </div>
               </div>
@@ -283,8 +293,8 @@ const EquipmentDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* BARRA DE NAVEGAÇÃO FLUTUANTE INFERIOR */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-gray-200 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
+      {/* BARRA DE NAVEGAÇÃO FLUTUANTE INFERIOR COM BORDA INSTITUCIONAL FINA */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-[#9d1c24] dark:border-[#9d1c24]/60 shadow-[0_12px_40px_rgba(157,28,36,0.15)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
         {[
           { id: 'info', icon: HardDrive, label: 'GERAL' },
           { id: 'chapa', icon: ImageIcon, label: 'CHAPA' },
