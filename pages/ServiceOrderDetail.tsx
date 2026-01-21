@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
@@ -22,16 +21,6 @@ import { generateOSReportSummary } from '../services/geminiService';
 import { mockData } from '../services/mockData';
 import { normalizeString } from '../utils';
 import FloatingEditBar from '../components/FloatingEditBar';
-
-// Fix for aistudio global declaration conflict by aligning modifiers and type definition
-declare global {
-  interface Window {
-    aistudio: {
-      hasSelectedApiKey: () => Promise<boolean>;
-      openSelectKey: () => Promise<void>;
-    };
-  }
-}
 
 const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
   const [scale, setScale] = useState(1);
@@ -83,7 +72,7 @@ const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => 
       const limit = (scale - 1) * 200;
       setPosition({
         x: Math.min(Math.max(touchStartRef.current.pos.x + dx, -limit), limit),
-        y: Math.min(Math.max(touchStartRef.current.pos.y + dy, -limit), limit)
+        y: Math.min(Math.max(touchStartRef.current.y + dy, -limit), limit)
       });
     }
   };
@@ -317,7 +306,13 @@ export const ServiceOrderDetail: React.FC = () => {
       await mockData.addOSActivity(id, {
         description: `ESTADO DA OS ALTERADO PARA ${getStatusLabelText(newStatus)}`
       });
-      fetchOSDetails(false);
+      
+      if (newStatus === OSStatus.CONCLUIDA) {
+        setActiveTab('info');
+        fetchOSDetails(false);
+      } else {
+        fetchOSDetails(false);
+      }
     } catch (e: any) {
       setErrorMessage("ERRO AO ATUALIZAR ESTADO.");
     } finally {
@@ -411,80 +406,179 @@ export const ServiceOrderDetail: React.FC = () => {
     try {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.width;
+      const margin = 20;
+      const contentWidth = pageWidth - (margin * 2);
+      
+      // 1. HEADER MODERNO
       doc.setFillColor(15, 23, 42); 
-      doc.rect(0, 0, pageWidth, 40, 'F');
+      doc.rect(0, 0, pageWidth, 45, 'F');
+      
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
+      doc.setFontSize(24);
       doc.setFont("helvetica", "bold");
-      doc.text("REAL FRIO", 20, 20);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text("RELATÓRIO DE ASSISTÊNCIA TÉCNICA", 20, 28);
-      doc.setFontSize(12);
-      doc.text(os.code, pageWidth - 20, 20, { align: 'right' });
-      doc.setFontSize(8);
-      doc.text(`GERADO EM: ${new Date().toLocaleString()}`, pageWidth - 20, 28, { align: 'right' });
-      doc.setTextColor(15, 23, 42);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text("DADOS DO CLIENTE", 20, 50);
-      doc.line(20, 52, 190, 52);
-      doc.setFont("helvetica", "normal");
+      doc.text("REAL FRIO", margin, 22);
+      
       doc.setFontSize(9);
-      doc.text(`CLIENTE: ${os.client?.name || '---'}`, 20, 60);
-      doc.text(`LOCAL: ${os.establishment?.name || 'SEDE'}`, 20, 65);
-      doc.text(`MORADA: ${os.establishment?.address || os.client?.address || '---'}`, 20, 70);
-      doc.setFont("helvetica", "bold");
-      doc.text("EQUIPAMENTO INTERVENCIONADO", 110, 50);
       doc.setFont("helvetica", "normal");
-      doc.text(`TIPO: ${os.equipment?.type || '---'}`, 110, 60);
-      doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, 110, 65);
-      doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, 110, 70);
+      doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 30);
+      
+      doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.text("DETALHES DA INTERVENÇÃO", 20, 85);
-      doc.line(20, 87, 190, 87);
+      doc.text(os.code, pageWidth - margin, 22, { align: 'right' });
+      
+      doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
-      doc.text(`TIPO DE SERVIÇO: ${os.type.toUpperCase()}`, 20, 95);
-      doc.text(`ESTADO FINAL: ${os.status.toUpperCase()}`, 110, 95);
-      autoTable(doc, {
-        startY: 105,
-        theme: 'striped',
-        head: [['ANOMALIA DETETADA', 'TRABALHO EFETUADO / RESOLUÇÃO']],
-        body: [[os.anomaly_detected || 'Não descrita.', os.resolution_notes || 'Sem notas de resolução.']],
-        headStyles: { fillColor: [51, 65, 85], textColor: 255, fontSize: 8 },
-        styles: { fontSize: 8, cellPadding: 5 }
+      doc.setTextColor(180, 180, 180);
+      doc.text(`DATA DE EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 30, { align: 'right' });
+
+      let currentY = 60;
+
+      // 2. SECÇÃO: DADOS DO CLIENTE & EQUIPAMENTO (Layout em Grelha)
+      doc.setDrawColor(241, 245, 249);
+      doc.setFillColor(252, 252, 253);
+      doc.roundedRect(margin, currentY, contentWidth, 35, 3, 3, 'FD');
+      
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text("DADOS DO CLIENTE", margin + 5, currentY + 8);
+      doc.text("EQUIPAMENTO INTERVENCIONADO", margin + (contentWidth / 2) + 5, currentY + 8);
+      
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin + 5, currentY + 10, margin + (contentWidth / 2) - 5, currentY + 10);
+      doc.line(margin + (contentWidth / 2) + 5, currentY + 10, margin + contentWidth - 5, currentY + 10);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      
+      // Coluna Cliente (MORADA REMOVIDA, NOME FATURAÇÃO ADICIONADO)
+      doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 5, currentY + 16);
+      doc.text(`FATURAÇÃO: ${os.client?.billing_name || '---'}`, margin + 5, currentY + 22, { maxWidth: (contentWidth / 2) - 10 });
+      doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 5, currentY + 28);
+      
+      // Coluna Equipamento
+      doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 5, currentY + 16);
+      doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 5, currentY + 22);
+      doc.text(`Nº SÉRIE (S/N): ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 5, currentY + 28);
+
+      currentY += 45;
+
+      // 3. SECÇÃO: NARRATIVA TÉCNICA (BLOCOS IGUAIS)
+      const narrativeFields = [
+        { label: "PEDIDO DO CLIENTE / DESCRIÇÃO DA AVARIA", value: os.description || 'Não especificado.' },
+        { label: "ANOMALIA DETETADA", value: os.anomaly_detected || 'Não descrita.' },
+        { label: "TRABALHO EFETUADO / RESOLUÇÃO", value: os.resolution_notes || 'Sem notas de resolução.' }
+      ];
+
+      narrativeFields.forEach(field => {
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(15, 23, 42);
+        doc.text(field.label + ":", margin, currentY);
+        
+        currentY += 5;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(51, 65, 85);
+        
+        const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth);
+        doc.text(splitText, margin, currentY);
+        
+        currentY += (splitText.length * 5) + 10;
+
+        // Verificar quebra de página
+        if (currentY > 260) {
+          doc.addPage();
+          currentY = 25;
+        }
       });
+
+      // 4. SECÇÃO: MATERIAL APLICADO (Tabela Minimalista)
       if (partsUsed.length > 0) {
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(15, 23, 42);
+        doc.text("MATERIAL E COMPONENTES APLICADOS:", margin, currentY);
+        currentY += 4;
+
         autoTable(doc, {
-          startY: (doc as any).lastAutoTable.finalY + 10,
-          theme: 'grid',
-          head: [['MATERIAL APLICADO', 'REFERÊNCIA', 'QTD']],
-          body: partsUsed.map(p => [p.name, p.reference, `${p.quantity.toLocaleString('pt-PT')} UN`]),
-          headStyles: { fillColor: [241, 245, 249], textColor: 0, fontStyle: 'bold', fontSize: 8 },
-          styles: { fontSize: 8 }
+          startY: currentY,
+          margin: { left: margin, right: margin },
+          theme: 'plain',
+          head: [['ARTIGO / DESIGNAÇÃO', 'REFERÊNCIA', 'QUANTIDADE']],
+          body: partsUsed.map(p => [p.name.toUpperCase(), p.reference.toUpperCase(), `${p.quantity.toLocaleString('pt-PT')} UN`]),
+          headStyles: { 
+            fillColor: [248, 250, 252], 
+            textColor: [100, 116, 139], 
+            fontSize: 7, 
+            fontStyle: 'bold',
+            halign: 'left'
+          },
+          styles: { 
+            fontSize: 8, 
+            cellPadding: 4, 
+            textColor: [51, 65, 85],
+            lineWidth: 0.1,
+            lineColor: [241, 245, 249]
+          },
+          columnStyles: {
+            2: { halign: 'right' }
+          }
         });
+        currentY = (doc as any).lastAutoTable.finalY + 20;
+      } else {
+        currentY += 5;
       }
-      const startSignatures = (doc as any).lastAutoTable.finalY + 20;
+
+      // 5. ASSINATURAS (Layout de Base)
+      if (currentY > 230) {
+        doc.addPage();
+        currentY = 30;
+      }
+
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin, currentY, pageWidth - margin, currentY);
+      currentY += 10;
+      
+      doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
-      doc.text("ASSINATURAS DE CONFORMIDADE", 20, startSignatures);
-      doc.line(20, startSignatures + 2, 190, startSignatures + 2);
+      doc.text("VALIDAÇÃO E CONFORMIDADE", margin, currentY);
+      currentY += 5;
+
+      const sigBoxWidth = (contentWidth / 2) - 10;
+      
+      // Assinatura Cliente
       if (clientSignature) {
-        doc.addImage(clientSignature, 'PNG', 20, startSignatures + 5, 60, 30);
-        doc.setFontSize(7);
-        doc.text("PELO CLIENTE", 20, startSignatures + 38);
+        try {
+          doc.addImage(clientSignature, 'PNG', margin, currentY, 60, 25);
+        } catch (e) {}
       }
-      if (technicianSignature) {
-        doc.addImage(technicianSignature, 'PNG', 130, startSignatures + 5, 60, 30);
-        doc.setFontSize(7);
-        doc.text("PELO TÉCNICO", 130, startSignatures + 38);
-      }
+      doc.setDrawColor(203, 213, 225);
+      doc.line(margin, currentY + 26, margin + sigBoxWidth, currentY + 26);
       doc.setFontSize(7);
-      doc.setTextColor(150);
-      doc.text("ESTE DOCUMENTO É UM REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA REAL FRIO.", pageWidth / 2, 285, { align: 'center' });
-      doc.save(`REALFRIO_RELATORIO_${os.code}.pdf`);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(148, 163, 184);
+      doc.text("PELO CLIENTE", margin + (sigBoxWidth / 2), currentY + 31, { align: 'center' });
+
+      // Assinatura Técnico
+      if (technicianSignature) {
+        try {
+          doc.addImage(technicianSignature, 'PNG', margin + (contentWidth / 2) + 10, currentY, 60, 25);
+        } catch (e) {}
+      }
+      doc.line(margin + (contentWidth / 2) + 10, currentY + 26, margin + contentWidth, currentY + 26);
+      doc.text("PELO TÉCNICO", margin + (contentWidth / 2) + 10 + (sigBoxWidth / 2), currentY + 31, { align: 'center' });
+
+      // 6. FOOTER
+      doc.setFontSize(7);
+      doc.setTextColor(148, 163, 184);
+      doc.text("Este documento é um comprovativo digital de intervenção técnica Real Frio.", pageWidth / 2, 285, { align: 'center' });
+      
+      doc.save(`RELATORIO_REALFRIO_${os.code}.pdf`);
     } catch (err) {
       console.error(err);
-      setErrorMessage("ERRO AO GERAR PDF.");
+      setErrorMessage("ERRO AO GERAR PDF PROFISSIONAL.");
     } finally {
       setIsExportingPDF(false);
     }
@@ -611,23 +705,12 @@ export const ServiceOrderDetail: React.FC = () => {
       return;
     }
     
-    // Suporte para Bridge do AI Studio se presente
-    if (window.aistudio) {
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      if (!hasKey) {
-        if (confirm("Para utilizar o resumo via IA, deve selecionar uma chave de API paga. Deseja configurar agora?")) {
-           await window.aistudio.openSelectKey();
-        }
-        return;
-      }
-    }
-
     setIsGenerating(true);
     try {
-      const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity.toLocaleString('pt-PT')}x ${p.name}`), "INTERVENÇÃO TÉCNICA");
+      const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity.toLocaleString('pt-PT')}x ${p.name}`), os?.type || "INTERVENÇÃO TÉCNICA");
       if (summary) {
         setResolutionNotes(summary.toUpperCase());
-        await mockData.addOSActivity(id!, { description: "GEROU RESUMO VIA IA" });
+        await mockData.addOSActivity(id!, { description: "GEROU RESUMO TÉCNICO VIA IA (PT-PT)" });
       }
     } catch (e: any) {
       setErrorMessage(e.message || "ERRO AO COMUNICAR COM A IA.");
@@ -743,6 +826,64 @@ export const ServiceOrderDetail: React.FC = () => {
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
+               <button onClick={() => setExpandedWarranty(!expandedWarranty)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                 <div className="flex items-center gap-3">
+                   <ShieldCheck size={18} className={isWarranty ? "text-emerald-500" : "text-slate-400"} />
+                   <div className="text-left">
+                     <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Estado de Garantia</h3>
+                     <p className={`text-[11px] font-bold uppercase tracking-tight mt-0.5 ${isWarranty ? "text-emerald-600" : "text-slate-400"}`}>
+                       {isWarranty ? "Intervenção em Garantia" : "Serviço Fora de Garantia"}
+                     </p>
+                   </div>
+                 </div>
+                 {expandedWarranty ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
+               </button>
+               {expandedWarranty && (
+                 <div className="px-6 pb-6 space-y-6 animate-in slide-in-from-top-2 duration-200">
+                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl">
+                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ativar Regime de Garantia</span>
+                       <button 
+                         onClick={toggleWarranty}
+                         disabled={os?.status === OSStatus.CONCLUIDA}
+                         className={`w-12 h-6 rounded-full transition-all relative ${isWarranty ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-800'}`}
+                       >
+                         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isWarranty ? 'left-7' : 'left-1'}`} />
+                       </button>
+                    </div>
+
+                    {isWarranty && (
+                      <div className="space-y-4 pt-2 animate-in zoom-in-95">
+                         <div className="grid grid-cols-1 gap-2">
+                            {[
+                              { id: 'has_brand', label: 'Marca Identificada' },
+                              { id: 'has_model', label: 'Modelo Identificado' },
+                              { id: 'has_serial', label: 'Nº Série Identificado' },
+                              { id: 'has_photo_nameplate', label: 'Foto Chapa Características' },
+                              { id: 'has_photo_parts', label: 'Foto Peça Avariada' },
+                              { id: 'has_failure_reason', label: 'Causa da Avaria Descrita' },
+                            ].map((item) => (
+                              <button
+                                key={item.id}
+                                disabled={os?.status === OSStatus.CONCLUIDA}
+                                onClick={() => setWarrantyInfo({...warrantyInfo, [item.id]: !((warrantyInfo as any)[item.id])})}
+                                className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-emerald-200 transition-all text-left"
+                              >
+                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase">{item.label}</span>
+                                {(warrantyInfo as any)[item.id] ? (
+                                  <CheckSquare className="text-emerald-500" size={16} />
+                                ) : (
+                                  <Square className="text-slate-200 dark:text-slate-800" size={16} />
+                                )}
+                              </button>
+                            ))}
+                         </div>
+                      </div>
+                    )}
+                 </div>
+               )}
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
                <button onClick={() => setExpandedClient(!expandedClient)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                  <div className="flex items-center gap-3"><Building2 size={18} className="text-blue-500" /><div className="text-left"><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Cliente & Contactos</h3>{!expandedClient && os?.client && <p className="text-[11px] font-bold text-blue-600 uppercase tracking-tight mt-0.5">{os.client.name}</p>}</div></div>
                  {expandedClient ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
@@ -764,8 +905,8 @@ export const ServiceOrderDetail: React.FC = () => {
                {expandedPlanning && (
                  <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-200">
                     <div className="grid grid-cols-2 gap-4">
-                       <div><label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Data</label><input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/5 transition-all" /></div>
-                       <div><label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Hora</label><input type="time" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/5 transition-all" /></div>
+                       <div><label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Data</label><input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" /></div>
+                       <div><label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Hora</label><input type="time" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" /></div>
                     </div>
                  </div>
                )}
@@ -910,7 +1051,7 @@ export const ServiceOrderDetail: React.FC = () => {
         )}
       </div>
 
-      {/* MENU FLUTUANTE INFERIOR - CORRIGIDO */}
+      {/* MENU FLUTUANTE INFERIOR */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-[#9d1c24] dark:border-[#9d1c24]/60 shadow-[0_12px_40px_rgba(157,28,36,0.25)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
         {[
           { id: 'info', icon: Info, label: 'INFO' },
@@ -984,7 +1125,7 @@ export const ServiceOrderDetail: React.FC = () => {
                     <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Referência</label><div className="relative"><Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} /><input type="text" value={newPartForm.reference} onChange={e => setNewPartForm({...newPartForm, reference: e.target.value})} className="w-full pl-11 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-mono font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" placeholder="EX: 102030" /></div></div>
                   </div>
                 )}
-                {(selectedPartId || isCreatingNewPart) && (<div className="pt-4 flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-6 rounded-3xl animate-in slide-in-from-top-2"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">QTD:</span><div className="flex items-center gap-4"><button onClick={() => { const currentVal = parseFloat(partQuantityStr.replace(',', '.')); const newVal = Math.max(0.1, Number((currentVal - 1).toFixed(3))); setPartQuantityStr(newVal.toString().replace('.', ',')); }} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm active:scale-90 transition-all"><Minus size={18} /></button><input type="text" inputMode="decimal" value={partQuantityStr} onChange={e => { const val = e.target.value.replace(',', '.'); if (/^\d*[.]?\d*$/.test(val) || val === '') setPartQuantityStr(e.target.value); }} className="w-16 bg-transparent text-lg font-black text-slate-900 dark:text-white text-center outline-none border-b-2 border-transparent focus:border-blue-500 transition-all" /><button onClick={() => { const currentVal = parseFloat(partQuantityStr.replace(',', '.')) || 0; const newVal = Number((currentVal + 1).toFixed(3)); setPartQuantityStr(newVal.toString().replace('.', ',')); }} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm active:scale-90 transition-all"><Plus size={18} /></button></div></div>)}
+                {(selectedPartId || isCreatingNewPart) && (<div className="pt-4 flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-6 rounded-3xl animate-in slide-in-from-top-2"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">QTD:</span><div className="flex items-center gap-4"><button onClick={() => { const currentVal = parseFloat(partQuantityStr.replace(',', '.')); const newVal = Math.max(0.1, Number((currentVal - 1).toFixed(3))); setPartQuantityStr(newVal.toString().replace('.', ',')); }} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm active:scale-90 transition-all"><Minus size={18} /></button><input type="text" inputMode="decimal" value={partQuantityStr} onChange={e => { const val = e.target.value.replace(',', '.'); if (/^\d*[.]?\d*$/.test(val) || val === '') setPartQuantityStr(e.target.value); }} className="w-16 bg-transparent text-lg font-black text-slate-900 dark:text-white text-center outline-none border-b-2 border-transparent focus:border-blue-500 transition-all" /><button onClick={() => { const currentVal = parseFloat(tempQuantityStr.replace(',', '.')) || 0; const newVal = Number((currentVal + 1).toFixed(3)); setPartQuantityStr(newVal.toString().replace('.', ',')); }} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm active:scale-90 transition-all"><Plus size={18} /></button></div></div>)}
                 <button onClick={isCreatingNewPart ? handleCreateAndAddPart : handleAddPart} disabled={(isCreatingNewPart ? !newPartForm.name : !selectedPartId) || actionLoading} className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50">{actionLoading ? <Loader2 size={20} className="animate-spin mx-auto" /> : isCreatingNewPart ? 'REGISTAR E APLICAR' : 'CONFIRMAR APLICAÇÃO'}</button>
               </div>
            </div>
@@ -1008,7 +1149,7 @@ export const ServiceOrderDetail: React.FC = () => {
       {showDeletePartModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
-              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Trash2 size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Remover Material?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">Deseja retirar este material desta OS?</p><div className="grid grid-cols-2 gap-4"><button onClick={() => setShowDeletePartModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-2xl active:scale-95 transition-all font-black text-[10px] uppercase">CANCELAR</button><button onClick={handleDeletePart} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">REMOVER</button></div></div>
+              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Trash2 size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Remover Material?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">Deseja retirar este material desta OS?</p><div className="grid grid-cols-2 gap-4"><button onClick={() => setShowDeletePartModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button><button onClick={handleDeletePart} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">REMOVER</button></div></div>
            </div>
         </div>
       )}
@@ -1016,7 +1157,7 @@ export const ServiceOrderDetail: React.FC = () => {
       {showDeletePhotoModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
-              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Camera size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Eliminar Foto?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">Deseja apagar definitivamente esta evidência?</p><div className="grid grid-cols-2 gap-4"><button onClick={() => setShowDeletePhotoModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-2xl active:scale-95 transition-all font-black text-[10px] uppercase">CANCELAR</button><button onClick={handleDeletePhoto} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ELIMINAR</button></div></div>
+              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Camera size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Eliminar Foto?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">Deseja apagar definitivamente esta evidência?</p><div className="grid grid-cols-2 gap-4"><button onClick={() => setShowDeletePhotoModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button><button onClick={handleDeletePhoto} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ELIMINAR</button></div></div>
            </div>
         </div>
       )}
@@ -1024,7 +1165,7 @@ export const ServiceOrderDetail: React.FC = () => {
       {showFinalizeModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
-              <div className="p-8"><div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><CheckCircle size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Finalizar Intervenção?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase">TODOS OS DADOS SERÃO BLOQUEADOS E O RELATÓRIO SERÁ GERADO.</p><div className="grid grid-cols-2 gap-4"><button onClick={() => setShowFinalizeModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-2xl active:scale-95 transition-all font-black text-[10px] uppercase">CANCELAR</button><button onClick={async () => { await mockData.updateServiceOrder(id!, { status: OSStatus.CONCLUIDA, anomaly_detected: anomaly, resolution_notes: resolutionNotes, client_signature: clientSignature, technician_signature: technicianSignature, is_warranty: isWarranty, warranty_info: warrantyInfo }); navigate('/os'); }} className="py-4 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">CONFIRMAR</button></div></div>
+              <div className="p-8"><div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><CheckCircle size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Finalizar Intervenção?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase">TODOS OS DADOS SERÃO BLOQUEADOS E O RELATÓRIO SERÁ GERADO.</p><div className="grid grid-cols-2 gap-4"><button onClick={() => setShowFinalizeModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button><button onClick={async () => { await mockData.updateServiceOrder(id!, { status: OSStatus.CONCLUIDA, anomaly_detected: anomaly, resolution_notes: resolutionNotes, client_signature: clientSignature, technician_signature: technicianSignature, is_warranty: isWarranty, warranty_info: warrantyInfo }); setShowFinalizeModal(false); setActiveTab('info'); fetchOSDetails(false); }} className="py-4 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">CONFIRMAR</button></div></div>
            </div>
         </div>
       )}

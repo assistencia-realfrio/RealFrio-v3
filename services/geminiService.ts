@@ -5,34 +5,36 @@ export const generateOSReportSummary = async (
   anomaly: string,
   notes: string,
   parts: string[],
-  duration: string
+  type: string
 ): Promise<string> => {
   try {
-    // A chave vem do mapeamento definido no vite.config.ts
     const apiKey = process.env.API_KEY;
 
     if (!apiKey || apiKey === 'undefined' || apiKey === '') {
-      console.error("DEBUG: API_KEY está vazia ou indefinida.");
       throw new Error("API_KEY_MISSING");
     }
 
-    // Inicialização direta conforme regras Gemini SDK
     const ai = new GoogleGenAI({ apiKey });
     
+    // Prompt otimizado para PT-PT e contexto técnico da Real Frio
     const prompt = `
-      Atua como um assistente administrativo técnico sénior da Real Frio.
-      Gera um resumo profissional e conciso (em Português de Portugal) para um Relatório de Ordem de Serviço com base nos seguintes dados:
-      
-      Pedido do Cliente: ${description}
-      Anomalia Detetada: ${anomaly || 'Não especificada'}
-      Trabalho Efetuado: ${notes}
-      Material: ${parts.join(', ') || 'Nenhum'}
-      Tipo: ${duration}
+      Atua como um técnico sénior de refrigeração e climatização da empresa Real Frio.
+      Gera um resumo técnico, profissional e extremamente conciso para o relatório de uma Ordem de Serviço (OS).
+      O texto deve ser escrito obrigatoriamente em Português de Portugal (PT-PT).
 
-      REGRAS:
-      1. Linguagem técnica e formal do setor do frio.
-      2. RETORNA APENAS O TEXTO DO RESUMO FINAL.
-      3. Sem saudações ou introduções.
+      DADOS DA INTERVENÇÃO:
+      - Tipo de Serviço: ${type}
+      - Pedido Original: ${description}
+      - Anomalia Detetada: ${anomaly || 'Não especificada'}
+      - Notas de Resolução/Trabalho: ${notes}
+      - Material Aplicado: ${parts.join(', ') || 'Nenhum material registado'}
+
+      REGRAS DO RESUMO:
+      1. Usa terminologia técnica correta (ex: fluido frigorigéneo, evaporador, condensadora, vácuo, carga, etc).
+      2. Escreve na terceira pessoa ou infinitivo (ex: "Efetuada a substituição..." ou "Procedeu-se à limpeza...").
+      3. Sê direto. Elimina "Olá", "Aqui está o resumo" ou qualquer introdução.
+      4. Garante que o tom é formal e adequado para um relatório oficial que o cliente irá ler.
+      5. RETORNA APENAS O TEXTO DO RESUMO.
     `;
 
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -40,16 +42,12 @@ export const generateOSReportSummary = async (
       contents: prompt,
     });
 
-    // Acesso direto à propriedade text (getter)
-    return response.text?.trim() || "O motor de IA não conseguiu gerar um resumo válido.";
+    return response.text?.trim() || "Não foi possível gerar um resumo automático.";
   } catch (error: any) {
     console.error("Erro Gemini:", error);
     if (error.message === "API_KEY_MISSING") {
-      throw new Error("Chave de API não configurada. Defina GEMINI_API_KEY no painel da Vercel e faça Redeploy.");
+      throw new Error("Chave de API (GEMINI_API_KEY) não encontrada no ambiente.");
     }
-    if (error.message?.includes("Requested entity was not found")) {
-      throw new Error("A chave de API fornecida é inválida ou o modelo não está disponível.");
-    }
-    throw new Error("Erro na comunicação com o serviço de Inteligência Artificial.");
+    throw new Error("Falha na comunicação com a IA. Tente novamente mais tarde.");
   }
 };
