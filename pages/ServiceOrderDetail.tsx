@@ -401,7 +401,7 @@ export const ServiceOrderDetail: React.FC = () => {
   };
 
   /**
-   * Lógica de Geração de PDF Otimizada (Ficheiro Pequeno e Layout Compacto)
+   * Geração de PDF Ultra-Compacto (Mínimo espaço vazio e ficheiro leve)
    */
   const createPDFDocument = async () => {
     if (!os) return null;
@@ -414,153 +414,150 @@ export const ServiceOrderDetail: React.FC = () => {
     });
 
     const pageWidth = doc.internal.pageSize.width;
-    const margin = 15; // Reduzida de 20 para 15 para ganhar espaço lateral
+    const margin = 12; // Margem reduzida para maximizar espaço
     const contentWidth = pageWidth - (margin * 2);
     
-    // 1. HEADER MODERNO (Mais baixo para poupar espaço)
+    // 1. HEADER COMPACTO
     doc.setFillColor(15, 23, 42); 
-    doc.rect(0, 0, pageWidth, 35, 'F'); // Reduzido de 45 para 35
+    doc.rect(0, 0, pageWidth, 30, 'F'); 
     
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
+    doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.text("REAL FRIO", margin, 18);
-    
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 24);
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(os.code, pageWidth - margin, 18, { align: 'right' });
+    doc.text("REAL FRIO", margin, 15);
     
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
+    doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 21);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(os.code, pageWidth - margin, 15, { align: 'right' });
+    
+    doc.setFontSize(6.5);
+    doc.setFont("helvetica", "normal");
     doc.setTextColor(180, 180, 180);
-    doc.text(`EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 24, { align: 'right' });
+    doc.text(`EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 21, { align: 'right' });
 
-    let currentY = 42; // Começa mais cedo
+    let currentY = 36;
 
-    // 2. SECÇÃO: DADOS DO CLIENTE & EQUIPAMENTO (Compactada)
+    // 2. BLOCO DE DADOS CLIENTE/EQUIPAMENTO (Extremamente Compacto)
     doc.setDrawColor(241, 245, 249);
     doc.setFillColor(252, 252, 253);
-    doc.roundedRect(margin, currentY, contentWidth, 28, 2, 2, 'FD'); // Altura reduzida de 35 para 28
+    doc.roundedRect(margin, currentY, contentWidth, 24, 1.5, 1.5, 'FD'); 
     
     doc.setTextColor(15, 23, 42);
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
-    doc.text("DADOS DO CLIENTE", margin + 4, currentY + 6);
-    doc.text("EQUIPAMENTO", margin + (contentWidth / 2) + 4, currentY + 6);
+    doc.text("DADOS DO CLIENTE", margin + 3, currentY + 5);
+    doc.text("EQUIPAMENTO", margin + (contentWidth / 2) + 3, currentY + 5);
     
     doc.setDrawColor(226, 232, 240);
-    doc.line(margin + 4, currentY + 8, margin + (contentWidth / 2) - 4, currentY + 8);
-    doc.line(margin + (contentWidth / 2) + 4, currentY + 8, margin + contentWidth - 4, currentY + 8);
+    doc.line(margin + 3, currentY + 7, margin + (contentWidth / 2) - 3, currentY + 7);
+    doc.line(margin + (contentWidth / 2) + 3, currentY + 7, margin + contentWidth - 3, currentY + 7);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setTextColor(71, 85, 105);
     
     // Coluna Cliente
-    doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 4, currentY + 13);
-    doc.text(`FIRMA: ${os.client?.billing_name || '---'}`, margin + 4, currentY + 18, { maxWidth: (contentWidth / 2) - 10 });
-    doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 4, currentY + 23);
+    doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 3, currentY + 11);
+    doc.text(`FIRMA: ${os.client?.billing_name || '---'}`, margin + 3, currentY + 15, { maxWidth: (contentWidth / 2) - 8 });
+    doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 3, currentY + 19);
     
     // Coluna Equipamento
-    doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 4, currentY + 13);
-    doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 4, currentY + 18);
-    doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 4, currentY + 23);
+    doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 3, currentY + 11);
+    doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 3, currentY + 15);
+    doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 3, currentY + 19);
 
-    currentY += 36; // Menor salto para a narrativa
+    currentY += 30;
 
-    // 3. SECÇÃO: NARRATIVA TÉCNICA (Compactada)
+    // 3. SECÇÕES DE TEXTO (Juntas, sem espaços mortos)
     const narrativeFields = [
-      { label: "PEDIDO / DESCRIÇÃO DA AVARIA", value: os.description || 'N/A' },
-      { label: "ANOMALIA DETETADA", value: os.anomaly_detected || 'N/A' },
-      { label: "RESOLUÇÃO / TRABALHO EFETUADO", value: os.resolution_notes || 'N/A' }
+      { label: "DESCRIÇÃO DO PEDIDO / AVARIA:", value: os.description || 'N/A' },
+      { label: "ANOMALIA DETETADA NO LOCAL:", value: os.anomaly_detected || 'N/A' },
+      { label: "TRABALHO EFETUADO E RESOLUÇÃO:", value: os.resolution_notes || 'N/A' }
     ];
 
     narrativeFields.forEach(field => {
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.text(field.label, margin, currentY);
       
-      currentY += 4;
+      currentY += 3.5;
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8.5); // Texto ligeiramente maior para legibilidade
+      doc.setFontSize(8); 
       doc.setTextColor(51, 65, 85);
       
       const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth);
       doc.text(splitText, margin, currentY);
       
-      currentY += (splitText.length * 4.5) + 6; // Reduzido o espaço entre blocos
+      currentY += (splitText.length * 4) + 4.5; // Espaçamento entre blocos mínimo
 
-      if (currentY > 270) { doc.addPage(); currentY = 20; }
+      if (currentY > 275) { doc.addPage(); currentY = 15; }
     });
 
-    // 4. SECÇÃO: MATERIAL APLICADO (Tabela Compacta)
+    // 4. MATERIAL (Tabela sem respiros excessivos)
     if (partsUsed.length > 0) {
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.text("MATERIAL APLICADO:", margin, currentY);
-      currentY += 3;
+      currentY += 2.5;
 
       autoTable(doc, {
         startY: currentY,
         margin: { left: margin, right: margin },
         theme: 'plain',
-        head: [['ARTIGO / DESIGNAÇÃO', 'REFERÊNCIA', 'QUANTIDADE']],
+        head: [['ARTIGO / DESIGNAÇÃO', 'REFERÊNCIA', 'QTD']],
         body: partsUsed.map(p => [p.name.toUpperCase(), p.reference.toUpperCase(), `${p.quantity.toLocaleString('pt-PT')} UN`]),
-        headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontSize: 7, fontStyle: 'bold', halign: 'left' },
-        styles: { fontSize: 8, cellPadding: 2, textColor: [51, 65, 85], lineWidth: 0.1, lineColor: [241, 245, 249] },
+        headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontSize: 6.5, fontStyle: 'bold', halign: 'left' },
+        styles: { fontSize: 7.5, cellPadding: 1.5, textColor: [51, 65, 85], lineWidth: 0.05, lineColor: [241, 245, 249] },
         columnStyles: { 2: { halign: 'right' } }
       });
-      currentY = (doc as any).lastAutoTable.finalY + 12;
-    } else {
-      currentY += 2;
+      currentY = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    // 5. ASSINATURAS (Aproximadas para evitar nova página desnecessária)
-    if (currentY > 240) { doc.addPage(); currentY = 20; }
+    // 5. ASSINATURAS (Aproximadas para evitar nova página)
+    if (currentY > 245) { doc.addPage(); currentY = 15; }
 
     doc.setDrawColor(226, 232, 240);
     doc.line(margin, currentY, pageWidth - margin, currentY);
-    currentY += 8;
+    currentY += 6;
     
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
     doc.text("VALIDAÇÃO E CONFORMIDADE", margin, currentY);
     currentY += 4;
 
-    const sigBoxWidth = (contentWidth / 2) - 10;
+    const sigBoxWidth = (contentWidth / 2) - 8;
     
     // Assinatura Cliente
     if (clientSignature) { 
       try { 
-        doc.addImage(clientSignature, 'JPEG', margin, currentY, 50, 20, undefined, 'FAST'); 
+        doc.addImage(clientSignature, 'JPEG', margin, currentY, 45, 18, undefined, 'FAST'); 
       } catch (e) {} 
     }
     doc.setDrawColor(203, 213, 225);
-    doc.line(margin, currentY + 22, margin + sigBoxWidth, currentY + 22);
-    doc.setFontSize(6.5);
+    doc.line(margin, currentY + 20, margin + sigBoxWidth, currentY + 20);
+    doc.setFontSize(6);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(148, 163, 184);
-    doc.text("ASSINATURA CLIENTE", margin + (sigBoxWidth / 2), currentY + 26, { align: 'center' });
+    doc.text("ASSINATURA CLIENTE", margin + (sigBoxWidth / 2), currentY + 24, { align: 'center' });
 
     // Assinatura Técnico
     if (technicianSignature) { 
       try { 
-        doc.addImage(technicianSignature, 'JPEG', margin + (contentWidth / 2) + 10, currentY, 50, 20, undefined, 'FAST'); 
+        doc.addImage(technicianSignature, 'JPEG', margin + (contentWidth / 2) + 8, currentY, 45, 18, undefined, 'FAST'); 
       } catch (e) {} 
     }
-    doc.line(margin + (contentWidth / 2) + 10, currentY + 22, margin + contentWidth, currentY + 22);
-    doc.text("ASSINATURA TÉCNICO", margin + (contentWidth / 2) + 10 + (sigBoxWidth / 2), currentY + 26, { align: 'center' });
+    doc.line(margin + (contentWidth / 2) + 8, currentY + 20, margin + contentWidth, currentY + 20);
+    doc.text("ASSINATURA TÉCNICO", margin + (contentWidth / 2) + 8 + (sigBoxWidth / 2), currentY + 24, { align: 'center' });
 
-    // 6. FOOTER (Fixo no fundo)
-    doc.setFontSize(6);
+    doc.setFontSize(5.5);
     doc.setTextColor(148, 163, 184);
-    doc.text("Documento digital oficial Real Frio. Intervenção em conformidade com as normas técnicas de refrigeração.", pageWidth / 2, 288, { align: 'center' });
+    doc.text("Relatório oficial Real Frio. Sistema Cloud v3.0", pageWidth / 2, 290, { align: 'center' });
     
     return doc;
   };
@@ -569,7 +566,7 @@ export const ServiceOrderDetail: React.FC = () => {
     setIsExportingPDF(true);
     try {
       const doc = await createPDFDocument();
-      if (doc) doc.save(`RELATORIO_REALFRIO_${os?.code}.pdf`);
+      if (doc) doc.save(`RELATORIO_${os?.code}.pdf`);
     } catch (err) {
       setErrorMessage("ERRO AO GERAR PDF.");
     } finally {
@@ -577,8 +574,17 @@ export const ServiceOrderDetail: React.FC = () => {
     }
   };
 
+  /**
+   * Envio de email com texto padrão solicitado pela Real Frio
+   */
   const handleSendEmailShortcut = async () => {
     if (!os) return;
+    
+    const clientEmail = os.client?.email?.trim();
+    if (!clientEmail) {
+      alert("ATENÇÃO: Este cliente não tem um email registado na ficha. Por favor, preencha o destinatário manualmente no seu gestor de email.");
+    }
+
     setIsExportingPDF(true);
     try {
       const doc = await createPDFDocument();
@@ -588,32 +594,37 @@ export const ServiceOrderDetail: React.FC = () => {
       const filename = `RELATORIO_REALFRIO_${os.code}.pdf`;
       const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
 
-      const clientEmail = os.client?.email || '';
-      const subject = `RELATÓRIO DE ASSISTÊNCIA TÉCNICA - ${os.code} - ${os.client?.name}`;
+      const interventionDate = new Date(os.created_at).toLocaleDateString('pt-PT');
+      const equipmentInfo = os.equipment ? `${os.equipment.type} - ${os.equipment.brand}` : '---';
+      
+      const subject = `RELATÓRIO TÉCNICO - ${os.code} - ${os.client?.name}`;
+      
+      // Texto padrão solicitado
       const body = `Exmos. Srs.\n\n` +
-                   `Junto enviamos o relatório técnico relativo à intervenção efetuada em ${new Date(os.created_at).toLocaleDateString('pt-PT')}.\n\n` +
+                   `Junto enviamos o relatório técnico relativo à intervenção efetuada em ${interventionDate}.\n\n` +
                    `Código OS: ${os.code}\n` +
-                   `Equipamento: ${os.equipment?.type || '---'} - ${os.equipment?.brand || '---'}\n\n` +
-                   `Por favor, encontre o PDF em anexo.\n\n` +
+                   `Equipamento: ${equipmentInfo}\n\n` +
                    `Com os melhores cumprimentos,\n` +
-                   `Real Frio`;
+                   `Real Frio, Lda`;
 
+      // Mobile: Partilha nativa com anexo
       if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
         await navigator.share({
           files: [pdfFile],
           title: subject,
           text: body,
         });
-        await mockData.addOSActivity(os.id, { description: 'RELATÓRIO PARTILHADO VIA DISPOSITIVO' });
+        await mockData.addOSActivity(os.id, { description: `RELATÓRIO PARTILHADO (PREVISTO PARA: ${clientEmail || 'MANUAL'})` });
       } else {
+        // Desktop: Fallback mailto com destinatário correto
         doc.save(filename);
-        const mailtoLink = `mailto:${clientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\n(Atenção: O ficheiro foi descarregado para o seu computador. Por favor, anexe-o a este email.)')}`;
+        const mailtoLink = `mailto:${clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\n(Nota: O ficheiro PDF foi descarregado para o seu computador. Por favor, anexe-o antes de enviar.)')}`;
         window.location.href = mailtoLink;
-        await mockData.addOSActivity(os.id, { description: 'RELATÓRIO ENVIADO (FALLBACK DESKTOP)' });
+        await mockData.addOSActivity(os.id, { description: `EMAIL ABERTO PARA: ${clientEmail || 'MANUAL'}` });
       }
     } catch (err) {
       console.error(err);
-      setErrorMessage("ERRO AO PREPARAR PARTILHA.");
+      setErrorMessage("ERRO AO PREPARAR ENVIO.");
     } finally {
       setIsExportingPDF(false);
     }
@@ -829,22 +840,22 @@ export const ServiceOrderDetail: React.FC = () => {
                     <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500/70 uppercase tracking-tight mt-1.5">A OS está bloqueada para edição</p>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <button onClick={handleSendEmailShortcut} className="p-3 bg-white dark:bg-slate-800 text-blue-600 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:scale-105 transition-all" title="Partilhar Relatório">
-                       <Share2 size={18} />
+                    <button onClick={handleSendEmailShortcut} className="p-3 bg-white dark:bg-slate-800 text-blue-600 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:scale-105 transition-all" title="Enviar Relatório">
+                       <Mail size={18} />
                     </button>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <button onClick={generatePDFReport} disabled={isExportingPDF} className="flex items-center justify-center gap-3 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-70">
+                  <button onClick={generatePDFReport} typeof="button" disabled={isExportingPDF} className="flex items-center justify-center gap-3 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-70">
                     {isExportingPDF ? <Loader2 size={18} className="animate-spin" /> : <FileDown size={18} />} 
                     {isExportingPDF ? 'A GERAR PDF...' : 'VER RELATÓRIO PDF'}
                   </button>
-                  <button onClick={() => setShowReopenModal(true)} className="flex items-center justify-center gap-3 py-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 transition-all active:scale-95">
+                  <button onClick={() => setShowReopenModal(true)} typeof="button" className="flex items-center justify-center gap-3 py-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 transition-all active:scale-95">
                     <RotateCw size={18} /> REABRIR PARA EDIÇÃO
                   </button>
-                  <button onClick={handleSendEmailShortcut} disabled={isExportingPDF} className="sm:col-span-2 flex items-center justify-center gap-3 py-4 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-blue-100 transition-all active:scale-95 disabled:opacity-50">
+                  <button onClick={handleSendEmailShortcut} typeof="button" disabled={isExportingPDF} className="sm:col-span-2 flex items-center justify-center gap-3 py-4 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-blue-100 transition-all active:scale-95 disabled:opacity-50">
                     {isExportingPDF ? <Loader2 size={18} className="animate-spin" /> : <Mail size={18} />} 
-                    {isExportingPDF ? 'A PREPARAR ANEXO...' : 'ENVIAR RELATÓRIO COM ANEXO'}
+                    {isExportingPDF ? 'A PREPARAR ANEXO...' : `ENVIAR PARA: ${os.client?.email || '(MANUAL)'}`}
                   </button>
                 </div>
               </div>
