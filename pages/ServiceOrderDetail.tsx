@@ -10,7 +10,7 @@ import {
   User, ChevronRight, ChevronDown, ChevronUp, Calendar, RotateCcw,
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
   RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
-  Settings2, FileDown, Key
+  Settings2, FileDown, Key, Mail, Share2
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -400,185 +400,184 @@ export const ServiceOrderDetail: React.FC = () => {
     }
   };
 
+  /**
+   * Lógica de Geração de PDF unificada
+   */
+  const createPDFDocument = async () => {
+    if (!os) return null;
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 20;
+    const contentWidth = pageWidth - (margin * 2);
+    
+    // 1. HEADER MODERNO
+    doc.setFillColor(15, 23, 42); 
+    doc.rect(0, 0, pageWidth, 45, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+    doc.text("REAL FRIO", margin, 22);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 30);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(os.code, pageWidth - margin, 22, { align: 'right' });
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(180, 180, 180);
+    doc.text(`DATA DE EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 30, { align: 'right' });
+
+    let currentY = 60;
+
+    // 2. SECÇÃO: DADOS DO CLIENTE & EQUIPAMENTO
+    doc.setDrawColor(241, 245, 249);
+    doc.setFillColor(252, 252, 253);
+    doc.roundedRect(margin, currentY, contentWidth, 35, 3, 3, 'FD');
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("DADOS DO CLIENTE", margin + 5, currentY + 8);
+    doc.text("EQUIPAMENTO INTERVENCIONADO", margin + (contentWidth / 2) + 5, currentY + 8);
+    doc.setDrawColor(226, 232, 240);
+    doc.line(margin + 5, currentY + 10, margin + (contentWidth / 2) - 5, currentY + 10);
+    doc.line(margin + (contentWidth / 2) + 5, currentY + 10, margin + contentWidth - 5, currentY + 10);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 5, currentY + 16);
+    doc.text(`FATURAÇÃO: ${os.client?.billing_name || '---'}`, margin + 5, currentY + 22, { maxWidth: (contentWidth / 2) - 10 });
+    doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 5, currentY + 28);
+    doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 5, currentY + 16);
+    doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 5, currentY + 22);
+    doc.text(`Nº SÉRIE (S/N): ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 5, currentY + 28);
+
+    currentY += 45;
+
+    // 3. SECÇÃO: NARRATIVA TÉCNICA
+    const narrativeFields = [
+      { label: "PEDIDO DO CLIENTE / DESCRIÇÃO DA AVARIA", value: os.description || 'Não especificado.' },
+      { label: "ANOMALIA DETETADA", value: os.anomaly_detected || 'Não descrita.' },
+      { label: "TRABALHO EFETUADO / RESOLUÇÃO", value: os.resolution_notes || 'Sem notas de resolução.' }
+    ];
+
+    narrativeFields.forEach(field => {
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text(field.label + ":", margin, currentY);
+      currentY += 5;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(51, 65, 85);
+      const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth);
+      doc.text(splitText, margin, currentY);
+      currentY += (splitText.length * 5) + 10;
+      if (currentY > 260) { doc.addPage(); currentY = 25; }
+    });
+
+    // 4. SECÇÃO: MATERIAL APLICADO
+    if (partsUsed.length > 0) {
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text("MATERIAL E COMPONENTES APLICADOS:", margin, currentY);
+      currentY += 4;
+      autoTable(doc, {
+        startY: currentY,
+        margin: { left: margin, right: margin },
+        theme: 'plain',
+        head: [['ARTIGO / DESIGNAÇÃO', 'REFERÊNCIA', 'QUANTIDADE']],
+        body: partsUsed.map(p => [p.name.toUpperCase(), p.reference.toUpperCase(), `${p.quantity.toLocaleString('pt-PT')} UN`]),
+        headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontSize: 7, fontStyle: 'bold', halign: 'left' },
+        styles: { fontSize: 8, cellPadding: 4, textColor: [51, 65, 85], lineWidth: 0.1, lineColor: [241, 245, 249] },
+        columnStyles: { 2: { halign: 'right' } }
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 20;
+    } else {
+      currentY += 5;
+    }
+
+    // 5. ASSINATURAS
+    if (currentY > 230) { doc.addPage(); currentY = 30; }
+    doc.setDrawColor(226, 232, 240);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+    currentY += 10;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("VALIDAÇÃO E CONFORMIDADE", margin, currentY);
+    currentY += 5;
+    const sigBoxWidth = (contentWidth / 2) - 10;
+    if (clientSignature) { try { doc.addImage(clientSignature, 'PNG', margin, currentY, 60, 25); } catch (e) {} }
+    doc.setDrawColor(203, 213, 225);
+    doc.line(margin, currentY + 26, margin + sigBoxWidth, currentY + 26);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(148, 163, 184);
+    doc.text("PELO CLIENTE", margin + (sigBoxWidth / 2), currentY + 31, { align: 'center' });
+    if (technicianSignature) { try { doc.addImage(technicianSignature, 'PNG', margin + (contentWidth / 2) + 10, currentY, 60, 25); } catch (e) {} }
+    doc.line(margin + (contentWidth / 2) + 10, currentY + 26, margin + contentWidth, currentY + 26);
+    doc.text("PELO TÉCNICO", margin + (contentWidth / 2) + 10 + (sigBoxWidth / 2), currentY + 31, { align: 'center' });
+
+    // 6. FOOTER
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text("Este documento é um comprovativo digital de intervenção técnica Real Frio.", pageWidth / 2, 285, { align: 'center' });
+    
+    return doc;
+  };
+
   const generatePDFReport = async () => {
+    setIsExportingPDF(true);
+    try {
+      const doc = await createPDFDocument();
+      if (doc) doc.save(`RELATORIO_REALFRIO_${os?.code}.pdf`);
+    } catch (err) {
+      setErrorMessage("ERRO AO GERAR PDF.");
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
+  const handleSendEmailShortcut = async () => {
     if (!os) return;
     setIsExportingPDF(true);
     try {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.width;
-      const margin = 20;
-      const contentWidth = pageWidth - (margin * 2);
-      
-      // 1. HEADER MODERNO
-      doc.setFillColor(15, 23, 42); 
-      doc.rect(0, 0, pageWidth, 45, 'F');
-      
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
-      doc.setFont("helvetica", "bold");
-      doc.text("REAL FRIO", margin, 22);
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 30);
-      
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "bold");
-      doc.text(os.code, pageWidth - margin, 22, { align: 'right' });
-      
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(180, 180, 180);
-      doc.text(`DATA DE EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 30, { align: 'right' });
+      const doc = await createPDFDocument();
+      if (!doc) throw new Error("Falha ao gerar documento");
 
-      let currentY = 60;
+      const pdfBlob = doc.output('blob');
+      const filename = `RELATORIO_REALFRIO_${os.code}.pdf`;
+      const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
 
-      // 2. SECÇÃO: DADOS DO CLIENTE & EQUIPAMENTO (Layout em Grelha)
-      doc.setDrawColor(241, 245, 249);
-      doc.setFillColor(252, 252, 253);
-      doc.roundedRect(margin, currentY, contentWidth, 35, 3, 3, 'FD');
-      
-      doc.setTextColor(15, 23, 42);
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.text("DADOS DO CLIENTE", margin + 5, currentY + 8);
-      doc.text("EQUIPAMENTO INTERVENCIONADO", margin + (contentWidth / 2) + 5, currentY + 8);
-      
-      doc.setDrawColor(226, 232, 240);
-      doc.line(margin + 5, currentY + 10, margin + (contentWidth / 2) - 5, currentY + 10);
-      doc.line(margin + (contentWidth / 2) + 5, currentY + 10, margin + contentWidth - 5, currentY + 10);
+      const clientEmail = os.client?.email || '';
+      const subject = `RELATÓRIO DE ASSISTÊNCIA TÉCNICA - ${os.code} - ${os.client?.name}`;
+      const body = `Exmos. Srs.\n\n` +
+                   `Junto enviamos o relatório técnico relativo à intervenção efetuada em ${new Date(os.created_at).toLocaleDateString('pt-PT')}.\n\n` +
+                   `Código OS: ${os.code}\n` +
+                   `Equipamento: ${os.equipment?.type || '---'} - ${os.equipment?.brand || '---'}\n\n` +
+                   `Por favor, encontre o PDF em anexo.\n\n` +
+                   `Com os melhores cumprimentos,\n` +
+                   `Real Frio`;
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(71, 85, 105);
-      
-      // Coluna Cliente (MORADA REMOVIDA, NOME FATURAÇÃO ADICIONADO)
-      doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 5, currentY + 16);
-      doc.text(`FATURAÇÃO: ${os.client?.billing_name || '---'}`, margin + 5, currentY + 22, { maxWidth: (contentWidth / 2) - 10 });
-      doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 5, currentY + 28);
-      
-      // Coluna Equipamento
-      doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 5, currentY + 16);
-      doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 5, currentY + 22);
-      doc.text(`Nº SÉRIE (S/N): ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 5, currentY + 28);
-
-      currentY += 45;
-
-      // 3. SECÇÃO: NARRATIVA TÉCNICA (BLOCOS IGUAIS)
-      const narrativeFields = [
-        { label: "PEDIDO DO CLIENTE / DESCRIÇÃO DA AVARIA", value: os.description || 'Não especificado.' },
-        { label: "ANOMALIA DETETADA", value: os.anomaly_detected || 'Não descrita.' },
-        { label: "TRABALHO EFETUADO / RESOLUÇÃO", value: os.resolution_notes || 'Sem notas de resolução.' }
-      ];
-
-      narrativeFields.forEach(field => {
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(15, 23, 42);
-        doc.text(field.label + ":", margin, currentY);
-        
-        currentY += 5;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(51, 65, 85);
-        
-        const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth);
-        doc.text(splitText, margin, currentY);
-        
-        currentY += (splitText.length * 5) + 10;
-
-        // Verificar quebra de página
-        if (currentY > 260) {
-          doc.addPage();
-          currentY = 25;
-        }
-      });
-
-      // 4. SECÇÃO: MATERIAL APLICADO (Tabela Minimalista)
-      if (partsUsed.length > 0) {
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(15, 23, 42);
-        doc.text("MATERIAL E COMPONENTES APLICADOS:", margin, currentY);
-        currentY += 4;
-
-        autoTable(doc, {
-          startY: currentY,
-          margin: { left: margin, right: margin },
-          theme: 'plain',
-          head: [['ARTIGO / DESIGNAÇÃO', 'REFERÊNCIA', 'QUANTIDADE']],
-          body: partsUsed.map(p => [p.name.toUpperCase(), p.reference.toUpperCase(), `${p.quantity.toLocaleString('pt-PT')} UN`]),
-          headStyles: { 
-            fillColor: [248, 250, 252], 
-            textColor: [100, 116, 139], 
-            fontSize: 7, 
-            fontStyle: 'bold',
-            halign: 'left'
-          },
-          styles: { 
-            fontSize: 8, 
-            cellPadding: 4, 
-            textColor: [51, 65, 85],
-            lineWidth: 0.1,
-            lineColor: [241, 245, 249]
-          },
-          columnStyles: {
-            2: { halign: 'right' }
-          }
+      // Tenta usar a Web Share API para anexar automaticamente (Móvel)
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        await navigator.share({
+          files: [pdfFile],
+          title: subject,
+          text: body,
         });
-        currentY = (doc as any).lastAutoTable.finalY + 20;
+        await mockData.addOSActivity(os.id, { description: 'RELATÓRIO PARTILHADO VIA DISPOSITIVO' });
       } else {
-        currentY += 5;
+        // Fallback para mailto convencional em Desktop (com download prévio para facilitar)
+        doc.save(filename);
+        const mailtoLink = `mailto:${clientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\n(Atenção: O ficheiro foi descarregado para o seu computador. Por favor, anexe-o a este email.)')}`;
+        window.location.href = mailtoLink;
+        await mockData.addOSActivity(os.id, { description: 'RELATÓRIO ENVIADO (FALLBACK DESKTOP)' });
       }
-
-      // 5. ASSINATURAS (Layout de Base)
-      if (currentY > 230) {
-        doc.addPage();
-        currentY = 30;
-      }
-
-      doc.setDrawColor(226, 232, 240);
-      doc.line(margin, currentY, pageWidth - margin, currentY);
-      currentY += 10;
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.text("VALIDAÇÃO E CONFORMIDADE", margin, currentY);
-      currentY += 5;
-
-      const sigBoxWidth = (contentWidth / 2) - 10;
-      
-      // Assinatura Cliente
-      if (clientSignature) {
-        try {
-          doc.addImage(clientSignature, 'PNG', margin, currentY, 60, 25);
-        } catch (e) {}
-      }
-      doc.setDrawColor(203, 213, 225);
-      doc.line(margin, currentY + 26, margin + sigBoxWidth, currentY + 26);
-      doc.setFontSize(7);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(148, 163, 184);
-      doc.text("PELO CLIENTE", margin + (sigBoxWidth / 2), currentY + 31, { align: 'center' });
-
-      // Assinatura Técnico
-      if (technicianSignature) {
-        try {
-          doc.addImage(technicianSignature, 'PNG', margin + (contentWidth / 2) + 10, currentY, 60, 25);
-        } catch (e) {}
-      }
-      doc.line(margin + (contentWidth / 2) + 10, currentY + 26, margin + contentWidth, currentY + 26);
-      doc.text("PELO TÉCNICO", margin + (contentWidth / 2) + 10 + (sigBoxWidth / 2), currentY + 31, { align: 'center' });
-
-      // 6. FOOTER
-      doc.setFontSize(7);
-      doc.setTextColor(148, 163, 184);
-      doc.text("Este documento é um comprovativo digital de intervenção técnica Real Frio.", pageWidth / 2, 285, { align: 'center' });
-      
-      doc.save(`RELATORIO_REALFRIO_${os.code}.pdf`);
     } catch (err) {
       console.error(err);
-      setErrorMessage("ERRO AO GERAR PDF PROFISSIONAL.");
+      setErrorMessage("ERRO AO PREPARAR PARTILHA.");
     } finally {
       setIsExportingPDF(false);
     }
@@ -789,9 +788,14 @@ export const ServiceOrderDetail: React.FC = () => {
                   <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200 dark:shadow-none">
                     <CheckCircle2 size={24} />
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-black text-emerald-900 dark:text-emerald-400 uppercase tracking-widest leading-none">Intervenção Finalizada</h3>
                     <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500/70 uppercase tracking-tight mt-1.5">A OS está bloqueada para edição</p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button onClick={handleSendEmailShortcut} className="p-3 bg-white dark:bg-slate-800 text-blue-600 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:scale-105 transition-all" title="Partilhar Relatório">
+                       <Share2 size={18} />
+                    </button>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -801,6 +805,10 @@ export const ServiceOrderDetail: React.FC = () => {
                   </button>
                   <button onClick={() => setShowReopenModal(true)} className="flex items-center justify-center gap-3 py-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 transition-all active:scale-95">
                     <RotateCw size={18} /> REABRIR PARA EDIÇÃO
+                  </button>
+                  <button onClick={handleSendEmailShortcut} disabled={isExportingPDF} className="sm:col-span-2 flex items-center justify-center gap-3 py-4 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-blue-100 transition-all active:scale-95 disabled:opacity-50">
+                    {isExportingPDF ? <Loader2 size={18} className="animate-spin" /> : <Mail size={18} />} 
+                    {isExportingPDF ? 'A PREPARAR ANEXO...' : 'ENVIAR RELATÓRIO COM ANEXO'}
                   </button>
                 </div>
               </div>
@@ -1149,7 +1157,7 @@ export const ServiceOrderDetail: React.FC = () => {
       {showDeletePartModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
-              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Trash2 size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Remover Material?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">Deseja retirar este material desta OS?</p><div className="grid grid-cols-2 gap-4"><button onClick={() => setShowDeletePartModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button><button onClick={handleDeletePart} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">REMOVER</button></div></div>
+              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Trash2 size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Remover Material?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</p><button onClick={handleDeletePart} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">REMOVER</button></div>
            </div>
         </div>
       )}
@@ -1157,7 +1165,7 @@ export const ServiceOrderDetail: React.FC = () => {
       {showDeletePhotoModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
-              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Camera size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Eliminar Foto?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">Deseja apagar definitivamente esta evidência?</p><div className="grid grid-cols-2 gap-4"><button onClick={() => setShowDeletePhotoModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button><button onClick={handleDeletePhoto} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ELIMINAR</button></div></div>
+              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Camera size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Eliminar Foto?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</p><button onClick={handleDeletePhoto} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ELIMINAR</button></div>
            </div>
         </div>
       )}

@@ -470,6 +470,18 @@ const ClientDetail: React.FC = () => {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Nome de Faturação / Firma</label>
                   <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold text-slate-800 dark:text-slate-200 outline-none" value={editForm.billing_name} onChange={e => setEditForm({...editForm, billing_name: e.target.value})} />
                 </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Telefone Sede</label>
+                  <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold text-slate-800 dark:text-slate-200 outline-none" value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Email Faturação</label>
+                  <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold text-slate-800 dark:text-slate-200 outline-none lowercase-container" style={{textTransform: 'none'}} value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Morada Sede / Link Maps</label>
+                  <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold text-slate-800 dark:text-slate-200 outline-none" value={editForm.address} onChange={e => setEditForm({...editForm, address: e.target.value})} />
+                </div>
                 <div className="md:col-span-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Loja de Atendimento</label>
                   <select 
@@ -480,6 +492,10 @@ const ClientDetail: React.FC = () => {
                     <option value="Caldas da Rainha">CALDAS DA RAINHA</option>
                     <option value="Porto de Mós">PORTO DE MÓS</option>
                   </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Link Google Drive</label>
+                  <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-medium text-slate-800 dark:text-slate-200 outline-none" value={editForm.google_drive_link || ''} onChange={e => setEditForm({...editForm, google_drive_link: e.target.value})} placeholder="https://drive.google.com/..." />
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Notas Gerais</label>
