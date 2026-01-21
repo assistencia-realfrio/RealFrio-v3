@@ -401,88 +401,111 @@ export const ServiceOrderDetail: React.FC = () => {
   };
 
   /**
-   * Lógica de Geração de PDF unificada
+   * Lógica de Geração de PDF Otimizada (Ficheiro Pequeno e Layout Compacto)
    */
   const createPDFDocument = async () => {
     if (!os) return null;
-    const doc = new jsPDF();
+    
+    const doc = new jsPDF({ 
+      compress: true,
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
     const pageWidth = doc.internal.pageSize.width;
-    const margin = 20;
+    const margin = 15; // Reduzida de 20 para 15 para ganhar espaço lateral
     const contentWidth = pageWidth - (margin * 2);
     
-    // 1. HEADER MODERNO
+    // 1. HEADER MODERNO (Mais baixo para poupar espaço)
     doc.setFillColor(15, 23, 42); 
-    doc.rect(0, 0, pageWidth, 45, 'F');
+    doc.rect(0, 0, pageWidth, 35, 'F'); // Reduzido de 45 para 35
+    
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
+    doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
-    doc.text("REAL FRIO", margin, 22);
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 30);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text(os.code, pageWidth - margin, 22, { align: 'right' });
+    doc.text("REAL FRIO", margin, 18);
+    
     doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 24);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(os.code, pageWidth - margin, 18, { align: 'right' });
+    
+    doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(180, 180, 180);
-    doc.text(`DATA DE EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 30, { align: 'right' });
+    doc.text(`EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 24, { align: 'right' });
 
-    let currentY = 60;
+    let currentY = 42; // Começa mais cedo
 
-    // 2. SECÇÃO: DADOS DO CLIENTE & EQUIPAMENTO
+    // 2. SECÇÃO: DADOS DO CLIENTE & EQUIPAMENTO (Compactada)
     doc.setDrawColor(241, 245, 249);
     doc.setFillColor(252, 252, 253);
-    doc.roundedRect(margin, currentY, contentWidth, 35, 3, 3, 'FD');
+    doc.roundedRect(margin, currentY, contentWidth, 28, 2, 2, 'FD'); // Altura reduzida de 35 para 28
+    
     doc.setTextColor(15, 23, 42);
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text("DADOS DO CLIENTE", margin + 5, currentY + 8);
-    doc.text("EQUIPAMENTO INTERVENCIONADO", margin + (contentWidth / 2) + 5, currentY + 8);
-    doc.setDrawColor(226, 232, 240);
-    doc.line(margin + 5, currentY + 10, margin + (contentWidth / 2) - 5, currentY + 10);
-    doc.line(margin + (contentWidth / 2) + 5, currentY + 10, margin + contentWidth - 5, currentY + 10);
-    doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("DADOS DO CLIENTE", margin + 4, currentY + 6);
+    doc.text("EQUIPAMENTO", margin + (contentWidth / 2) + 4, currentY + 6);
+    
+    doc.setDrawColor(226, 232, 240);
+    doc.line(margin + 4, currentY + 8, margin + (contentWidth / 2) - 4, currentY + 8);
+    doc.line(margin + (contentWidth / 2) + 4, currentY + 8, margin + contentWidth - 4, currentY + 8);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
     doc.setTextColor(71, 85, 105);
-    doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 5, currentY + 16);
-    doc.text(`FATURAÇÃO: ${os.client?.billing_name || '---'}`, margin + 5, currentY + 22, { maxWidth: (contentWidth / 2) - 10 });
-    doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 5, currentY + 28);
-    doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 5, currentY + 16);
-    doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 5, currentY + 22);
-    doc.text(`Nº SÉRIE (S/N): ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 5, currentY + 28);
+    
+    // Coluna Cliente
+    doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 4, currentY + 13);
+    doc.text(`FIRMA: ${os.client?.billing_name || '---'}`, margin + 4, currentY + 18, { maxWidth: (contentWidth / 2) - 10 });
+    doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 4, currentY + 23);
+    
+    // Coluna Equipamento
+    doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 4, currentY + 13);
+    doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 4, currentY + 18);
+    doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 4, currentY + 23);
 
-    currentY += 45;
+    currentY += 36; // Menor salto para a narrativa
 
-    // 3. SECÇÃO: NARRATIVA TÉCNICA
+    // 3. SECÇÃO: NARRATIVA TÉCNICA (Compactada)
     const narrativeFields = [
-      { label: "PEDIDO DO CLIENTE / DESCRIÇÃO DA AVARIA", value: os.description || 'Não especificado.' },
-      { label: "ANOMALIA DETETADA", value: os.anomaly_detected || 'Não descrita.' },
-      { label: "TRABALHO EFETUADO / RESOLUÇÃO", value: os.resolution_notes || 'Sem notas de resolução.' }
+      { label: "PEDIDO / DESCRIÇÃO DA AVARIA", value: os.description || 'N/A' },
+      { label: "ANOMALIA DETETADA", value: os.anomaly_detected || 'N/A' },
+      { label: "RESOLUÇÃO / TRABALHO EFETUADO", value: os.resolution_notes || 'N/A' }
     ];
 
     narrativeFields.forEach(field => {
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
-      doc.text(field.label + ":", margin, currentY);
-      currentY += 5;
+      doc.text(field.label, margin, currentY);
+      
+      currentY += 4;
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      doc.setFontSize(8.5); // Texto ligeiramente maior para legibilidade
       doc.setTextColor(51, 65, 85);
+      
       const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth);
       doc.text(splitText, margin, currentY);
-      currentY += (splitText.length * 5) + 10;
-      if (currentY > 260) { doc.addPage(); currentY = 25; }
+      
+      currentY += (splitText.length * 4.5) + 6; // Reduzido o espaço entre blocos
+
+      if (currentY > 270) { doc.addPage(); currentY = 20; }
     });
 
-    // 4. SECÇÃO: MATERIAL APLICADO
+    // 4. SECÇÃO: MATERIAL APLICADO (Tabela Compacta)
     if (partsUsed.length > 0) {
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
-      doc.text("MATERIAL E COMPONENTES APLICADOS:", margin, currentY);
-      currentY += 4;
+      doc.text("MATERIAL APLICADO:", margin, currentY);
+      currentY += 3;
+
       autoTable(doc, {
         startY: currentY,
         margin: { left: margin, right: margin },
@@ -490,39 +513,54 @@ export const ServiceOrderDetail: React.FC = () => {
         head: [['ARTIGO / DESIGNAÇÃO', 'REFERÊNCIA', 'QUANTIDADE']],
         body: partsUsed.map(p => [p.name.toUpperCase(), p.reference.toUpperCase(), `${p.quantity.toLocaleString('pt-PT')} UN`]),
         headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontSize: 7, fontStyle: 'bold', halign: 'left' },
-        styles: { fontSize: 8, cellPadding: 4, textColor: [51, 65, 85], lineWidth: 0.1, lineColor: [241, 245, 249] },
+        styles: { fontSize: 8, cellPadding: 2, textColor: [51, 65, 85], lineWidth: 0.1, lineColor: [241, 245, 249] },
         columnStyles: { 2: { halign: 'right' } }
       });
-      currentY = (doc as any).lastAutoTable.finalY + 20;
+      currentY = (doc as any).lastAutoTable.finalY + 12;
     } else {
-      currentY += 5;
+      currentY += 2;
     }
 
-    // 5. ASSINATURAS
-    if (currentY > 230) { doc.addPage(); currentY = 30; }
+    // 5. ASSINATURAS (Aproximadas para evitar nova página desnecessária)
+    if (currentY > 240) { doc.addPage(); currentY = 20; }
+
     doc.setDrawColor(226, 232, 240);
     doc.line(margin, currentY, pageWidth - margin, currentY);
-    currentY += 10;
-    doc.setFontSize(9);
+    currentY += 8;
+    
+    doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
     doc.text("VALIDAÇÃO E CONFORMIDADE", margin, currentY);
-    currentY += 5;
+    currentY += 4;
+
     const sigBoxWidth = (contentWidth / 2) - 10;
-    if (clientSignature) { try { doc.addImage(clientSignature, 'PNG', margin, currentY, 60, 25); } catch (e) {} }
+    
+    // Assinatura Cliente
+    if (clientSignature) { 
+      try { 
+        doc.addImage(clientSignature, 'JPEG', margin, currentY, 50, 20, undefined, 'FAST'); 
+      } catch (e) {} 
+    }
     doc.setDrawColor(203, 213, 225);
-    doc.line(margin, currentY + 26, margin + sigBoxWidth, currentY + 26);
-    doc.setFontSize(7);
+    doc.line(margin, currentY + 22, margin + sigBoxWidth, currentY + 22);
+    doc.setFontSize(6.5);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(148, 163, 184);
-    doc.text("PELO CLIENTE", margin + (sigBoxWidth / 2), currentY + 31, { align: 'center' });
-    if (technicianSignature) { try { doc.addImage(technicianSignature, 'PNG', margin + (contentWidth / 2) + 10, currentY, 60, 25); } catch (e) {} }
-    doc.line(margin + (contentWidth / 2) + 10, currentY + 26, margin + contentWidth, currentY + 26);
-    doc.text("PELO TÉCNICO", margin + (contentWidth / 2) + 10 + (sigBoxWidth / 2), currentY + 31, { align: 'center' });
+    doc.text("ASSINATURA CLIENTE", margin + (sigBoxWidth / 2), currentY + 26, { align: 'center' });
 
-    // 6. FOOTER
-    doc.setFontSize(7);
+    // Assinatura Técnico
+    if (technicianSignature) { 
+      try { 
+        doc.addImage(technicianSignature, 'JPEG', margin + (contentWidth / 2) + 10, currentY, 50, 20, undefined, 'FAST'); 
+      } catch (e) {} 
+    }
+    doc.line(margin + (contentWidth / 2) + 10, currentY + 22, margin + contentWidth, currentY + 22);
+    doc.text("ASSINATURA TÉCNICO", margin + (contentWidth / 2) + 10 + (sigBoxWidth / 2), currentY + 26, { align: 'center' });
+
+    // 6. FOOTER (Fixo no fundo)
+    doc.setFontSize(6);
     doc.setTextColor(148, 163, 184);
-    doc.text("Este documento é um comprovativo digital de intervenção técnica Real Frio.", pageWidth / 2, 285, { align: 'center' });
+    doc.text("Documento digital oficial Real Frio. Intervenção em conformidade com as normas técnicas de refrigeração.", pageWidth / 2, 288, { align: 'center' });
     
     return doc;
   };
@@ -560,7 +598,6 @@ export const ServiceOrderDetail: React.FC = () => {
                    `Com os melhores cumprimentos,\n` +
                    `Real Frio`;
 
-      // Tenta usar a Web Share API para anexar automaticamente (Móvel)
       if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
         await navigator.share({
           files: [pdfFile],
@@ -569,7 +606,6 @@ export const ServiceOrderDetail: React.FC = () => {
         });
         await mockData.addOSActivity(os.id, { description: 'RELATÓRIO PARTILHADO VIA DISPOSITIVO' });
       } else {
-        // Fallback para mailto convencional em Desktop (com download prévio para facilitar)
         doc.save(filename);
         const mailtoLink = `mailto:${clientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\n(Atenção: O ficheiro foi descarregado para o seu computador. Por favor, anexe-o a este email.)')}`;
         window.location.href = mailtoLink;
