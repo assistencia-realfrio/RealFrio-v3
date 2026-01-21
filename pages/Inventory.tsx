@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { Package, Plus, Edit2, Search, Tag, X, Trash2, ChevronRight, AlertCircle, Layers, Sparkles, Hash, Loader2, Check } from 'lucide-react';
+import { Package, Plus, Edit2, Search, Tag, X, Trash2, ChevronRight, AlertCircle, Layers, Sparkles, Hash, Loader2, Check, RefreshCw } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { PartCatalogItem } from '../types';
 import { normalizeString } from '../utils';
@@ -7,6 +8,7 @@ import { normalizeString } from '../utils';
 const Inventory: React.FC = () => {
   const [items, setItems] = useState<PartCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<PartCatalogItem | null>(null);
@@ -17,9 +19,13 @@ const Inventory: React.FC = () => {
 
   const fetchCatalog = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await mockData.getCatalog();
       setItems(data.sort((a, b) => a.name.localeCompare(b.name, 'pt-PT')));
+    } catch (err: any) {
+      console.error("Erro ao carregar catálogo:", err);
+      setError("Não foi possível carregar os artigos. Verifique a conexão ou as permissões da base de dados.");
     } finally { setLoading(false); }
   };
 
@@ -90,29 +96,47 @@ const Inventory: React.FC = () => {
 
       {loading ? (
         <div className="py-20 flex justify-center"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>
+      ) : error ? (
+        <div className="mx-1 p-8 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-[2rem] text-center">
+           <AlertCircle size={32} className="mx-auto text-red-500 mb-4" />
+           <p className="text-xs font-black text-red-600 uppercase tracking-widest mb-6">{error}</p>
+           <button 
+            onClick={fetchCatalog}
+            className="px-6 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 mx-auto active:scale-95 transition-all"
+           >
+             <RefreshCw size={14} /> Tentar Novamente
+           </button>
+        </div>
       ) : (
         <div className="space-y-2.5 mx-1">
-          {filteredItems.map((item) => {
-            const status = getStockStatus(item.stock);
-            return (
-              <div key={item.id} onClick={() => handleOpenModal(item)} className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-[1.8rem] shadow-sm hover:shadow-md transition-all cursor-pointer group active:scale-[0.98]">
-                <div className="flex items-center gap-4 min-w-0 flex-1">
-                  <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-600 group-hover:bg-blue-600 transition-all shadow-inner"><Layers size={20} /></div>
-                  <div className="min-w-0 pr-4">
-                    <div className="flex items-center gap-2 mb-0.5">
-                       <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest font-mono bg-blue-50/50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">{item.reference}</span>
-                       <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${status.color}`}>{status.label}</span>
+          {filteredItems.length === 0 ? (
+            <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-gray-100 dark:border-slate-800 mx-1">
+               <Package size={32} className="mx-auto text-gray-200 dark:text-slate-700 mb-4" />
+               <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest">Nenhum artigo encontrado no catálogo</p>
+            </div>
+          ) : (
+            filteredItems.map((item) => {
+              const status = getStockStatus(item.stock);
+              return (
+                <div key={item.id} onClick={() => handleOpenModal(item)} className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-[1.8rem] shadow-sm hover:shadow-md transition-all cursor-pointer group active:scale-[0.98]">
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-600 group-hover:bg-blue-600 transition-all shadow-inner"><Layers size={20} /></div>
+                    <div className="min-w-0 pr-4">
+                      <div className="flex items-center gap-2 mb-0.5">
+                         <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest font-mono bg-blue-50/50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">{item.reference}</span>
+                         <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${status.color}`}>{status.label}</span>
+                      </div>
+                      <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase truncate leading-tight group-hover:text-blue-600 transition-colors">{item.name}</h3>
                     </div>
-                    <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase truncate leading-tight group-hover:text-blue-600 transition-colors">{item.name}</h3>
+                  </div>
+                  <div className="text-right flex items-center gap-4 flex-shrink-0">
+                    <p className="text-sm font-black text-slate-900 dark:text-slate-100">{item.stock.toLocaleString('pt-PT', { maximumFractionDigits: 3 })} UN</p>
+                    <ChevronRight size={18} className="text-slate-200 dark:text-slate-700" />
                   </div>
                 </div>
-                <div className="text-right flex items-center gap-4 flex-shrink-0">
-                  <p className="text-sm font-black text-slate-900 dark:text-slate-100">{item.stock.toLocaleString('pt-PT', { maximumFractionDigits: 3 })} UN</p>
-                  <ChevronRight size={18} className="text-slate-200 dark:text-slate-700" />
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       )}
 

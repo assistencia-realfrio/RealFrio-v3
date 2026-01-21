@@ -56,7 +56,8 @@ export const mockData = {
   },
 
   getProfiles: async () => {
-    const { data } = await supabase.from('profiles').select('*').order('full_name');
+    const { data, error } = await supabase.from('profiles').select('*').order('full_name');
+    if (error) console.error("Supabase Error (Profiles):", error);
     return data || [];
   },
 
@@ -74,19 +75,21 @@ export const mockData = {
 
   // Service Orders
   getServiceOrders: async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('service_orders')
       .select('*, client:clients(*), establishment:establishments(*), equipment:equipments(*)')
       .order('created_at', { ascending: false });
+    if (error) console.error("Supabase Error (OS):", error);
     return data || [];
   },
 
   getServiceOrderById: async (id: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('service_orders')
       .select('*, client:clients(*), establishment:establishments(*), equipment:equipments(*)')
       .eq('id', id)
       .single();
+    if (error) console.error("Supabase Error (OS Detail):", error);
     return data;
   },
 
@@ -107,12 +110,14 @@ export const mockData = {
 
   // Clients
   getClients: async () => {
-    const { data } = await supabase.from('clients').select('*').order('name');
+    const { data, error } = await supabase.from('clients').select('*').order('name');
+    if (error) console.error("Supabase Error (Clients):", error);
     return data || [];
   },
 
   getClientById: async (id: string) => {
-    const { data } = await supabase.from('clients').select('*').eq('id', id).single();
+    const { data, error } = await supabase.from('clients').select('*').eq('id', id).single();
+    if (error) console.error("Supabase Error (Client Detail):", error);
     return data;
   },
 
@@ -141,14 +146,16 @@ export const mockData = {
 
   // Establishments
   getAllEstablishments: async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('establishments')
       .select('*, client:clients(name)');
+    if (error) console.error("Supabase Error (Ests):", error);
     return (data || []).map(e => ({ ...e, client_name: (e.client as any)?.name }));
   },
 
   getEstablishmentsByClient: async (clientId: string) => {
-    const { data } = await supabase.from('establishments').select('*').eq('client_id', clientId);
+    const { data, error } = await supabase.from('establishments').select('*').eq('client_id', clientId);
+    if (error) console.error("Supabase Error (Ests by Client):", error);
     return data || [];
   },
 
@@ -164,12 +171,14 @@ export const mockData = {
 
   // Equipments
   getEquipments: async () => {
-    const { data } = await supabase.from('equipments').select('*');
+    const { data, error } = await supabase.from('equipments').select('*');
+    if (error) console.error("Supabase Error (Equips):", error);
     return data || [];
   },
 
   getEquipmentById: async (id: string) => {
-    const { data } = await supabase.from('equipments').select('*').eq('id', id).single();
+    const { data, error } = await supabase.from('equipments').select('*').eq('id', id).single();
+    if (error) console.error("Supabase Error (Equip Detail):", error);
     return data;
   },
 
@@ -189,7 +198,8 @@ export const mockData = {
 
   // Material Usado (Parts Used)
   getOSParts: async (osId: string) => {
-    const { data } = await supabase.from('parts_used').select('*').eq('os_id', osId);
+    const { data, error } = await supabase.from('parts_used').select('*').eq('os_id', osId);
+    if (error) console.error("Supabase Error (OS Parts):", error);
     return data || [];
   },
 
@@ -216,7 +226,11 @@ export const mockData = {
 
   // Catálogo (Tabela 'catalog')
   getCatalog: async () => {
-    const { data } = await supabase.from('catalog').select('*').order('name');
+    const { data, error } = await supabase.from('catalog').select('*').order('name');
+    if (error) {
+      console.error("Supabase Error (Catalog Fetch):", error);
+      throw error;
+    }
     return data || [];
   },
 
@@ -232,7 +246,8 @@ export const mockData = {
 
   // Photos
   getOSPhotos: async (osId: string) => {
-    const { data } = await supabase.from('os_photos').select('*').eq('os_id', osId).order('created_at');
+    const { data, error } = await supabase.from('os_photos').select('*').eq('os_id', osId).order('created_at');
+    if (error) console.error("Supabase Error (Photos):", error);
     return data || [];
   },
 
@@ -249,11 +264,12 @@ export const mockData = {
   // Notes
   getOSNotes: async (osId: string) => {
     const session = mockData.getSession();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('os_notes')
       .select('*')
       .eq('os_id', osId)
       .order('created_at', { ascending: true });
+    if (error) console.error("Supabase Error (Notes):", error);
     return (data || []).map(n => ({
       ...n,
       user_id: n.user_id === session?.id ? 'current' : n.user_id
@@ -278,15 +294,17 @@ export const mockData = {
 
   // Activity
   getOSActivity: async (osId: string) => {
-    const { data } = await supabase.from('os_activities').select('*').eq('os_id', osId).order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('os_activities').select('*').eq('os_id', osId).order('created_at', { ascending: false });
+    if (error) console.error("Supabase Error (Activity):", error);
     return data || [];
   },
 
   getAllActivities: async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('os_activities')
       .select('*, service_orders(code)')
       .order('created_at', { ascending: false });
+    if (error) console.error("Supabase Error (All Activities):", error);
     return (data || []).map(a => ({ ...a, os_code: (a.service_orders as any)?.code }));
   },
 
@@ -302,7 +320,8 @@ export const mockData = {
 
   // Vacations
   getVacations: async () => {
-    const { data } = await supabase.from('vacations').select('*').order('start_date');
+    const { data, error } = await supabase.from('vacations').select('*').order('start_date');
+    if (error) console.error("Supabase Error (Vacations):", error);
     return data || [];
   },
 
@@ -322,10 +341,11 @@ export const mockData = {
 
   // Time Entries
   getAllTimeEntries: async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('time_entries')
       .select('*, service_orders(code, clients(name))')
       .order('start_time', { ascending: false });
+    if (error) console.error("Supabase Error (Time Entries):", error);
     
     return (data || []).map(e => ({
       ...e,

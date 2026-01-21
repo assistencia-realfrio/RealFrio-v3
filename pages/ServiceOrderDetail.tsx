@@ -29,8 +29,8 @@ declare global {
     openSelectKey: () => Promise<void>;
   }
   interface Window {
-    /* Fixed: Removed readonly modifier to avoid "identical modifiers" error with other declarations */
-    aistudio: AIStudio;
+    // Added readonly modifier to match the global definition and resolve merging conflict.
+    readonly aistudio: AIStudio;
   }
 }
 
@@ -1291,9 +1291,9 @@ export const ServiceOrderDetail: React.FC = () => {
                                setIsCreatingNewPart(true);
                                setNewPartForm({ name: partSearchTerm, reference: '' });
                              }}
-                             className="flex items-center gap-2 mx-auto bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-6 py-3 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 transition-all"
+                             className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all"
                             >
-                              <Plus size={14} /> REGISTAR NOVO ARTIGO NO CATÁLOGO
+                              <Plus size={14} /> ADICIONAR NOVO ARTIGO
                             </button>
                          </div>
                        ) : filteredCatalog.map(p => (
