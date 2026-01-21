@@ -8,8 +8,12 @@ export const generateOSReportSummary = async (
   duration: string
 ): Promise<string> => {
   try {
-    // Instanciar apenas no momento da chamada para garantir que a chave mais recente é usada
-    // Use process.env.API_KEY directly as per guidelines
+    /* The API key must be obtained exclusively from process.env.API_KEY and used directly in the named parameter. */
+    if (!process.env.API_KEY || process.env.API_KEY === 'undefined') {
+      throw new Error("API_KEY_MISSING");
+    }
+
+    /* Instantiate right before making an API call to ensure it uses the most up-to-date API key. */
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const prompt = `
@@ -29,16 +33,21 @@ export const generateOSReportSummary = async (
       4. O resultado deve estar pronto a ser colado diretamente no relatório oficial.
     `;
 
-    // Calling generateContent with the model name and prompt as per guidelines
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
 
-    // Accessing .text property directly as per guidelines (getter, not a method)
+    /* Directly access the .text property of GenerateContentResponse. Do not call .text() as it is a getter. */
     return response.text?.trim() || "Não foi possível gerar o resumo.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao gerar resumo com Gemini:", error);
-    return "Erro ao comunicar com o serviço de IA.";
+    if (error.message === "API_KEY_MISSING") {
+      throw new Error("Chave de API não configurada no ambiente.");
+    }
+    if (error.message?.includes("Requested entity was not found")) {
+      throw new Error("API_KEY_INVALID");
+    }
+    throw error;
   }
 };

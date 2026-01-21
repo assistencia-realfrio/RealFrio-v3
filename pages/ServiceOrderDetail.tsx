@@ -10,7 +10,7 @@ import {
   User, ChevronRight, ChevronDown, ChevronUp, Calendar, RotateCcw,
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
   RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
-  Settings2, FileDown
+  Settings2, FileDown, Key
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -21,6 +21,18 @@ import { generateOSReportSummary } from '../services/geminiService';
 import { mockData } from '../services/mockData';
 import { normalizeString } from '../utils';
 import FloatingEditBar from '../components/FloatingEditBar';
+
+// Extensão do objeto window para as APIs do AI Studio
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+  interface Window {
+    /* Fixed: Removed readonly modifier to avoid "identical modifiers" error with other declarations */
+    aistudio: AIStudio;
+  }
+}
 
 const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
   const [scale, setScale] = useState(1);
@@ -666,6 +678,20 @@ export const ServiceOrderDetail: React.FC = () => {
       setErrorMessage("DESCREVA A ANOMALIA PRIMEIRO.");
       return;
     }
+
+    // Verificar se existe chave de API no bridge
+    if (window.aistudio) {
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        if (confirm("Para utilizar o resumo via IA, deve selecionar uma chave de API paga. Deseja configurar agora?")) {
+           await window.aistudio.openSelectKey();
+           // Após abrir, assumimos que o utilizador selecionou ou cancelou. 
+           // Se selecionou, a próxima tentativa funcionará via process.env.API_KEY injetada.
+        }
+        return;
+      }
+    }
+
     setIsGenerating(true);
     try {
       const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity.toLocaleString('pt-PT')}x ${p.name}`), "INTERVENÇÃO TÉCNICA");
@@ -674,7 +700,12 @@ export const ServiceOrderDetail: React.FC = () => {
         await mockData.addOSActivity(id!, { description: "GEROU RESUMO VIA IA" });
       }
     } catch (e: any) {
-      setErrorMessage("ERRO AO COMUNICAR COM A IA.");
+      if (e.message === "API_KEY_INVALID" && window.aistudio) {
+         setErrorMessage("CHAVE DE API INVÁLIDA OU EXPIRADA. RE-SELECIONE A CHAVE.");
+         await window.aistudio.openSelectKey();
+      } else {
+         setErrorMessage(e.message || "ERRO AO COMUNICAR COM A IA.");
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -1103,9 +1134,12 @@ export const ServiceOrderDetail: React.FC = () => {
 
         {activeTab === 'finalizar' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-             <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 transition-colors">
+             <div className={`p-6 rounded-[2.5rem] shadow-sm border transition-all ${showValidationErrors && !anomaly.trim() ? 'border-red-500 bg-red-50/20 ring-1 ring-red-500/20' : 'bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800'}`}>
                 <div className="flex items-center justify-between mb-6">
-                   <div className="flex items-center gap-3"><AlertTriangle size={18} className="text-orange-500" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Anomalia Detetada *</h3></div>
+                   <div className="flex items-center gap-3">
+                      <AlertTriangle size={18} className={showValidationErrors && !anomaly.trim() ? "text-red-600" : "text-orange-500"} />
+                      <h3 className={`text-[10px] font-black uppercase tracking-widest ${showValidationErrors && !anomaly.trim() ? 'text-red-600' : 'text-slate-900 dark:text-white'}`}>Anomalia Detetada *</h3>
+                   </div>
                    <button type="button" onClick={handleResetAnomaly} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors p-2" title="Limpar"><RotateCcw size={12} /> <span className="text-[9px] font-black uppercase">LIMPAR</span></button>
                 </div>
                 <input type="text" placeholder="..." className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-xs font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" value={anomaly} onChange={e => setAnomaly(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} />
@@ -1161,7 +1195,7 @@ export const ServiceOrderDetail: React.FC = () => {
       {/* MODAL ERRO DE VALIDAÇÃO */}
       {showValidationErrorModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
               <div className="p-8 text-center">
                  <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
                     <ShieldAlert size={32}/>
@@ -1336,7 +1370,7 @@ export const ServiceOrderDetail: React.FC = () => {
                  <button 
                   onClick={isCreatingNewPart ? handleCreateAndAddPart : handleAddPart} 
                   disabled={(isCreatingNewPart ? !newPartForm.name : !selectedPartId) || actionLoading} 
-                  className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50"
+                  className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50"
                  >
                     {actionLoading ? <Loader2 size={20} className="animate-spin mx-auto" /> : isCreatingNewPart ? 'REGISTAR E APLICAR' : 'CONFIRMAR APLICAÇÃO'}
                  </button>
