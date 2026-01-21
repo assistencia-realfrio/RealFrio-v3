@@ -147,6 +147,16 @@ export interface ServiceOrder {
   establishment?: Establishment;
   equipment?: Equipment;
   store: string;
+  is_warranty?: boolean;
+  warranty_info?: {
+    rma_code?: string;
+    has_brand?: boolean;
+    has_model?: boolean;
+    has_serial?: boolean;
+    has_photo_nameplate?: boolean;
+    has_photo_parts?: boolean;
+    has_failure_reason?: boolean;
+  };
 }
 
 export interface Profile {
@@ -154,7 +164,7 @@ export interface Profile {
   email: string;
   full_name: string;
   role: UserRole;
-  store: string; // CR ou PM
+  store: string; 
 }
 
 export interface TimeEntry {

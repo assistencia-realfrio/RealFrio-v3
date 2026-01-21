@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Package, Plus, Edit2, Search, Tag, X, Trash2, ChevronRight, AlertCircle, Layers, Sparkles, Hash, Loader2, Check } from 'lucide-react';
 import { mockData } from '../services/mockData';
@@ -32,7 +31,7 @@ const Inventory: React.FC = () => {
   const handleOpenModal = (item?: PartCatalogItem) => {
     if (item) {
       setEditingItem(item);
-      setFormData({ name: item.name, reference: item.reference, stock: item.stock.toString() });
+      setFormData({ name: item.name, reference: item.reference, stock: item.stock.toString().replace('.', ',') });
     } else {
       setEditingItem(null);
       setFormData({ name: '', reference: '', stock: '0' });
@@ -45,17 +44,18 @@ const Inventory: React.FC = () => {
     if (!formData.name || !formData.reference) return;
     setIsSubmitting(true);
     try {
+      const numericStock = parseFloat(formData.stock.replace(',', '.'));
       if (editingItem) {
         await mockData.updateCatalogItem(editingItem.id, {
           name: formData.name.toUpperCase(),
           reference: formData.reference.toUpperCase(),
-          stock: parseFloat(formData.stock) || 0
+          stock: numericStock || 0
         });
       } else {
         await mockData.addCatalogItem({
           name: formData.name.toUpperCase(),
           reference: formData.reference.toUpperCase(),
-          stock: parseFloat(formData.stock) || 0
+          stock: numericStock || 0
         });
       }
       setShowModal(false);
@@ -107,7 +107,7 @@ const Inventory: React.FC = () => {
                   </div>
                 </div>
                 <div className="text-right flex items-center gap-4 flex-shrink-0">
-                  <p className="text-sm font-black text-slate-900 dark:text-slate-100">{item.stock} UN</p>
+                  <p className="text-sm font-black text-slate-900 dark:text-slate-100">{item.stock.toLocaleString('pt-PT', { maximumFractionDigits: 3 })} UN</p>
                   <ChevronRight size={18} className="text-slate-200 dark:text-slate-700" />
                 </div>
               </div>
@@ -166,10 +166,16 @@ const Inventory: React.FC = () => {
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Stock em Armazém</label>
                 <input 
-                  type="number" 
-                  step="0.001"
+                  type="text" 
+                  inputMode="decimal"
                   className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
-                  value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})}
+                  value={formData.stock} 
+                  onChange={e => {
+                    const val = e.target.value.replace(',', '.');
+                    if (/^\d*[.]?\d*$/.test(val) || val === '') {
+                      setFormData({...formData, stock: e.target.value});
+                    }
+                  }}
                 />
               </div>
 

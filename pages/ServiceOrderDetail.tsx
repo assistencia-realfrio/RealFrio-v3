@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
@@ -10,8 +9,11 @@ import {
   Send, AlertCircle, Sparkles, ShieldAlert, Loader2, Eye, History, Clock,
   User, ChevronRight, ChevronDown, ChevronUp, Calendar, RotateCcw,
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
-  RotateCw, Cloud, Edit2, Layers, Tag, Hash
+  RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
+  Settings2, FileDown
 } from 'lucide-react';
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import SignatureCanvas from '../components/SignatureCanvas';
 import OSStatusBadge from '../components/OSStatusBadge';
 import { OSStatus, ServiceOrder, PartUsed, PartCatalogItem, OSPhoto, OSNote, OSActivity } from '../types';
@@ -136,17 +138,23 @@ export const ServiceOrderDetail: React.FC = () => {
   const [observations, setObservations] = useState('');
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [clientSignature, setClientSignature] = useState<string | null>(null);
   const [technicianSignature, setTechnicianSignature] = useState<string | null>(null);
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [loading, setLoading] = useState(true);
   
+  // Estados para Garantia
+  const [isWarranty, setIsWarranty] = useState(false);
+  const [warrantyInfo, setWarrantyInfo] = useState<ServiceOrder['warranty_info']>({});
+  
   // Modais
   const [showDeletePartModal, setShowDeletePartModal] = useState(false);
   const [showDeletePhotoModal, setShowDeletePhotoModal] = useState(false);
   const [showValidationErrorModal, setShowValidationErrorModal] = useState(false);
   const [showFinalizeModal, setShowFinalizeModal] = useState(false);
+  const [showReopenModal, setShowReopenModal] = useState(false);
   const [showPartModal, setShowPartModal] = useState(false);
   const [showEditQuantityModal, setShowEditQuantityModal] = useState(false);
   
@@ -154,9 +162,7 @@ export const ServiceOrderDetail: React.FC = () => {
   const [partToEditQuantity, setPartToEditQuantity] = useState<PartUsed | null>(null);
   
   // Estados para Quantidade com suporte Decimal
-  const [partQuantity, setPartQuantity] = useState<number>(1);
   const [partQuantityStr, setPartQuantityStr] = useState<string>("1");
-  const [tempQuantity, setTempQuantity] = useState<number>(1);
   const [tempQuantityStr, setTempQuantityStr] = useState<string>("1");
 
   const [photoToDelete, setPhotoToDelete] = useState<OSPhoto | null>(null);
@@ -175,6 +181,7 @@ export const ServiceOrderDetail: React.FC = () => {
   // Estados para cartões colapsáveis
   const [expandedClient, setExpandedClient] = useState(false);
   const [expandedEquip, setExpandedEquip] = useState(false);
+  const [expandedWarranty, setExpandedWarranty] = useState(false);
   const [expandedPlanning, setExpandedPlanning] = useState(false);
   const [expandedLog, setExpandedLog] = useState(false);
 
@@ -219,6 +226,7 @@ export const ServiceOrderDetail: React.FC = () => {
     const originalClientSig = os.client_signature || '';
     const currentTechSig = technicianSignature || '';
     const originalTechSig = os.technician_signature || '';
+    
     return (
       description !== (os.description || '') ||
       anomaly !== (os.anomaly_detected || '') ||
@@ -227,9 +235,11 @@ export const ServiceOrderDetail: React.FC = () => {
       scheduledDate !== origDate ||
       scheduledTime !== origTime ||
       currentClientSig !== originalClientSig ||
-      currentTechSig !== originalTechSig
+      currentTechSig !== originalTechSig ||
+      isWarranty !== (!!os.is_warranty) ||
+      JSON.stringify(warrantyInfo || {}) !== JSON.stringify(os.warranty_info || {})
     );
-  }, [os, description, anomaly, resolutionNotes, observations, scheduledDate, scheduledTime, clientSignature, technicianSignature]);
+  }, [os, description, anomaly, resolutionNotes, observations, scheduledDate, scheduledTime, clientSignature, technicianSignature, isWarranty, warrantyInfo]);
 
   const fetchOSDetails = async (showLoader = true) => {
     if (!id) return;
@@ -244,6 +254,9 @@ export const ServiceOrderDetail: React.FC = () => {
         setObservations(osData.observations || '');
         setClientSignature(osData.client_signature && osData.client_signature.trim() !== '' ? osData.client_signature : null);
         setTechnicianSignature(osData.technician_signature && osData.technician_signature.trim() !== '' ? osData.technician_signature : null);
+        setIsWarranty(!!osData.is_warranty);
+        setWarrantyInfo(osData.warranty_info || {});
+        
         if (osData.scheduled_date) {
           const parts = osData.scheduled_date.split(/[T ]/);
           setScheduledDate(parts[0] || '');
@@ -297,7 +310,6 @@ export const ServiceOrderDetail: React.FC = () => {
     if (!id || !os) return;
     setActionLoading(true);
     try {
-      // Importante: se a data estiver vazia, enviamos null para limpar na DB
       const finalScheduled = scheduledDate 
         ? `${scheduledDate}T${scheduledTime || '00:00'}:00` 
         : null;
@@ -307,10 +319,11 @@ export const ServiceOrderDetail: React.FC = () => {
         anomaly_detected: anomaly,
         resolution_notes: resolutionNotes,
         observations: observations,
-        // CORREÇÃO: Passar o estado diretamente. Se for null, o banco de dados limpa o campo.
         client_signature: clientSignature,
         technician_signature: technicianSignature,
-        scheduled_date: finalScheduled as any
+        scheduled_date: finalScheduled as any,
+        is_warranty: isWarranty,
+        warranty_info: warrantyInfo
       });
       await mockData.addOSActivity(id, {
         description: 'GUARDOU ALTERAÇÕES NA ORDEM DE SERVIÇO'
@@ -321,6 +334,172 @@ export const ServiceOrderDetail: React.FC = () => {
       setErrorMessage("ERRO AO GUARDAR DADOS.");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const toggleWarranty = () => {
+    const newValue = !isWarranty;
+    setIsWarranty(newValue);
+    
+    // Lógica de pré-seleção inteligente ao ativar
+    if (newValue) {
+      const autoCheckedInfo: ServiceOrder['warranty_info'] = { ...warrantyInfo };
+      
+      if (os?.equipment) {
+        autoCheckedInfo.has_brand = !!os.equipment.brand;
+        autoCheckedInfo.has_model = !!os.equipment.model;
+        autoCheckedInfo.has_serial = !!os.equipment.serial_number;
+        autoCheckedInfo.has_photo_nameplate = !!os.equipment.nameplate_url;
+      }
+      
+      // Pré-selecionar motivo da avaria se o campo estiver preenchido
+      if (anomaly && anomaly.trim().length > 0) {
+        autoCheckedInfo.has_failure_reason = true;
+      }
+      
+      setWarrantyInfo(autoCheckedInfo);
+    }
+  };
+
+  const handleSelectReopenStatus = async (targetStatus: OSStatus) => {
+    if (!id || !os) return;
+    setActionLoading(true);
+    try {
+      // RESET DOS DADOS DA ABA FECHO AO REABRIR
+      const updates: Partial<ServiceOrder> = { 
+        status: targetStatus,
+        anomaly_detected: '',
+        resolution_notes: '',
+        client_signature: null,
+        technician_signature: null
+      };
+
+      await mockData.updateServiceOrder(id, updates);
+      await mockData.addOSActivity(id, {
+        description: `OS REABERTA COM ESTADO: ${getStatusLabelText(targetStatus).toUpperCase()} (DADOS DE FECHO RESETADOS)`
+      });
+
+      // Limpar estados locais imediatamente
+      setAnomaly('');
+      setResolutionNotes('');
+      setClientSignature(null);
+      setTechnicianSignature(null);
+      
+      setShowReopenModal(false);
+      fetchOSDetails(false);
+    } catch (e: any) {
+      setErrorMessage("ERRO AO REABRIR OS.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const generatePDFReport = async () => {
+    if (!os) return;
+    setIsExportingPDF(true);
+    
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.width;
+      
+      // Estilo e Cores
+      doc.setFillColor(15, 23, 42); // Navy Dark
+      doc.rect(0, 0, pageWidth, 40, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      doc.text("REAL FRIO", 20, 20);
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text("RELATÓRIO DE ASSISTÊNCIA TÉCNICA", 20, 28);
+      
+      doc.setFontSize(12);
+      doc.text(os.code, pageWidth - 20, 20, { align: 'right' });
+      doc.setFontSize(8);
+      doc.text(`GERADO EM: ${new Date().toLocaleString()}`, pageWidth - 20, 28, { align: 'right' });
+
+      // Info Cliente
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("DADOS DO CLIENTE", 20, 50);
+      doc.line(20, 52, 190, 52);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(`CLIENTE: ${os.client?.name || '---'}`, 20, 60);
+      doc.text(`LOCAL: ${os.establishment?.name || 'SEDE'}`, 20, 65);
+      doc.text(`MORADA: ${os.establishment?.address || os.client?.address || '---'}`, 20, 70);
+
+      // Info Equipamento
+      doc.setFont("helvetica", "bold");
+      doc.text("EQUIPAMENTO INTERVENCIONADO", 110, 50);
+      doc.setFont("helvetica", "normal");
+      doc.text(`TIPO: ${os.equipment?.type || '---'}`, 110, 60);
+      doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, 110, 65);
+      doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, 110, 70);
+
+      // Natureza da OS
+      doc.setFont("helvetica", "bold");
+      doc.text("DETALHES DA INTERVENÇÃO", 20, 85);
+      doc.line(20, 87, 190, 87);
+      doc.setFont("helvetica", "normal");
+      doc.text(`TIPO DE SERVIÇO: ${os.type.toUpperCase()}`, 20, 95);
+      doc.text(`ESTADO FINAL: ${os.status.toUpperCase()}`, 110, 95);
+
+      // Anomalia e Resolução
+      autoTable(doc, {
+        startY: 105,
+        theme: 'striped',
+        head: [['ANOMALIA DETETADA', 'TRABALHO EFETUADO / RESOLUÇÃO']],
+        body: [[os.anomaly_detected || 'Não descrita.', os.resolution_notes || 'Sem notas de resolução.']],
+        headStyles: { fillColor: [51, 65, 85], textColor: 255, fontSize: 8 },
+        styles: { fontSize: 8, cellPadding: 5 }
+      });
+
+      // Material
+      if (partsUsed.length > 0) {
+        autoTable(doc, {
+          startY: (doc as any).lastAutoTable.finalY + 10,
+          theme: 'grid',
+          head: [['MATERIAL APLICADO', 'REFERÊNCIA', 'QTD']],
+          body: partsUsed.map(p => [p.name, p.reference, `${p.quantity.toLocaleString('pt-PT')} UN`]),
+          headStyles: { fillColor: [241, 245, 249], textColor: 0, fontStyle: 'bold', fontSize: 8 },
+          styles: { fontSize: 8 }
+        });
+      }
+
+      // Assinaturas
+      const startSignatures = (doc as any).lastAutoTable.finalY + 20;
+      doc.setFont("helvetica", "bold");
+      doc.text("ASSINATURAS DE CONFORMIDADE", 20, startSignatures);
+      doc.line(20, startSignatures + 2, 190, startSignatures + 2);
+      
+      if (clientSignature) {
+        doc.addImage(clientSignature, 'PNG', 20, startSignatures + 5, 60, 30);
+        doc.setFontSize(7);
+        doc.text("PELO CLIENTE", 20, startSignatures + 38);
+      }
+      
+      if (technicianSignature) {
+        doc.addImage(technicianSignature, 'PNG', 130, startSignatures + 5, 60, 30);
+        doc.setFontSize(7);
+        doc.text("PELO TÉCNICO", 130, startSignatures + 38);
+      }
+
+      // Rodapé
+      doc.setFontSize(7);
+      doc.setTextColor(150);
+      doc.text("ESTE DOCUMENTO É UM REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA REAL FRIO.", pageWidth / 2, 285, { align: 'center' });
+
+      doc.save(`REALFRIO_RELATORIO_${os.code}.pdf`);
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("ERRO AO GERAR PDF.");
+    } finally {
+      setIsExportingPDF(false);
     }
   };
 
@@ -390,17 +569,12 @@ export const ServiceOrderDetail: React.FC = () => {
       });
       setShowPartModal(false);
       setSelectedPartId('');
-      setPartQuantity(1);
       setPartQuantityStr("1");
       setPartSearchTerm('');
       fetchOSDetails(false);
     } catch (e: any) {
       console.error(e);
-      if (e.message?.includes('400')) {
-        setErrorMessage("ERRO BD: A TABELA OS_PARTS PRECISA DE SER ALTERADA PARA 'NUMERIC' NO SUPABASE.");
-      } else {
-        setErrorMessage("ERRO AO ADICIONAR MATERIAL.");
-      }
+      setErrorMessage("ERRO AO ADICIONAR MATERIAL.");
     } finally {
       setActionLoading(false);
     }
@@ -438,19 +612,13 @@ export const ServiceOrderDetail: React.FC = () => {
       setIsCreatingNewPart(false);
       setNewPartForm({ name: '', reference: '' });
       setSelectedPartId('');
-      setPartQuantity(1);
       setPartQuantityStr("1");
       setPartSearchTerm('');
       fetchOSDetails(false);
       const newCatalog = await mockData.getCatalog();
       setCatalog(newCatalog);
     } catch (e: any) {
-      console.error(e);
-      if (e.status === 400 || e.message?.includes('400')) {
-        setErrorMessage("ERRO BD: A COLUNA 'QUANTITY' NA TABELA 'OS_PARTS' DEVE SER DO TIPO 'NUMERIC'.");
-      } else {
-        setErrorMessage("ERRO AO CRIAR MATERIAL: " + e.message);
-      }
+      setErrorMessage("ERRO AO CRIAR MATERIAL.");
     } finally {
       setActionLoading(false);
     }
@@ -465,12 +633,7 @@ export const ServiceOrderDetail: React.FC = () => {
       await mockData.updateOSPart(partUsedId, { quantity: numericQuantity });
       fetchOSDetails(false);
     } catch (e: any) {
-      console.error("Erro na atualização:", e);
-      if (e.status === 400 || e.message?.includes('400')) {
-        setErrorMessage("ERRO: A SUA BASE DE DADOS AINDA NÃO ACEITA DECIMAIS. ALTERE A COLUNA 'QUANTITY' PARA 'NUMERIC'.");
-      } else {
-        setErrorMessage("ERRO AO ATUALIZAR QUANTIDADE.");
-      }
+      setErrorMessage("ERRO AO ATUALIZAR QUANTIDADE.");
     } finally {
       setActionLoading(false);
     }
@@ -510,11 +673,11 @@ export const ServiceOrderDetail: React.FC = () => {
   };
 
   const handleResetAnomaly = () => {
-    if (confirm("Deseja limpar o campo de anomalia?")) setAnomaly('');
+    setAnomaly('');
   };
 
   const handleResetResolution = () => {
-    if (confirm("Deseja limpar as notas de resolução?")) setResolutionNotes('');
+    setResolutionNotes('');
   };
 
   const handleResetSignatures = () => {
@@ -530,7 +693,6 @@ export const ServiceOrderDetail: React.FC = () => {
     return catalog.filter(p => normalizeString(p.name).includes(term) || normalizeString(p.reference).includes(term));
   }, [catalog, partSearchTerm]);
 
-  // Agrupar fotos por tipo para a visualização
   const groupedPhotos = useMemo(() => {
     const groups: Record<string, OSPhoto[]> = {
       antes: [],
@@ -608,6 +770,37 @@ export const ServiceOrderDetail: React.FC = () => {
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {activeTab === 'info' && (
           <div className="space-y-3">
+            {/* QUADRO DE AÇÕES PÓS-CONCLUSÃO ATIVADO */}
+            {os?.status === OSStatus.CONCLUIDA && (
+              <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/50 p-6 rounded-[2rem] shadow-sm animate-in zoom-in-95 duration-300 transition-colors">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200 dark:shadow-none">
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-emerald-900 dark:text-emerald-400 uppercase tracking-widest leading-none">Intervenção Finalizada</h3>
+                    <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500/70 uppercase tracking-tight mt-1.5">A OS está bloqueada para edição</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button 
+                    onClick={generatePDFReport}
+                    disabled={isExportingPDF}
+                    className="flex items-center justify-center gap-3 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-70"
+                  >
+                    {isExportingPDF ? <Loader2 size={18} className="animate-spin" /> : <FileDown size={18} />} 
+                    {isExportingPDF ? 'A GERAR PDF...' : 'VER RELATÓRIO PDF'}
+                  </button>
+                  <button 
+                    onClick={() => setShowReopenModal(true)}
+                    className="flex items-center justify-center gap-3 py-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 transition-all active:scale-95"
+                  >
+                    <RotateCw size={18} /> REABRIR PARA EDIÇÃO
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
               <div className="flex items-center gap-3 mb-3">
                  <AlertCircle size={18} className="text-orange-500" />
@@ -621,6 +814,81 @@ export const ServiceOrderDetail: React.FC = () => {
                 readOnly={os?.status === OSStatus.CONCLUIDA}
                 placeholder="..."
               />
+            </div>
+
+            {/* QUADRO DE GARANTIA */}
+            <div className={`bg-white dark:bg-slate-900 rounded-[2rem] border shadow-sm transition-all overflow-hidden ${isWarranty ? 'border-indigo-200 ring-1 ring-indigo-50/50 dark:border-indigo-900/50' : 'border-gray-100 dark:border-slate-800'}`}>
+               <button onClick={() => setExpandedWarranty(!expandedWarranty)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                 <div className="flex items-center gap-3">
+                    <ShieldCheck size={18} className={isWarranty ? "text-indigo-500" : "text-slate-400"} />
+                    <div className="text-left">
+                       <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Gestão de Garantia</h3>
+                       {!expandedWarranty && isWarranty && (
+                         <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-tight mt-0.5">
+                           Processo de Garantia Ativo
+                         </p>
+                       )}
+                    </div>
+                 </div>
+                 {expandedWarranty ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
+               </button>
+               {expandedWarranty && (
+                 <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-200 space-y-6">
+                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-950/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isWarranty ? 'bg-indigo-500 text-white shadow-lg' : 'bg-slate-200 text-slate-400'}`}>
+                          <AlertTriangle size={14} />
+                        </div>
+                        <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">Ativar Natureza de Garantia?</span>
+                      </div>
+                      <button 
+                        onClick={toggleWarranty}
+                        disabled={os?.status === OSStatus.CONCLUIDA}
+                        className={`w-12 h-6 rounded-full transition-all relative ${isWarranty ? 'bg-indigo-500' : 'bg-slate-300'}`}
+                      >
+                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isWarranty ? 'left-7' : 'left-1'}`} />
+                      </button>
+                    </div>
+
+                    {isWarranty && (
+                      <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
+                         <div className="space-y-4">
+                            <div className="flex items-center gap-2 mb-1 ml-1">
+                               <Settings2 size={12} className="text-slate-400" />
+                               <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Checklist Requisitos Fabricante</label>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                               {[
+                                 { id: 'has_brand', label: 'Marca', icon: Tag, auto: !!os?.equipment?.brand },
+                                 { id: 'has_model', label: 'Modelo', icon: Layers, auto: !!os?.equipment?.model },
+                                 { id: 'has_serial', label: 'Nº de Série', icon: Hash, auto: !!os?.equipment?.serial_number },
+                                 { id: 'has_photo_nameplate', label: 'Foto da Chapa', icon: Camera, auto: !!os?.equipment?.nameplate_url },
+                                 { id: 'has_photo_parts', label: 'Fotos/Vídeos Peças', icon: ImageIcon, auto: false },
+                                 { id: 'has_failure_reason', label: 'Motivo da Avaria', icon: AlertCircle, auto: !!anomaly },
+                               ].map((item) => {
+                                 const isChecked = warrantyInfo?.[item.id as keyof typeof warrantyInfo];
+                                 return (
+                                   <button
+                                     key={item.id}
+                                     disabled={os?.status === OSStatus.CONCLUIDA}
+                                     onClick={() => setWarrantyInfo({...warrantyInfo, [item.id]: !isChecked})}
+                                     className={`flex items-center justify-between p-3.5 rounded-xl border transition-all text-left group ${isChecked ? 'bg-emerald-50 border-emerald-100 text-emerald-700 dark:bg-emerald-900/10 dark:border-emerald-900/30' : 'bg-slate-50 border-slate-100 text-slate-400 dark:bg-slate-950 dark:border-slate-800'}`}
+                                   >
+                                     <div className="flex items-center gap-3 min-w-0">
+                                       <item.icon size={14} className={isChecked ? 'text-emerald-500' : 'text-slate-300'} />
+                                       <span className="text-[10px] font-black uppercase tracking-tight truncate">{item.label}</span>
+                                     </div>
+                                     {isChecked ? <CheckCircle2 size={16} className="text-emerald-500 flex-shrink-0" /> : <Square size={16} className="text-slate-200 flex-shrink-0" />}
+                                   </button>
+                                 );
+                               })}
+                            </div>
+                            <p className="text-[8px] text-slate-400 italic px-2">* Itens assinalados automaticamente se existirem na ficha do equipamento.</p>
+                         </div>
+                      </div>
+                    )}
+                 </div>
+               )}
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
@@ -759,7 +1027,7 @@ export const ServiceOrderDetail: React.FC = () => {
             <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-colors">
                <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3"><Package size={18} className="text-slate-400" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Material Aplicado</h3></div>
-                  <button onClick={() => { setShowPartModal(true); setIsCreatingNewPart(false); setPartQuantity(1); setPartQuantityStr("1"); }} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 active:scale-95 disabled:opacity-50"><Plus size={14} /> ADICIONAR</button>
+                  <button onClick={() => { setShowPartModal(true); setIsCreatingNewPart(false); setPartQuantityStr("1"); }} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 active:scale-95 disabled:opacity-50"><Plus size={14} /> ADICIONAR</button>
                </div>
                <div className="space-y-2">
                   {partsUsed.length === 0 ? <div className="text-center py-10 opacity-20"><Package size={32} className="mx-auto mb-2" /><p className="text-[10px] font-black uppercase tracking-widest">Nenhum material registado</p></div> : partsUsed.map((part) => (
@@ -774,7 +1042,6 @@ export const ServiceOrderDetail: React.FC = () => {
                           <button 
                             onClick={() => { 
                               setPartToEditQuantity(part); 
-                              setTempQuantity(part.quantity); 
                               setTempQuantityStr(part.quantity.toString().replace('.', ',')); 
                               setShowEditQuantityModal(true); 
                             }}
@@ -815,7 +1082,6 @@ export const ServiceOrderDetail: React.FC = () => {
                 </div>
 
                 <div className="space-y-10">
-                   {/* Fix: Explicitly cast Object.entries to resolve 'unknown' type errors for categoryPhotos */}
                    {(Object.entries(groupedPhotos) as [string, OSPhoto[]][]).map(([category, categoryPhotos]) => {
                      if (categoryPhotos.length === 0) return null;
                      return (
@@ -852,17 +1118,21 @@ export const ServiceOrderDetail: React.FC = () => {
              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 transition-colors">
                 <div className="flex items-center justify-between mb-6">
                    <div className="flex items-center gap-3"><AlertTriangle size={18} className="text-orange-500" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Anomalia Detetada *</h3></div>
-                   <button onClick={handleResetAnomaly} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors p-2" title="Limpar"><RotateCcw size={12} /> <span className="text-[9px] font-black uppercase">LIMPAR</span></button>
+                   <button type="button" onClick={handleResetAnomaly} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors p-2" title="Limpar"><RotateCcw size={12} /> <span className="text-[9px] font-black uppercase">LIMPAR</span></button>
                 </div>
                 <input type="text" placeholder="..." className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-xs font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" value={anomaly} onChange={e => setAnomaly(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} />
              </div>
 
              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 transition-colors">
+                {/* Fixed JSX Structure for AI Summary Card */}
                 <div className="flex items-center justify-between mb-6">
-                   <div className="flex items-center gap-3 text-blue-500"><Sparkles size={18} /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Resumo da Intervenção (IA)</h3></div>
+                   <div className="flex items-center gap-3 text-blue-500">
+                     <Sparkles size={18} />
+                     <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Resumo da Intervenção (IA)</h3>
+                   </div>
                    <div className="flex items-center gap-2">
-                     <button onClick={handleResetResolution} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors p-2"><RotateCcw size={12} /> <span className="text-[9px] font-black uppercase">LIMPAR</span></button>
-                     <button onClick={handleGenerateAISummary} disabled={isGenerating || os?.status === OSStatus.CONCLUIDA} className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-[9px] font-black uppercase hover:bg-blue-100 transition-all disabled:opacity-50">{isGenerating ? <RefreshCw size={12} className="animate-spin" /> : <Sparkle size={12} />} GERAR IA</button>
+                     <button type="button" onClick={handleResetResolution} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors p-2"><RotateCcw size={12} /> <span className="text-[9px] font-black uppercase">LIMPAR</span></button>
+                     <button type="button" onClick={handleGenerateAISummary} disabled={isGenerating || os?.status === OSStatus.CONCLUIDA} className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-[9px] font-black uppercase hover:bg-blue-100 transition-all disabled:opacity-50">{isGenerating ? <RefreshCw size={12} className="animate-spin" /> : <Sparkle size={12} />} GERAR IA</button>
                    </div>
                 </div>
                 <textarea className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-[2rem] px-6 py-5 text-sm text-slate-800 dark:text-slate-200 leading-relaxed outline-none focus:ring-4 focus:ring-blue-500/10 transition-all min-h-[160px] resize-none" value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} placeholder="..." />
@@ -881,7 +1151,52 @@ export const ServiceOrderDetail: React.FC = () => {
         )}
       </div>
 
-      {/* MODAL ADICIONAR MATERIAL */}
+      {/* MODAL REABRIR OS COM SELEÇÃO DE ESTADO ORDENADO E RESET DE FECHO */}
+      {showReopenModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
+              <div className="p-8 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                 <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Reabrir Ordem de Serviço</h3>
+                 <button onClick={() => setShowReopenModal(false)} className="text-gray-400 hover:text-gray-600 p-2"><X size={24}/></button>
+              </div>
+              <div className="p-8 space-y-4">
+                 <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-2xl border border-orange-100 dark:border-orange-800/50 mb-2">
+                    <p className="text-[9px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest leading-relaxed">
+                      Atenção: Ao reabrir, os dados da aba "Fecho" (anomalia, notas de resolução e assinaturas) serão apagados para permitir uma nova intervenção.
+                    </p>
+                 </div>
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center mb-4">Selecione o estado de destino para edição:</p>
+                 <div className="grid grid-cols-1 gap-2.5">
+                   {[
+                     OSStatus.POR_INICIAR,
+                     OSStatus.INICIADA,
+                     OSStatus.PARA_ORCAMENTO,
+                     OSStatus.ORCAMENTO_ENVIADO,
+                     OSStatus.AGUARDA_PECAS,
+                     OSStatus.PECAS_RECEBIDAS
+                   ].map((status) => (
+                     <button
+                       key={status}
+                       onClick={() => handleSelectReopenStatus(status)}
+                       disabled={actionLoading}
+                       className="w-full p-4 rounded-2xl border border-slate-100 dark:border-slate-800 text-left hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all group flex items-center justify-between"
+                     >
+                        <span className="text-xs font-black uppercase text-slate-700 dark:text-slate-300 group-hover:text-blue-600 transition-colors">
+                          {getStatusLabelText(status)}
+                        </span>
+                        <ChevronRight size={16} className="text-slate-200 group-hover:text-blue-500" />
+                     </button>
+                   ))}
+                 </div>
+                 <div className="pt-4">
+                    <button onClick={() => setShowReopenModal(false)} className="w-full py-4 bg-slate-50 dark:bg-slate-800 text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">FECHAR</button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAIS (MANTIDOS) */}
       {showPartModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
@@ -914,7 +1229,7 @@ export const ServiceOrderDetail: React.FC = () => {
                             </button>
                          </div>
                        ) : filteredCatalog.map(p => (
-                          <button key={p.id} onClick={() => { setSelectedPartId(p.id); setPartQuantity(1); setPartQuantityStr("1"); }} className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between group ${selectedPartId === p.id ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' : 'bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800 hover:border-blue-100 dark:hover:border-blue-900/50'}`}>
+                          <button key={p.id} onClick={() => { setSelectedPartId(p.id); setPartQuantityStr("1"); }} className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between group ${selectedPartId === p.id ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' : 'bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800 hover:border-blue-100 dark:hover:border-blue-900/50'}`}>
                              <div className="min-w-0 pr-4">
                                 <p className={`text-sm font-black uppercase truncate ${selectedPartId === p.id ? 'text-blue-600' : 'text-slate-900 dark:text-white'}`}>{p.name}</p>
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">REF: {p.reference}</p>
@@ -990,7 +1305,7 @@ export const ServiceOrderDetail: React.FC = () => {
                  <button 
                   onClick={isCreatingNewPart ? handleCreateAndAddPart : handleAddPart} 
                   disabled={(isCreatingNewPart ? !newPartForm.name : !selectedPartId) || actionLoading} 
-                  className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 transition-all"
+                  className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50"
                  >
                     {actionLoading ? <Loader2 size={20} className="animate-spin mx-auto" /> : isCreatingNewPart ? 'REGISTAR E APLICAR' : 'CONFIRMAR APLICAÇÃO'}
                  </button>
@@ -999,7 +1314,6 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL AJUSTAR QUANTIDADE MATERIAL */}
       {showEditQuantityModal && partToEditQuantity && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
@@ -1050,7 +1364,6 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL ELIMINAR MATERIAL */}
       {showDeletePartModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center">
@@ -1067,7 +1380,6 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL ELIMINAR FOTO */}
       {showDeletePhotoModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center">
@@ -1084,7 +1396,6 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL FINALIZE CONFIRMATION */}
       {showFinalizeModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
@@ -1095,13 +1406,14 @@ export const ServiceOrderDetail: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <button onClick={() => setShowFinalizeModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button>
                   <button onClick={async () => { 
-                    // CORREÇÃO: Passar o estado diretamente aqui também
                     await mockData.updateServiceOrder(id!, { 
                       status: OSStatus.CONCLUIDA, 
                       anomaly_detected: anomaly, 
                       resolution_notes: resolutionNotes, 
                       client_signature: clientSignature, 
-                      technician_signature: technicianSignature 
+                      technician_signature: technicianSignature,
+                      is_warranty: isWarranty,
+                      warranty_info: warrantyInfo
                     }); 
                     navigate('/os'); 
                   }} className="py-4 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">CONFIRMAR</button>
@@ -1111,7 +1423,6 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
       
-      {/* MODAL VIEW PHOTO */}
       {selectedPhotoForView && (
         <div className="fixed inset-0 z-[300] bg-slate-950 flex flex-col animate-in fade-in duration-300">
            <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 z-[310] bg-gradient-to-b from-black/80 to-transparent">
@@ -1122,7 +1433,6 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
-      {/* ERROR TOAST-LIKE BANNER */}
       {errorMessage && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[400] w-full max-w-xs animate-in slide-in-from-top-10 duration-300">
            <div className="bg-red-600 text-white p-4 rounded-2xl shadow-2xl flex items-start gap-3">
