@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HardDrive, Filter, MapPin, ChevronDown, RefreshCw, Calendar, LayoutList, StretchHorizontal } from 'lucide-react';
+import { HardDrive, Filter, MapPin, ChevronDown, RefreshCw, Calendar, LayoutList, StretchHorizontal, ShieldAlert, X } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { ServiceOrder, OSStatus } from '../types';
 import { useStore } from '../contexts/StoreContext';
@@ -38,6 +37,12 @@ const ServiceOrders: React.FC = () => {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<OSStatus | 'all'>('all');
   const [viewMode, setViewMode] = useState<'compact' | 'complete'>('compact');
+  
+  // Estados para validação de fecho na lista
+  const [showValidationErrorModal, setShowValidationErrorModal] = useState(false);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [osIdToValidate, setOsIdToValidate] = useState<string | null>(null);
+
   const navigate = useNavigate();
   const { currentStore, setStore } = useStore();
   
@@ -63,11 +68,19 @@ const ServiceOrders: React.FC = () => {
     
     if (newStatus === OSStatus.CONCLUIDA) {
       const osToUpdate = allOrders.find(o => o.id === osId);
+      const fields = [];
       const hasAnomaly = osToUpdate?.anomaly_detected && osToUpdate.anomaly_detected.trim().length > 0;
-      const hasSignatures = osToUpdate?.client_signature && osToUpdate?.technician_signature;
+      const hasClientSig = osToUpdate?.client_signature && osToUpdate.client_signature.trim().length > 0;
+      const hasTechSig = osToUpdate?.technician_signature && osToUpdate.technician_signature.trim().length > 0;
 
-      if (!hasAnomaly || !hasSignatures) {
-        navigate(`/os/${osId}?validate=true`);
+      if (!hasAnomaly) fields.push("ANOMALIA DETETADA");
+      if (!hasClientSig) fields.push("ASSINATURA DO CLIENTE");
+      if (!hasTechSig) fields.push("ASSINATURA DO TÉCNICO");
+
+      if (fields.length > 0) {
+        setMissingFields(fields);
+        setOsIdToValidate(osId);
+        setShowValidationErrorModal(true);
         return;
       }
     }
@@ -311,6 +324,39 @@ const ServiceOrders: React.FC = () => {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* MODAL ERRO DE VALIDAÇÃO (MESMO QUE NO DETALHE) */}
+      {showValidationErrorModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={(e) => e.stopPropagation()}>
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
+              <div className="p-8 text-center">
+                 <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                    <ShieldAlert size={32}/>
+                 </div>
+                 <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Dados em Falta</h3>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-6 uppercase">
+                    Para concluir a OS, deve preencher os seguintes campos obrigatórios:
+                 </p>
+                 <div className="space-y-2 mb-8">
+                   {missingFields.map((field, idx) => (
+                     <div key={idx} className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 p-3 rounded-xl text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest">
+                       {field}
+                     </div>
+                   ))}
+                 </div>
+                 <button 
+                  onClick={() => {
+                    setShowValidationErrorModal(false);
+                    if (osIdToValidate) navigate(`/os/${osIdToValidate}?tab=finalizar`);
+                  }}
+                  className="w-full py-4 bg-slate-900 dark:bg-blue-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all"
+                 >
+                    ENTENDIDO, VOU PREENCHER
+                 </button>
+              </div>
+           </div>
         </div>
       )}
     </div>

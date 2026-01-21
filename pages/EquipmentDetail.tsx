@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
@@ -43,7 +42,6 @@ const EquipmentDetail: React.FC = () => {
         setClientName(client?.name || 'Cliente Desconhecido');
         setEstablishmentName(establishments.find(e => e.id === eq.establishment_id)?.name || 'Localização Desconhecida');
         
-        // Filtramos todas as OS do equipamento e ordenamos (mais recentes primeiro)
         const eqOs = allOs
           .filter(o => o.equipment_id === id)
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -110,35 +108,16 @@ const EquipmentDetail: React.FC = () => {
   if (!equipment) return <div className="p-8 text-center uppercase font-black text-slate-400">Ativo não encontrado.</div>;
 
   return (
-    <div className="max-w-4xl mx-auto pb-24 relative px-1 sm:px-0">
+    <div className="max-w-4xl mx-auto pb-44 relative px-1 sm:px-0">
       <div className="space-y-4">
-        <div className="sticky top-0 z-10 pb-2">
-          <div className="flex items-center gap-2">
-            <button onClick={() => navigate(-1)} className="p-3 text-slate-500 hover:text-blue-600 rounded-2xl transition-all bg-white border border-gray-200 shadow-sm active:scale-95 flex-shrink-0">
-              <ArrowLeft size={22} />
-            </button>
-            <div className="flex-1 flex overflow-x-auto bg-white border border-gray-200 rounded-2xl shadow-sm no-scrollbar">
-              {[
-                { id: 'info', icon: HardDrive, label: 'Geral' },
-                { id: 'chapa', icon: ImageIcon, label: 'Chapa' },
-                { id: 'history', icon: History, label: 'Intervenções' },
-                { id: 'attachments', icon: Paperclip, label: 'Anexos' }
-              ].map((tab) => (
-                <button 
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex-1 flex items-center justify-center py-4 px-3 transition-all border-b-2 gap-2 ${activeTab === tab.id ? 'border-blue-600 text-blue-600 bg-blue-50/30' : 'border-transparent text-slate-400'}`}
-                >
-                  <tab.icon size={18} />
-                  <span className="hidden sm:inline text-[9px] font-black uppercase tracking-widest">{tab.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="flex items-center gap-2 mb-2 px-1">
+          <button onClick={() => navigate(-1)} className="p-3 text-slate-500 dark:text-slate-400 hover:text-blue-600 rounded-2xl transition-all bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm active:scale-95">
+            <ArrowLeft size={22} />
+          </button>
         </div>
 
-        <div className="bg-white shadow-xl rounded-[2.5rem] p-8 border border-gray-100 text-center animate-in fade-in duration-300 relative">
-          <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-tight mb-1">
+        <div className="bg-white dark:bg-slate-900 shadow-xl rounded-[2.5rem] p-8 border border-gray-100 dark:border-slate-800 text-center animate-in fade-in duration-300 relative transition-colors">
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight mb-1">
             {equipment.type}
           </h1>
           <p className="text-[10px] font-bold text-blue-600 uppercase tracking-[0.2em]">{equipment.brand} | {equipment.model}</p>
@@ -147,34 +126,34 @@ const EquipmentDetail: React.FC = () => {
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           {activeTab === 'info' && (
             <div className="space-y-4">
-              <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden divide-y divide-slate-50">
+              <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden divide-y divide-slate-50 dark:divide-slate-800 transition-colors">
                 <div className="p-6 flex items-center gap-4">
-                   <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center flex-shrink-0">
+                   <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-500 flex items-center justify-center flex-shrink-0">
                       <Building2 size={22} />
                    </div>
                    <div className="min-w-0">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Proprietário / Cliente</p>
-                      <button onClick={() => navigate(`/clients/${equipment.client_id}`)} className="text-sm font-black text-slate-900 uppercase truncate hover:text-blue-600 text-left">
+                      <button onClick={() => navigate(`/clients/${equipment.client_id}`)} className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase truncate hover:text-blue-600 text-left">
                         {clientName}
                       </button>
                    </div>
                 </div>
                 <div className="p-6 flex items-center gap-4">
-                   <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center flex-shrink-0">
+                   <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 flex items-center justify-center flex-shrink-0">
                       <MapPin size={22} />
                    </div>
                    <div className="min-w-0">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Localização de Instalação</p>
-                      <p className="text-sm font-black text-slate-900 uppercase truncate">{establishmentName}</p>
+                      <p className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase truncate">{establishmentName}</p>
                    </div>
                 </div>
                 <div className="p-6 flex items-center gap-4">
-                   <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center flex-shrink-0">
+                   <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0">
                       <FileText size={22} />
                    </div>
                    <div className="min-w-0">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Número de Série (S/N)</p>
-                      <p className="text-sm font-black text-slate-900 font-mono uppercase">{equipment.serial_number}</p>
+                      <p className="text-sm font-black text-slate-900 dark:text-slate-100 font-mono uppercase">{equipment.serial_number}</p>
                    </div>
                 </div>
               </div>
@@ -182,7 +161,7 @@ const EquipmentDetail: React.FC = () => {
               <div className="pt-6">
                 <Link 
                   to={`/equipments/${equipment.id}/edit`}
-                  className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95"
+                  className="w-full bg-slate-900 dark:bg-blue-600 text-white py-5 rounded-3xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95"
                 >
                   <Edit2 size={16} /> EDITAR FICHA DO ATIVO
                 </Link>
@@ -191,12 +170,12 @@ const EquipmentDetail: React.FC = () => {
           )}
 
           {activeTab === 'chapa' && (
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6 text-center">
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 space-y-6 text-center transition-colors">
                <div className="flex flex-col items-center">
                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-8">Chapa de Características</h3>
                   {equipment.nameplate_url ? (
-                    <div className="relative group w-full max-w-md mx-auto aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl border border-gray-100 mb-8">
-                       <img src={equipment.nameplate_url} className="w-full h-full object-contain bg-slate-50" alt="Chapa de Características" />
+                    <div className="relative group w-full max-w-md mx-auto aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl border border-gray-100 dark:border-slate-800 mb-8">
+                       <img src={equipment.nameplate_url} className="w-full h-full object-contain bg-slate-50 dark:bg-slate-950" alt="Chapa de Características" />
                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
                           <button onClick={() => window.open(equipment.nameplate_url)} className="p-4 bg-white text-slate-900 rounded-full hover:bg-blue-50 transition-colors shadow-xl">
                             <Eye size={24} />
@@ -208,7 +187,7 @@ const EquipmentDetail: React.FC = () => {
                        </div>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center w-full max-w-md mx-auto aspect-[4/3] bg-slate-50 border-2 border-dashed border-gray-200 rounded-[3rem] cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all group mb-8">
+                    <label className="flex flex-col items-center justify-center w-full max-w-md mx-auto aspect-[4/3] bg-slate-50 dark:bg-slate-950 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-[3rem] cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:border-blue-200 transition-all group mb-8">
                        <Camera size={48} className="text-gray-300 group-hover:text-blue-400 mb-4 transition-colors" />
                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest group-hover:text-blue-500">Adicionar Foto da Chapa</p>
                        <input type="file" accept="image/*" className="hidden" onChange={handleUploadNameplate} />
@@ -219,51 +198,49 @@ const EquipmentDetail: React.FC = () => {
           )}
 
           {activeTab === 'history' && (
-            <div className="space-y-3">
+            <div className="space-y-3 pb-10">
                <div className="flex items-center justify-between px-4 mb-4">
                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Intervenções (Ativas e Histórico)</h3>
-                  <span className="bg-slate-100 text-slate-600 text-[10px] font-black px-2 py-0.5 rounded-full">{history.length}</span>
+                  <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black px-2 py-0.5 rounded-full">{history.length}</span>
                </div>
                
                {history.length === 0 ? (
-                 <div className="text-center py-20 bg-white rounded-[2.5rem] border-2 border-dashed border-gray-100 mx-1">
-                    <History size={32} className="mx-auto text-gray-200 mb-4" />
+                 <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-gray-100 dark:border-slate-800 mx-1">
+                    <History size={32} className="mx-auto text-gray-200 dark:text-slate-700 mb-4" />
                     <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest">Sem registos para este ativo</p>
                  </div>
                ) : (
                  <div className="space-y-3 px-1">
-                   {history.map(os => {
-                     return (
-                       <Link 
-                         key={os.id} 
-                         to={`/os/${os.id}`} 
-                         className="flex items-center justify-between p-6 bg-white border border-gray-100 rounded-3xl hover:border-blue-100 hover:shadow-lg transition-all group"
-                       >
-                         <div className="flex items-center gap-5 min-w-0 flex-1">
-                           <div className="w-12 h-12 rounded-2xl bg-slate-50 flex flex-col items-center justify-center font-black group-hover:bg-blue-600 group-hover:text-white transition-all flex-shrink-0 shadow-inner">
-                             <span className="text-[10px] font-mono text-slate-400 group-hover:text-blue-100">{os.code.split('-')[0]}</span>
-                             <span className="text-[8px] text-slate-300 group-hover:text-blue-200 uppercase mt-0.5">{new Date(os.created_at).toLocaleDateString('pt-PT', {day: '2-digit', month: '2-digit'})}</span>
-                           </div>
-                           <div className="min-w-0 flex-1">
-                             <div className="flex items-center gap-2 mb-1">
-                               <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">{os.code}</p>
-                               <span className="text-[8px] font-black text-slate-300 uppercase">|</span>
-                               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{os.type}</p>
-                             </div>
-                             <h4 className="text-base font-black text-slate-900 uppercase truncate mb-1">{os.description}</h4>
-                           </div>
+                   {history.map(os => (
+                     <Link 
+                       key={os.id} 
+                       to={`/os/${os.id}`} 
+                       className="flex items-center justify-between p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl hover:border-blue-100 hover:shadow-lg transition-all group"
+                     >
+                       <div className="flex items-center gap-5 min-w-0 flex-1">
+                         <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex flex-col items-center justify-center font-black group-hover:bg-blue-600 group-hover:text-white transition-all flex-shrink-0 shadow-inner">
+                           <span className="text-[10px] font-mono text-slate-400 group-hover:text-blue-100 leading-none">OS</span>
+                           <span className="text-[8px] text-slate-300 group-hover:text-blue-200 uppercase mt-0.5">{new Date(os.created_at).toLocaleDateString('pt-PT', {day: '2-digit', month: '2-digit'})}</span>
                          </div>
-                         <OSStatusBadge status={os.status} className="scale-90 flex-shrink-0" />
-                       </Link>
-                     );
-                   })}
+                         <div className="min-w-0 flex-1">
+                           <div className="flex items-center gap-2 mb-1">
+                             <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">{os.code}</p>
+                             <span className="text-[8px] font-black text-slate-300 uppercase">|</span>
+                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{os.type}</p>
+                           </div>
+                           <h4 className="text-base font-black text-slate-900 dark:text-white uppercase truncate mb-1">{os.description}</h4>
+                         </div>
+                       </div>
+                       <OSStatusBadge status={os.status} className="scale-90 flex-shrink-0" />
+                     </Link>
+                   ))}
                  </div>
                )}
             </div>
           )}
 
           {activeTab === 'attachments' && (
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 space-y-6 transition-colors pb-10">
               <div className="flex justify-between items-center mb-2">
                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Anexos & Documentação</h3>
                  <label className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer hover:bg-blue-700 shadow-lg active:scale-95 transition-all">
@@ -272,28 +249,28 @@ const EquipmentDetail: React.FC = () => {
                  </label>
               </div>
               {(equipment.attachments || []).length === 0 ? (
-                <div className="text-center py-16 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-100">
-                   <Paperclip size={32} className="mx-auto text-slate-200 mb-3" />
-                   <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest px-8">Nenhum esquema ou manual anexado</p>
+                <div className="text-center py-16 bg-slate-50 dark:bg-slate-950 rounded-[2rem] border-2 border-dashed border-slate-100 dark:border-slate-800 transition-colors">
+                   <Paperclip size={32} className="mx-auto text-slate-200 dark:text-slate-800 mb-3" />
+                   <p className="text-[10px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-widest px-8">Nenhum esquema ou manual anexado</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                    {equipment.attachments?.map(att => (
-                     <div key={att.id} className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 group transition-all">
+                     <div key={att.id} className="flex items-center justify-between p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 transition-all group">
                         <div className="flex items-center gap-4 min-w-0">
-                           <div className="w-10 h-10 rounded-xl bg-white text-slate-400 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:text-blue-500">
+                           <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:text-blue-500">
                               <FileText size={18} />
                            </div>
                            <div className="min-w-0">
-                              <p className="text-xs font-black text-slate-900 uppercase truncate mb-0.5">{att.name}</p>
-                              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{new Date(att.created_at).toLocaleDateString()}</p>
+                              <p className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase truncate mb-0.5">{att.name}</p>
+                              <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{new Date(att.created_at).toLocaleDateString()}</p>
                            </div>
                         </div>
                         <div className="flex items-center gap-2">
-                           <button onClick={() => window.open(att.url)} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white rounded-xl transition-all" title="Ver Anexo">
+                           <button onClick={() => window.open(att.url)} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all" title="Ver Anexo">
                               <ExternalLink size={16} />
                            </button>
-                           <button onClick={() => handleRemoveAttachment(att.id)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-white rounded-xl transition-all" title="Remover">
+                           <button onClick={() => handleRemoveAttachment(att.id)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all" title="Remover">
                               <Trash2 size={16} />
                            </button>
                         </div>
@@ -304,6 +281,25 @@ const EquipmentDetail: React.FC = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* BARRA DE NAVEGAÇÃO FLUTUANTE INFERIOR */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-gray-200 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
+        {[
+          { id: 'info', icon: HardDrive, label: 'GERAL' },
+          { id: 'chapa', icon: ImageIcon, label: 'CHAPA' },
+          { id: 'history', icon: History, label: 'HIST.' },
+          { id: 'attachments', icon: Paperclip, label: 'ANEXOS' }
+        ].map((tab) => (
+          <button 
+            key={tab.id} 
+            onClick={() => setActiveTab(tab.id as any)} 
+            className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-full transition-all gap-1 ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+          >
+            <tab.icon size={18} />
+            <span className="text-[7px] font-black uppercase tracking-widest">{tab.label}</span>
+          </button>
+        ))}
       </div>
     </div>
   );

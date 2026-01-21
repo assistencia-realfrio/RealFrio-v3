@@ -124,7 +124,15 @@ type TabType = 'info' | 'notas' | 'tecnico' | 'fotos' | 'finalizar';
 export const ServiceOrderDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>('info');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam === 'finalizar' || tabParam === 'info' || tabParam === 'notas' || tabParam === 'tecnico' || tabParam === 'fotos') {
+      return tabParam as TabType;
+    }
+    return 'info';
+  });
   const [os, setOs] = useState<ServiceOrder | null>(null);
   const [partsUsed, setPartsUsed] = useState<PartUsed[]>([]);
   const [photos, setPhotos] = useState<OSPhoto[]>([]);
@@ -680,13 +688,6 @@ export const ServiceOrderDetail: React.FC = () => {
     setResolutionNotes('');
   };
 
-  const handleResetSignatures = () => {
-    if (confirm("Deseja limpar ambas as assinaturas?")) {
-      setClientSignature(null);
-      setTechnicianSignature(null);
-    }
-  };
-
   const filteredCatalog = useMemo(() => {
     const term = normalizeString(partSearchTerm);
     if (!term) return catalog;
@@ -716,20 +717,22 @@ export const ServiceOrderDetail: React.FC = () => {
   );
 
   return (
-    <div className="max-w-4xl mx-auto pb-32 relative px-1 sm:px-0 space-y-4">
+    <div className="max-w-4xl mx-auto pb-44 relative px-1 sm:px-0 space-y-4">
       <FloatingEditBar isVisible={isDirty} isSubmitting={actionLoading} onSave={handleSaveData} onCancel={fetchOSDetails} />
 
       <div className="space-y-2 mb-4">
-        <div className="bg-white dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-gray-200 dark:border-slate-800 p-3 grid grid-cols-3 items-center transition-colors">
-          <div className="flex justify-start">
+        <div className="bg-white dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-gray-200 dark:border-slate-800 p-3 flex items-center justify-between transition-colors overflow-hidden">
+          <div className="flex-shrink-0">
             <button onClick={() => navigate('/os')} className="p-2.5 text-slate-500 dark:text-slate-400 hover:text-blue-600 rounded-2xl transition-all bg-slate-50 dark:bg-slate-800 border border-transparent hover:border-blue-100">
               <ArrowLeft size={20} />
             </button>
           </div>
-          <div className="flex justify-center">
-            <span className="text-[12px] font-black text-blue-600 uppercase tracking-[0.2em] font-mono leading-none">{os?.code}</span>
+          <div className="flex-1 px-3 text-center min-w-0 overflow-hidden">
+            <span className="text-[10px] sm:text-[12px] font-black text-blue-600 uppercase tracking-tight sm:tracking-[0.2em] font-mono leading-none whitespace-nowrap block truncate">
+              {os?.code}
+            </span>
           </div>
-          <div className="flex justify-end">
+          <div className="flex-shrink-0">
              {actionLoading ? (
                <RefreshCw size={14} className="animate-spin text-blue-600" />
              ) : (
@@ -749,21 +752,6 @@ export const ServiceOrderDetail: React.FC = () => {
                </div>
              )}
           </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-800 p-1 flex overflow-x-auto no-scrollbar transition-colors">
-          {[
-            { id: 'info', icon: Info, label: 'INFO' },
-            { id: 'notas', icon: MessageSquare, label: 'NOTAS' },
-            { id: 'tecnico', icon: Package, label: 'MATERIAL' },
-            { id: 'fotos', icon: ImageIcon, label: 'FOTOS' },
-            { id: 'finalizar', icon: CheckCircle, label: 'FECHO' }
-          ].map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)} className={`flex-1 flex items-center justify-center py-4 px-2 sm:px-4 rounded-xl gap-0 sm:gap-2 transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>
-              <tab.icon size={16} />
-              <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest ml-1">{tab.label}</span>
-            </button>
-          ))}
         </div>
       </div>
 
@@ -1124,7 +1112,6 @@ export const ServiceOrderDetail: React.FC = () => {
              </div>
 
              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 transition-colors">
-                {/* Fixed JSX Structure for AI Summary Card */}
                 <div className="flex items-center justify-between mb-6">
                    <div className="flex items-center gap-3 text-blue-500">
                      <Sparkles size={18} />
@@ -1139,7 +1126,7 @@ export const ServiceOrderDetail: React.FC = () => {
              </div>
 
              <div className="space-y-4">
-               <div className="flex items-center justify-between px-2"><h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Validação de Trabalho</h3><button onClick={handleResetSignatures} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors p-2"><RotateCcw size={12} /> <span className="text-[9px] font-black uppercase">LIMPAR ASSINATURAS</span></button></div>
+               <div className="flex items-center justify-between px-2"><h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Validação de Trabalho</h3></div>
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                  <SignatureCanvas label="Assinatura Cliente" onSave={setClientSignature} onClear={() => setClientSignature(null)} initialValue={clientSignature} readOnly={os?.status === OSStatus.CONCLUIDA} error={showValidationErrors && !clientSignature} />
                  <SignatureCanvas label="Assinatura Técnico" onSave={setTechnicianSignature} onClear={() => setTechnicianSignature(null)} initialValue={technicianSignature} readOnly={os?.status === OSStatus.CONCLUIDA} error={showValidationErrors && !technicianSignature} />
@@ -1151,7 +1138,57 @@ export const ServiceOrderDetail: React.FC = () => {
         )}
       </div>
 
-      {/* MODAL REABRIR OS COM SELEÇÃO DE ESTADO ORDENADO E RESET DE FECHO */}
+      {/* BARRA DE NAVEGAÇÃO FLUTUANTE INFERIOR */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-gray-200 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
+        {[
+          { id: 'info', icon: Info, label: 'INFO' },
+          { id: 'notas', icon: MessageSquare, label: 'NOTAS' },
+          { id: 'tecnico', icon: Package, label: 'MATERIAL' },
+          { id: 'fotos', icon: ImageIcon, label: 'FOTOS' },
+          { id: 'finalizar', icon: CheckCircle, label: 'FECHO' }
+        ].map((tab) => (
+          <button 
+            key={tab.id} 
+            onClick={() => setActiveTab(tab.id as TabType)} 
+            className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-full transition-all gap-1 ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+          >
+            <tab.icon size={18} />
+            <span className="text-[7px] font-black uppercase tracking-widest">{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* MODAL ERRO DE VALIDAÇÃO */}
+      {showValidationErrorModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
+              <div className="p-8 text-center">
+                 <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                    <ShieldAlert size={32}/>
+                 </div>
+                 <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Dados em Falta</h3>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-6 uppercase">
+                    Para concluir a OS, deve preencher os seguintes campos obrigatórios:
+                 </p>
+                 <div className="space-y-2 mb-8">
+                   {missingFields.map((field, idx) => (
+                     <div key={idx} className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 p-3 rounded-xl text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest">
+                       {field}
+                     </div>
+                   ))}
+                 </div>
+                 <button 
+                  onClick={() => setShowValidationErrorModal(false)}
+                  className="w-full py-4 bg-slate-900 dark:bg-blue-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all"
+                 >
+                    ENTENDIDO, VOU PREENCHER
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL REABRIR OS */}
       {showReopenModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
@@ -1188,15 +1225,12 @@ export const ServiceOrderDetail: React.FC = () => {
                      </button>
                    ))}
                  </div>
-                 <div className="pt-4">
-                    <button onClick={() => setShowReopenModal(false)} className="w-full py-4 bg-slate-50 dark:bg-slate-800 text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">FECHAR</button>
-                 </div>
               </div>
            </div>
         </div>
       )}
 
-      {/* MODAIS (MANTIDOS) */}
+      {/* MODAL MATERIAL */}
       {showPartModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
@@ -1266,9 +1300,6 @@ export const ServiceOrderDetail: React.FC = () => {
                         />
                       </div>
                     </div>
-                    <button onClick={() => setIsCreatingNewPart(false)} className="text-[9px] font-black text-slate-400 uppercase hover:text-blue-600 transition-all flex items-center gap-1.5">
-                      <ArrowLeft size={10} /> Voltar para Pesquisa
-                    </button>
                   </div>
                 )}
 
@@ -1314,6 +1345,7 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
+      {/* MODAL AJUSTAR QUANTIDADE */}
       {showEditQuantityModal && partToEditQuantity && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
@@ -1364,15 +1396,16 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
+      {/* MODAIS DE CONFIRMAÇÃO DE REMOÇÃO */}
       {showDeletePartModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
               <div className="p-8">
                 <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Trash2 size={32}/></div>
                 <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Remover Material?</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">Deseja retirar "{partToDelete?.name}" desta Ordem de Serviço?</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <button onClick={() => setShowDeletePartModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button>
+                  <button onClick={() => setShowDeletePartModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button>
                   <button onClick={handleDeletePart} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">REMOVER</button>
                 </div>
               </div>
@@ -1382,13 +1415,13 @@ export const ServiceOrderDetail: React.FC = () => {
 
       {showDeletePhotoModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
               <div className="p-8">
                 <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Camera size={32}/></div>
                 <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Eliminar Foto?</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">Deseja apagar definitivamente esta evidência fotográfica?</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <button onClick={() => setShowDeletePhotoModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button>
+                  <button onClick={() => setShowDeletePhotoModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button>
                   <button onClick={handleDeletePhoto} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ELIMINAR</button>
                 </div>
               </div>
@@ -1404,7 +1437,7 @@ export const ServiceOrderDetail: React.FC = () => {
                 <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Finalizar Intervenção?</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase">TODOS OS DADOS SERÃO BLOQUEADOS E O RELATÓRIO SERÁ GERADO.</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <button onClick={() => setShowFinalizeModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button>
+                  <button onClick={() => setShowFinalizeModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button>
                   <button onClick={async () => { 
                     await mockData.updateServiceOrder(id!, { 
                       status: OSStatus.CONCLUIDA, 
@@ -1434,7 +1467,7 @@ export const ServiceOrderDetail: React.FC = () => {
       )}
 
       {errorMessage && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[400] w-full max-w-xs animate-in slide-in-from-top-10 duration-300">
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[400] w-full max-w-xs animate-in slide-in-from-top-10 duration-300 px-4">
            <div className="bg-red-600 text-white p-4 rounded-2xl shadow-2xl flex items-start gap-3">
               <AlertCircle size={20} className="flex-shrink-0" />
               <div className="flex-1">
