@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { 
   DatabaseZap, 
-  Download, 
   Upload, 
   ShieldCheck, 
   AlertTriangle, 
@@ -11,15 +10,66 @@ import {
   HardDriveDownload,
   ShieldAlert,
   Loader2,
-  FileCheck,
-  RotateCcw,
   X,
   Stethoscope,
   Wrench,
   CheckCircle2,
-  Terminal
+  Terminal,
+  AlertCircle,
+  Check,
+  // Added Info import to fix the "Cannot find name 'Info'" error
+  Info
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
+
+interface ConfirmDialogProps {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  variant: 'danger' | 'warning' | 'info';
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ isOpen, title, message, confirmLabel, variant, onConfirm, onCancel }) => {
+  if (!isOpen) return null;
+
+  const colors = {
+    danger: { bg: 'bg-red-500', text: 'text-red-600', icon: 'text-red-500', light: 'bg-red-50' },
+    warning: { bg: 'bg-orange-500', text: 'text-orange-600', icon: 'text-orange-500', light: 'bg-orange-50' },
+    info: { bg: 'bg-blue-600', text: 'text-blue-600', icon: 'text-blue-500', light: 'bg-blue-50' }
+  }[variant];
+
+  return (
+    <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-200">
+        <div className="p-8 text-center">
+          <div className={`w-16 h-16 ${colors.light} dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner`}>
+            {variant === 'danger' ? <ShieldAlert className={colors.icon} size={32} /> : variant === 'warning' ? <AlertTriangle className={colors.icon} size={32} /> : <Info className={colors.icon} size={32} />}
+          </div>
+          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">{title}</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">{message}</p>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <button 
+              onClick={onCancel}
+              className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all"
+            >
+              CANCELAR
+            </button>
+            <button 
+              onClick={onConfirm}
+              className={`py-4 ${colors.bg} text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all`}
+            >
+              {confirmLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const Maintenance: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -27,6 +77,25 @@ const Maintenance: React.FC = () => {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isRepaired, setIsRepaired] = useState(false);
+
+  // Estados para Controle de Modais de Confirmação
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'info';
+    action: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmLabel: '',
+    variant: 'info',
+    action: () => {}
+  });
+
+  const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
 
   const handleCreateRestorePoint = async () => {
     setLoading(true);
@@ -60,15 +129,7 @@ const Maintenance: React.FC = () => {
     }
   };
 
-  const handleRestoreSystem = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!confirm("AVISO DE SUBSTITUIÇÃO TOTAL:\n\nEsta operação irá APAGAR PERMANENTEMENTE todos os dados atuais da base de dados antes de carregar o backup.\n\nTem a certeza que deseja prosseguir?")) {
-      e.target.value = '';
-      return;
-    }
-
+  const executeRestore = async (file: File) => {
     setLoading(true);
     setError(null);
     setStatus("A validar integridade do ficheiro...");
@@ -79,40 +140,46 @@ const Maintenance: React.FC = () => {
     reader.onload = async (event) => {
       try {
         const backup = JSON.parse(event.target?.result as string);
+        if (!backup.data) throw new Error("Ficheiro de backup inválido.");
         
-        if (!backup.data) {
-          throw new Error("Ficheiro de backup inválido ou corrompido (falta secção 'data').");
-        }
-
-        setProgress(10);
-        
-        // Chamar a função de importação com Wipe total
         await mockData.importFullSystemData(backup, (msg) => {
           setStatus(msg);
           setProgress(prev => Math.min(prev + 5, 98));
         });
         
         setProgress(100);
-        setStatus("Sistema substituído com sucesso! A aplicação irá recarregar em 3 segundos.");
-        
-        setTimeout(() => window.location.reload(), 3000);
+        setStatus("Sistema substituído com sucesso! Recarregando...");
+        setTimeout(() => window.location.reload(), 2000);
       } catch (err: any) {
-        setError(err.message || "Falha ao restaurar sistema. Verifique a consola para detalhes técnicos.");
+        setError(err.message || "Falha ao restaurar sistema.");
         setLoading(false);
-      } finally {
-        if (e.target) e.target.value = '';
       }
     };
     reader.readAsText(file);
   };
 
-  const handleRepairMissingSedes = async () => {
-    if (!confirm("Deseja iniciar a reparação automática de locais para clientes sem sede?")) return;
+  const handleRestoreSystem = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Aviso Crítico',
+      message: 'Esta operação irá APAGAR PERMANENTEMENTE todos os dados atuais antes de carregar o backup. Deseja prosseguir?',
+      confirmLabel: 'SUBSTITUIR TUDO',
+      variant: 'danger',
+      action: () => executeRestore(file)
+    });
+    
+    // Limpar input para permitir selecionar o mesmo ficheiro se necessário
+    e.target.value = '';
+  };
+
+  const executeRepair = async () => {
     setLoading(true);
     setError(null);
     setIsRepaired(false);
-    setStatus("A iniciar diagnóstico de integridade...");
+    setStatus("A iniciar diagnóstico...");
     setProgress(10);
 
     try {
@@ -123,21 +190,37 @@ const Maintenance: React.FC = () => {
       
       setProgress(100);
       if (count > 0) {
-        setStatus(`Reparação concluída! Foram criados ${count} locais sede.`);
+        setStatus(`Reparação concluída! Criados ${count} locais sede.`);
         setIsRepaired(true);
       } else {
-        setStatus("Diagnóstico concluído: Não foram encontrados clientes sem local.");
+        setStatus("Diagnóstico concluído: Integridade verificada.");
       }
     } catch (err: any) {
-      console.error("Detailed Maintenance Error:", err);
-      setError(err.message || "Erro desconhecido durante a reparação.");
+      setError(err.message || "Erro durante a reparação.");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleRepairMissingSedes = () => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Reparação de Dados',
+      message: 'Deseja iniciar a criação automática de sedes para clientes que não possuem local de intervenção?',
+      confirmLabel: 'INICIAR REPARAÇÃO',
+      variant: 'warning',
+      action: executeRepair
+    });
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
+      <ConfirmDialog 
+        {...confirmConfig} 
+        onCancel={closeConfirm} 
+        onConfirm={() => { closeConfirm(); confirmConfig.action(); }} 
+      />
+
       <div className="px-1 flex flex-col gap-2">
          <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase leading-tight text-center sm:text-left">Painel de Manutenção</h1>
          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] text-center sm:text-left">Gestão de Integridade e Pontos de Restauro</p>
@@ -253,9 +336,6 @@ const Maintenance: React.FC = () => {
                <p className="text-[10px] font-mono text-red-500 leading-relaxed break-words">
                  {error}
                </p>
-               <p className="mt-3 text-[8px] font-bold text-slate-400 uppercase leading-tight italic">
-                 Dica: Se estiver a usar o utilizador "Demo", certifique-se de que as políticas RLS no Supabase permitem acesso público ou logue-se com uma conta real.
-               </p>
              </div>
            )}
         </div>
@@ -270,8 +350,8 @@ const Maintenance: React.FC = () => {
          <ul className="space-y-3">
             {[
               "A reparação utiliza a morada do cliente para criar o local de intervenção.",
-              "A conta 'Demo' pode não ter permissão para escrever no Supabase sem login real.",
-              "Abra a consola (F12) se o erro persistir para ver o código de estado HTTP."
+              "Operações de manutenção exigem estabilidade de rede.",
+              "A limpeza e o restauro ocorrem em tempo real na base de dados."
             ].map((text, i) => (
               <li key={i} className="flex items-start gap-3">
                  <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 mt-1.5 flex-shrink-0"></div>
@@ -282,7 +362,7 @@ const Maintenance: React.FC = () => {
       </div>
 
       <div className="flex justify-center pt-4">
-         <p className="text-[8px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.5em]">Real Frio Maintenance Agent v3.1</p>
+         <p className="text-[8px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.5em]">Real Frio Maintenance Agent v3.2</p>
       </div>
     </div>
   );
