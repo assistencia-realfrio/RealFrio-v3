@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon } from 'lucide-react';
+import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench } from 'lucide-react';
 import { UserRole, OSActivity, ServiceOrder, Client, Equipment } from '../types';
 import { mockData } from '../services/mockData';
 import BrandLogo from './BrandLogo';
@@ -148,7 +148,10 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     { name: 'Férias', path: '/vacations', icon: Palmtree },
     { name: 'Clientes', path: '/clients', icon: UsersIcon },
     { name: 'Stock & Catálogo', path: '/inventory', icon: Package },
-    ...(isAdmin ? [{ name: 'Equipa', path: '/users', icon: UserCog }] : []),
+    ...(isAdmin ? [
+      { name: 'Equipa', path: '/users', icon: UserCog },
+      { name: 'Manutenção', path: '/maintenance', icon: Wrench }
+    ] : []),
   ];
 
   const getRelativeTime = (dateStr: string) => {
@@ -388,7 +391,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                    title="Atividade Recente"
                  >
                    <Bell size={22} />
-                   <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+                   <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-50 border-2 border-white dark:border-slate-900 rounded-full"></span>
                  </button>
                  {notificationsOpen && (
                    <div className="fixed sm:absolute inset-x-4 sm:inset-auto top-24 sm:top-full sm:right-0 mt-0 sm:mt-4 w-auto sm:w-[380px] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden z-[100] animate-in fade-in slide-in-from-top-4 duration-300">

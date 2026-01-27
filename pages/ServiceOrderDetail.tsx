@@ -414,40 +414,40 @@ export const ServiceOrderDetail: React.FC = () => {
     });
 
     const pageWidth = doc.internal.pageSize.width;
-    const margin = 12; // Margem reduzida para maximizar espaço
+    const margin = 10; // Reduzido para o mínimo aceitável
     const contentWidth = pageWidth - (margin * 2);
     
     // 1. HEADER COMPACTO
     doc.setFillColor(15, 23, 42); 
-    doc.rect(0, 0, pageWidth, 30, 'F'); 
+    doc.rect(0, 0, pageWidth, 28, 'F'); 
     
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("REAL FRIO", margin, 15);
+    doc.text("REAL FRIO", margin, 12);
     
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
-    doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 21);
+    doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 18);
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(os.code, pageWidth - margin, 15, { align: 'right' });
+    doc.text(os.code, pageWidth - margin, 12, { align: 'right' });
     
-    doc.setFontSize(6.5);
+    doc.setFontSize(6);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(180, 180, 180);
-    doc.text(`EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 21, { align: 'right' });
+    doc.text(`EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 18, { align: 'right' });
 
-    let currentY = 36;
+    let currentY = 32;
 
-    // 2. BLOCO DE DADOS CLIENTE/EQUIPAMENTO (Extremamente Compacto)
+    // 2. BLOCO DE DADOS CLIENTE/EQUIPAMENTO
     doc.setDrawColor(241, 245, 249);
     doc.setFillColor(252, 252, 253);
-    doc.roundedRect(margin, currentY, contentWidth, 24, 1.5, 1.5, 'FD'); 
+    doc.roundedRect(margin, currentY, contentWidth, 22, 1, 1, 'FD'); 
     
     doc.setTextColor(15, 23, 42);
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.text("DADOS DO CLIENTE", margin + 3, currentY + 5);
     doc.text("EQUIPAMENTO", margin + (contentWidth / 2) + 3, currentY + 5);
@@ -457,22 +457,22 @@ export const ServiceOrderDetail: React.FC = () => {
     doc.line(margin + (contentWidth / 2) + 3, currentY + 7, margin + contentWidth - 3, currentY + 7);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
+    doc.setFontSize(6.5);
     doc.setTextColor(71, 85, 105);
     
     // Coluna Cliente
     doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 3, currentY + 11);
-    doc.text(`FIRMA: ${os.client?.billing_name || '---'}`, margin + 3, currentY + 15, { maxWidth: (contentWidth / 2) - 8 });
-    doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 3, currentY + 19);
+    doc.text(`FIRMA: ${os.client?.billing_name || '---'}`, margin + 3, currentY + 14.5, { maxWidth: (contentWidth / 2) - 8 });
+    doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 3, currentY + 18);
     
     // Coluna Equipamento
     doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 3, currentY + 11);
-    doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 3, currentY + 15);
-    doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 3, currentY + 19);
+    doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 3, currentY + 14.5);
+    doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 3, currentY + 18);
 
-    currentY += 30;
+    currentY += 26;
 
-    // 3. SECÇÕES DE TEXTO (Juntas, sem espaços mortos)
+    // 3. SECÇÕES DE TEXTO
     const narrativeFields = [
       { label: "DESCRIÇÃO DO PEDIDO / AVARIA:", value: os.description || 'N/A' },
       { label: "ANOMALIA DETETADA NO LOCAL:", value: os.anomaly_detected || 'N/A' },
@@ -480,31 +480,31 @@ export const ServiceOrderDetail: React.FC = () => {
     ];
 
     narrativeFields.forEach(field => {
-      doc.setFontSize(7.5);
+      doc.setFontSize(7);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.text(field.label, margin, currentY);
       
-      currentY += 3.5;
+      currentY += 3;
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8); 
+      doc.setFontSize(7.5); 
       doc.setTextColor(51, 65, 85);
       
       const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth);
       doc.text(splitText, margin, currentY);
       
-      currentY += (splitText.length * 4) + 4.5; // Espaçamento entre blocos mínimo
+      currentY += (splitText.length * 4) + 3; // Menor espaço entre blocos
 
       if (currentY > 275) { doc.addPage(); currentY = 15; }
     });
 
-    // 4. MATERIAL (Tabela sem respiros excessivos)
+    // 4. MATERIAL
     if (partsUsed.length > 0) {
-      doc.setFontSize(7.5);
+      doc.setFontSize(7);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.text("MATERIAL APLICADO:", margin, currentY);
-      currentY += 2.5;
+      currentY += 2;
 
       autoTable(doc, {
         startY: currentY,
@@ -512,52 +512,52 @@ export const ServiceOrderDetail: React.FC = () => {
         theme: 'plain',
         head: [['ARTIGO / DESIGNAÇÃO', 'REFERÊNCIA', 'QTD']],
         body: partsUsed.map(p => [p.name.toUpperCase(), p.reference.toUpperCase(), `${p.quantity.toLocaleString('pt-PT')} UN`]),
-        headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontSize: 6.5, fontStyle: 'bold', halign: 'left' },
-        styles: { fontSize: 7.5, cellPadding: 1.5, textColor: [51, 65, 85], lineWidth: 0.05, lineColor: [241, 245, 249] },
+        headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontSize: 6, fontStyle: 'bold', halign: 'left' },
+        styles: { fontSize: 7, cellPadding: 1, textColor: [51, 65, 85], lineWidth: 0.05, lineColor: [241, 245, 249] },
         columnStyles: { 2: { halign: 'right' } }
       });
-      currentY = (doc as any).lastAutoTable.finalY + 10;
+      currentY = (doc as any).lastAutoTable.finalY + 8;
     }
 
-    // 5. ASSINATURAS (Aproximadas para evitar nova página)
-    if (currentY > 245) { doc.addPage(); currentY = 15; }
+    // 5. ASSINATURAS
+    if (currentY > 250) { doc.addPage(); currentY = 15; }
 
     doc.setDrawColor(226, 232, 240);
     doc.line(margin, currentY, pageWidth - margin, currentY);
-    currentY += 6;
+    currentY += 5;
     
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.text("VALIDAÇÃO E CONFORMIDADE", margin, currentY);
-    currentY += 4;
+    currentY += 3;
 
-    const sigBoxWidth = (contentWidth / 2) - 8;
+    const sigBoxWidth = (contentWidth / 2) - 5;
     
     // Assinatura Cliente
     if (clientSignature) { 
       try { 
-        doc.addImage(clientSignature, 'JPEG', margin, currentY, 45, 18, undefined, 'FAST'); 
+        doc.addImage(clientSignature, 'JPEG', margin, currentY, 40, 15, undefined, 'FAST'); 
       } catch (e) {} 
     }
     doc.setDrawColor(203, 213, 225);
-    doc.line(margin, currentY + 20, margin + sigBoxWidth, currentY + 20);
-    doc.setFontSize(6);
+    doc.line(margin, currentY + 16, margin + sigBoxWidth, currentY + 16);
+    doc.setFontSize(5.5);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(148, 163, 184);
-    doc.text("ASSINATURA CLIENTE", margin + (sigBoxWidth / 2), currentY + 24, { align: 'center' });
+    doc.text("ASSINATURA CLIENTE", margin + (sigBoxWidth / 2), currentY + 20, { align: 'center' });
 
     // Assinatura Técnico
     if (technicianSignature) { 
       try { 
-        doc.addImage(technicianSignature, 'JPEG', margin + (contentWidth / 2) + 8, currentY, 45, 18, undefined, 'FAST'); 
+        doc.addImage(technicianSignature, 'JPEG', margin + (contentWidth / 2) + 5, currentY, 40, 15, undefined, 'FAST'); 
       } catch (e) {} 
     }
-    doc.line(margin + (contentWidth / 2) + 8, currentY + 20, margin + contentWidth, currentY + 20);
-    doc.text("ASSINATURA TÉCNICO", margin + (contentWidth / 2) + 8 + (sigBoxWidth / 2), currentY + 24, { align: 'center' });
+    doc.line(margin + (contentWidth / 2) + 5, currentY + 16, margin + contentWidth, currentY + 16);
+    doc.text("ASSINATURA TÉCNICO", margin + (contentWidth / 2) + 5 + (sigBoxWidth / 2), currentY + 20, { align: 'center' });
 
-    doc.setFontSize(5.5);
+    doc.setFontSize(5);
     doc.setTextColor(148, 163, 184);
-    doc.text("Relatório oficial Real Frio. Sistema Cloud v3.0", pageWidth / 2, 290, { align: 'center' });
+    doc.text("Documento oficial Real Frio. Emitido via Plataforma Cloud Técnica.", pageWidth / 2, 290, { align: 'center' });
     
     return doc;
   };
@@ -575,25 +575,26 @@ export const ServiceOrderDetail: React.FC = () => {
   };
 
   /**
-   * Envio de email com texto padrão solicitado pela Real Frio
+   * Envio de email com texto padrão e destinatário automático via MAILTO:
    */
   const handleSendEmailShortcut = async () => {
     if (!os) return;
     
     const clientEmail = os.client?.email?.trim();
     if (!clientEmail) {
-      alert("ATENÇÃO: Este cliente não tem um email registado na ficha. Por favor, preencha o destinatário manualmente no seu gestor de email.");
+      alert("ATENÇÃO: Este cliente não tem um email registado. Por favor, adicione o destinatário manualmente no seu gestor de email.");
     }
 
     setIsExportingPDF(true);
     try {
+      // 1. Descarrega o ficheiro primeiro (para estar disponível no dispositivo)
       const doc = await createPDFDocument();
       if (!doc) throw new Error("Falha ao gerar documento");
-
-      const pdfBlob = doc.output('blob');
+      
       const filename = `RELATORIO_REALFRIO_${os.code}.pdf`;
-      const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+      doc.save(filename);
 
+      // 2. Prepara dados para o link mailto
       const interventionDate = new Date(os.created_at).toLocaleDateString('pt-PT');
       const equipmentInfo = os.equipment ? `${os.equipment.type} - ${os.equipment.brand}` : '---';
       
@@ -607,21 +608,15 @@ export const ServiceOrderDetail: React.FC = () => {
                    `Com os melhores cumprimentos,\n` +
                    `Real Frio, Lda`;
 
-      // Mobile: Partilha nativa com anexo
-      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-        await navigator.share({
-          files: [pdfFile],
-          title: subject,
-          text: body,
-        });
-        await mockData.addOSActivity(os.id, { description: `RELATÓRIO PARTILHADO (PREVISTO PARA: ${clientEmail || 'MANUAL'})` });
-      } else {
-        // Desktop: Fallback mailto com destinatário correto
-        doc.save(filename);
-        const mailtoLink = `mailto:${clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\n(Nota: O ficheiro PDF foi descarregado para o seu computador. Por favor, anexe-o antes de enviar.)')}`;
-        window.location.href = mailtoLink;
-        await mockData.addOSActivity(os.id, { description: `EMAIL ABERTO PARA: ${clientEmail || 'MANUAL'}` });
-      }
+      // 3. Abre o gestor de email com destinatário, assunto e corpo preenchidos
+      // Nota: Não é possível anexar ficheiros automaticamente via mailto por limitações do protocolo RFC 2368.
+      // O utilizador deve simplesmente anexar o PDF que acabou de ser descarregado automaticamente acima.
+      const mailtoLink = `mailto:${clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      
+      window.location.href = mailtoLink;
+      
+      await mockData.addOSActivity(os.id, { description: `EMAIL ABERTO PARA: ${clientEmail || '(MANUAL)'}` });
+      
     } catch (err) {
       console.error(err);
       setErrorMessage("ERRO AO PREPARAR ENVIO.");
@@ -855,7 +850,7 @@ export const ServiceOrderDetail: React.FC = () => {
                   </button>
                   <button onClick={handleSendEmailShortcut} typeof="button" disabled={isExportingPDF} className="sm:col-span-2 flex items-center justify-center gap-3 py-4 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-blue-100 transition-all active:scale-95 disabled:opacity-50">
                     {isExportingPDF ? <Loader2 size={18} className="animate-spin" /> : <Mail size={18} />} 
-                    {isExportingPDF ? 'A PREPARAR ANEXO...' : `ENVIAR PARA: ${os.client?.email || '(MANUAL)'}`}
+                    {isExportingPDF ? 'A PREPARAR...' : `ENVIAR PARA: ${os.client?.email || '(MANUAL)'}`}
                   </button>
                 </div>
               </div>

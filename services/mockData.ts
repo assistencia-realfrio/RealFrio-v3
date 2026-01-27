@@ -354,6 +354,58 @@ export const mockData = {
     }));
   },
 
+  // Diagnostic & Repair Tools
+  repairMissingSedes: async (onProgress: (msg: string) => void) => {
+    console.log("Iniciando repairMissingSedes...");
+    onProgress("A ler lista de clientes do Supabase...");
+    
+    const { data: clients, error: ce } = await supabase.from('clients').select('id, name, address, phone');
+    if (ce) {
+      console.error("Erro ao ler clientes:", ce);
+      throw new Error(`Erro Supabase (Clientes): ${ce.message}. Verifique as permissões RLS.`);
+    }
+
+    onProgress(`Verificando locais para ${clients?.length} clientes...`);
+    const { data: ests, error: ee } = await supabase.from('establishments').select('client_id');
+    if (ee) {
+      console.error("Erro ao ler estabelecimentos:", ee);
+      throw new Error(`Erro Supabase (Locais): ${ee.message}`);
+    }
+
+    const clientsWithEsts = new Set(ests?.map(e => e.client_id) || []);
+    const clientsMissingSedes = clients?.filter(c => !clientsWithEsts.has(c.id)) || [];
+
+    if (clientsMissingSedes.length === 0) {
+      onProgress("Integridade OK: Todos os clientes têm locais.");
+      return 0;
+    }
+
+    onProgress(`A criar ${clientsMissingSedes.length} locais sede...`);
+    let count = 0;
+    
+    for (const c of clientsMissingSedes) {
+      const payload = {
+        client_id: c.id,
+        name: 'SEDE / PRINCIPAL',
+        address: c.address || 'MORADA NÃO DEFINIDA',
+        phone: c.phone || 'SEM TELEFONE',
+        contact_person: c.name
+      };
+
+      const { error: ie } = await supabase.from('establishments').insert([payload]);
+      
+      if (ie) {
+        console.warn(`Falha ao criar sede para cliente ${c.name}:`, ie.message);
+      } else {
+        count++;
+      }
+      
+      onProgress(`Processado: ${count} de ${clientsMissingSedes.length}...`);
+    }
+
+    return count;
+  },
+
   // Maintenance
   exportFullSystemData: async () => {
     const tables = ['profiles', 'clients', 'establishments', 'equipments', 'catalog', 'service_orders', 'parts_used', 'os_photos', 'os_notes', 'os_activities', 'vacations', 'time_entries'];

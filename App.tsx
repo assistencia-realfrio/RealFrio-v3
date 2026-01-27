@@ -20,6 +20,7 @@ import Equipments from './pages/Equipments';
 import Inventory from './pages/Inventory';
 import Profile from './pages/Profile';
 import Users from './pages/Users';
+import Maintenance from './pages/Maintenance';
 import { UserRole } from './types';
 import { StoreProvider } from './contexts/StoreContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -78,6 +79,7 @@ function App() {
             
             <Route path="/inventory" element={user ? <Layout user={user} onLogout={handleLogout}><Inventory /></Layout> : <Navigate to="/login" />} />
             <Route path="/users" element={user ? <Layout user={user} onLogout={handleLogout}><Users /></Layout> : <Navigate to="/login" />} />
+            <Route path="/maintenance" element={user ? <Layout user={user} onLogout={handleLogout}><Maintenance /></Layout> : <Navigate to="/login" />} />
             <Route path="/profile" element={user ? <Layout user={user} onLogout={handleLogout}><Profile /></Layout> : <Navigate to="/login" />} />
             
             <Route path="*" element={<Navigate to="/" />} />

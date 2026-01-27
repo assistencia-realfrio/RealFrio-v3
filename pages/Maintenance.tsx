@@ -13,7 +13,11 @@ import {
   Loader2,
   FileCheck,
   RotateCcw,
-  X
+  X,
+  Stethoscope,
+  Wrench,
+  CheckCircle2,
+  Terminal
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 
@@ -22,12 +26,14 @@ const Maintenance: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isRepaired, setIsRepaired] = useState(false);
 
   const handleCreateRestorePoint = async () => {
     setLoading(true);
     setStatus("A recolher dados de todas as tabelas...");
     setProgress(20);
     setError(null);
+    setIsRepaired(false);
     
     try {
       const backup = await mockData.exportFullSystemData();
@@ -67,6 +73,7 @@ const Maintenance: React.FC = () => {
     setError(null);
     setStatus("A validar integridade do ficheiro...");
     setProgress(5);
+    setIsRepaired(false);
 
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -99,43 +106,92 @@ const Maintenance: React.FC = () => {
     reader.readAsText(file);
   };
 
+  const handleRepairMissingSedes = async () => {
+    if (!confirm("Deseja iniciar a reparação automática de locais para clientes sem sede?")) return;
+
+    setLoading(true);
+    setError(null);
+    setIsRepaired(false);
+    setStatus("A iniciar diagnóstico de integridade...");
+    setProgress(10);
+
+    try {
+      const count = await mockData.repairMissingSedes((msg) => {
+        setStatus(msg);
+        setProgress(prev => Math.min(prev + 2, 98));
+      });
+      
+      setProgress(100);
+      if (count > 0) {
+        setStatus(`Reparação concluída! Foram criados ${count} locais sede.`);
+        setIsRepaired(true);
+      } else {
+        setStatus("Diagnóstico concluído: Não foram encontrados clientes sem local.");
+      }
+    } catch (err: any) {
+      console.error("Detailed Maintenance Error:", err);
+      setError(err.message || "Erro desconhecido durante a reparação.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500">
+    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
       <div className="px-1 flex flex-col gap-2">
-         <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase leading-tight">Painel de Manutenção</h1>
-         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Gestão de Integridade e Pontos de Restauro</p>
+         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase leading-tight text-center sm:text-left">Painel de Manutenção</h1>
+         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] text-center sm:text-left">Gestão de Integridade e Pontos de Restauro</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* CRIAR BACKUP */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-slate-800 flex flex-col items-center text-center">
+          <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
             <DatabaseZap size={32} />
           </div>
-          <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-2">Criar Ponto de Restauro</h3>
-          <p className="text-xs text-slate-500 font-medium uppercase tracking-tight leading-relaxed mb-8 px-4">
+          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Criar Ponto de Restauro</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight leading-relaxed mb-8 px-4">
             Gera uma fotografia total do sistema para salvaguarda externa. Recomendado antes de grandes alterações.
           </p>
           <button 
             onClick={handleCreateRestorePoint}
             disabled={loading}
-            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95"
+            className="w-full py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95"
           >
             <HardDriveDownload size={18} />
             GERAR BACKUP TOTAL
           </button>
         </div>
 
+        {/* REPARAR INTEGRIDADE */}
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-indigo-100 dark:border-indigo-900/30 flex flex-col items-center text-center transition-colors">
+          <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+            <Stethoscope size={32} />
+          </div>
+          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Reparar Locais em Falta</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight leading-relaxed mb-8 px-4">
+            Cria automaticamente sedes para clientes importados que ficaram sem local de intervenção.
+          </p>
+          <button 
+            onClick={handleRepairMissingSedes}
+            disabled={loading}
+            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95"
+          >
+            {loading ? <RefreshCw className="animate-spin" size={18} /> : <Wrench size={18} />}
+            {loading ? 'A PROCESSAR...' : 'EXECUTAR DIAGNÓSTICO'}
+          </button>
+        </div>
+
         {/* RESTAURAR BACKUP */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-red-100 flex flex-col items-center text-center relative overflow-hidden">
-          <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-red-100 dark:border-red-900/30 flex flex-col items-center text-center md:col-span-2">
+          <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
             <ShieldAlert size={32} />
           </div>
-          <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-2">Substituir Sistema</h3>
-          <p className="text-xs text-slate-500 font-medium uppercase tracking-tight leading-relaxed mb-8 px-4">
+          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Substituir Sistema (Wipe & Load)</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight leading-relaxed mb-8 px-4">
             Importa um backup e SUBSTITUI todos os dados atuais. CUIDADO: Os dados existentes serão apagados.
           </p>
-          <label className={`w-full py-4 bg-white text-red-600 border-2 border-dashed border-red-200 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-red-50 transition-all flex items-center justify-center gap-3 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}>
+          <label className={`w-full max-w-md py-4 bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 border-2 border-dashed border-red-200 dark:border-red-900/50 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-red-50 transition-all flex items-center justify-center gap-3 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}>
             <Upload size={18} />
             SELECIONAR FICHA DE RESTAURO
             <input 
@@ -151,20 +207,22 @@ const Maintenance: React.FC = () => {
 
       {/* STATUS PANEL */}
       {(loading || status || error) && (
-        <div className={`p-8 rounded-[2.5rem] border shadow-2xl animate-in slide-in-from-bottom-4 duration-300 ${error ? 'bg-red-50 border-red-100' : 'bg-slate-900 text-white border-slate-800'}`}>
+        <div className={`p-8 rounded-[2.5rem] border shadow-2xl animate-in slide-in-from-bottom-4 duration-300 ${error ? 'bg-red-50 border-red-100 dark:bg-red-950/20 dark:border-red-900/50' : 'bg-slate-900 text-white border-slate-800'}`}>
            <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                  {error ? (
                    <AlertTriangle className="text-red-500" size={24} />
                  ) : loading ? (
                    <Loader2 className="text-blue-500 animate-spin" size={24} />
+                 ) : isRepaired ? (
+                   <CheckCircle2 className="text-emerald-500" size={24} />
                  ) : (
                    <ShieldCheck className="text-emerald-500" size={24} />
                  )}
                  <div>
-                    <h4 className={`text-[10px] font-black uppercase tracking-widest ${error ? 'text-red-900' : 'text-slate-400'}`}>Estado da Operação</h4>
-                    <p className={`text-sm font-black uppercase tracking-tight ${error ? 'text-red-600' : 'text-white'}`}>
-                      {error ? 'Erro de Execução' : status}
+                    <h4 className={`text-[10px] font-black uppercase tracking-widest ${error ? 'text-red-900 dark:text-red-400' : 'text-slate-400'}`}>Estado da Operação</h4>
+                    <p className={`text-sm font-black uppercase tracking-tight ${error ? 'text-red-600 dark:text-red-500' : 'text-white'}`}>
+                      {error ? 'Erro de Ligação/Permissão' : status}
                     </p>
                  </div>
               </div>
@@ -188,36 +246,43 @@ const Maintenance: React.FC = () => {
            )}
 
            {error && (
-             <p className="text-[10px] font-bold text-red-500 uppercase leading-relaxed mt-2 bg-white/50 p-4 rounded-xl border border-red-100">
-               {error}
-             </p>
+             <div className="mt-4 p-4 bg-white/10 dark:bg-black/20 rounded-xl border border-red-200/20">
+               <div className="flex items-center gap-2 text-[9px] font-black text-red-400 uppercase tracking-widest mb-2">
+                 <Terminal size={12} /> Log de Erro Técnico
+               </div>
+               <p className="text-[10px] font-mono text-red-500 leading-relaxed break-words">
+                 {error}
+               </p>
+               <p className="mt-3 text-[8px] font-bold text-slate-400 uppercase leading-tight italic">
+                 Dica: Se estiver a usar o utilizador "Demo", certifique-se de que as políticas RLS no Supabase permitem acesso público ou logue-se com uma conta real.
+               </p>
+             </div>
            )}
         </div>
       )}
 
       {/* RECOMENDAÇÕES */}
-      <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-200">
+      <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 transition-colors">
          <div className="flex items-center gap-3 mb-4 text-slate-400">
             <History size={16} />
             <h4 className="text-[10px] font-black uppercase tracking-widest">Recomendações de Segurança</h4>
          </div>
          <ul className="space-y-3">
             {[
-              "A importação agora limpa a base de dados ANTES de inserir os novos registos.",
-              "Isto garante que ficheiros de backup v2.x sejam restaurados sem conflitos de IDs.",
-              "Os perfis de utilizadores também são atualizados para coincidir com o backup.",
-              "Não interrompa a operação; a limpeza e o restauro ocorrem em menos de 30 segundos."
+              "A reparação utiliza a morada do cliente para criar o local de intervenção.",
+              "A conta 'Demo' pode não ter permissão para escrever no Supabase sem login real.",
+              "Abra a consola (F12) se o erro persistir para ver o código de estado HTTP."
             ].map((text, i) => (
               <li key={i} className="flex items-start gap-3">
-                 <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5 flex-shrink-0"></div>
-                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{text}</p>
+                 <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 mt-1.5 flex-shrink-0"></div>
+                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight">{text}</p>
               </li>
             ))}
          </ul>
       </div>
 
       <div className="flex justify-center pt-4">
-         <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.5em]">Real Frio Wipe & Restore Agent v2.2</p>
+         <p className="text-[8px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.5em]">Real Frio Maintenance Agent v3.1</p>
       </div>
     </div>
   );
