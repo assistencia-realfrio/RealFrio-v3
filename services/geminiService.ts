@@ -8,19 +8,14 @@ export const generateOSReportSummary = async (
   type: string
 ): Promise<string> => {
   try {
-    const apiKey = process.env.API_KEY;
-
-    if (!apiKey || apiKey === 'undefined' || apiKey === '') {
-      throw new Error("API_KEY_MISSING");
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
+    // Correctly initialize GoogleGenAI as per coding guidelines using the environment variable API_KEY
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     // Prompt otimizado para PT-PT e contexto técnico da Real Frio
     const prompt = `
       Atua como um técnico sénior de refrigeração e climatização da empresa Real Frio.
       Gera um resumo técnico, profissional e extremamente conciso para o relatório de uma Ordem de Serviço (OS).
-      O texto deve ser escrito obrigatoriamente em Português de Portugal (PT-PT).
+      O texto deve be escrito obrigatoriamente em Português de Portugal (PT-PT).
 
       DADOS DA INTERVENÇÃO:
       - Tipo de Serviço: ${type}
@@ -45,9 +40,6 @@ export const generateOSReportSummary = async (
     return response.text?.trim() || "Não foi possível gerar um resumo automático.";
   } catch (error: any) {
     console.error("Erro Gemini:", error);
-    if (error.message === "API_KEY_MISSING") {
-      throw new Error("Chave de API (GEMINI_API_KEY) não encontrada no ambiente.");
-    }
     throw new Error("Falha na comunicação com a IA. Tente novamente mais tarde.");
   }
 };

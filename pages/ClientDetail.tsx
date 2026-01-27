@@ -4,12 +4,58 @@ import {
   MapPin, Phone, Mail, User, HardDrive, History as HistoryIcon, 
   Edit2, X, Save, ArrowLeft, ChevronRight, ChevronDown,
   Plus, Building2, FileText, ExternalLink, Filter, Trash2, Eye,
-  Cloud
+  Cloud, AlertTriangle, ShieldAlert
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { Client, Establishment, Equipment, ServiceOrder } from '../types';
 import OSStatusBadge from '../components/OSStatusBadge';
 import FloatingEditBar from '../components/FloatingEditBar';
+
+// Componente de Diálogo de Confirmação Interno para evitar bloqueios de Sandbox
+interface ConfirmDialogProps {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  variant: 'danger' | 'warning';
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ isOpen, title, message, confirmLabel, variant, onConfirm, onCancel }) => {
+  if (!isOpen) return null;
+
+  const isDanger = variant === 'danger';
+
+  return (
+    <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-200">
+        <div className="p-8 text-center">
+          <div className={`w-16 h-16 ${isDanger ? 'bg-red-50 text-red-500' : 'bg-orange-50 text-orange-500'} dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner`}>
+            {isDanger ? <ShieldAlert size={32} /> : <AlertTriangle size={32} />}
+          </div>
+          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">{title}</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">{message}</p>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <button 
+              onClick={onCancel}
+              className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all"
+            >
+              CANCELAR
+            </button>
+            <button 
+              onClick={onConfirm}
+              className={`py-4 ${isDanger ? 'bg-red-600' : 'bg-orange-500'} text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all`}
+            >
+              {confirmLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ClientDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +70,25 @@ const ClientDetail: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Client | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Estado para controle do modal de confirmação
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning';
+    action: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmLabel: '',
+    variant: 'warning',
+    action: () => {}
+  });
+
+  const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
 
   // Estados para filtros
   const [selectedEstIdEq, setSelectedEstIdEq] = useState<string>('all');
@@ -92,19 +157,28 @@ const ClientDetail: React.FC = () => {
     setIsEditing(false);
   };
 
-  const handleDeleteClient = async () => {
+  const executeDeleteClient = async () => {
     if (!id) return;
-    if (confirm("ATENÇÃO: Deseja eliminar este cliente definitivamente?")) {
-      setIsSubmitting(true);
-      try {
-        await mockData.deleteClient(id);
-        navigate('/clients');
-      } catch (error: any) {
-        alert("ERRO AO ELIMINAR CLIENTE: " + (error.message || "Tente novamente."));
-      } finally {
-        setIsSubmitting(false);
-      }
+    setIsSubmitting(true);
+    try {
+      await mockData.deleteClient(id);
+      navigate('/clients');
+    } catch (error: any) {
+      alert("ERRO AO ELIMINAR CLIENTE: " + (error.message || "Tente novamente."));
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const handleDeleteClient = () => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Eliminar Cliente',
+      message: 'Esta operação é IRREVERSÍVEL e apagará todos os dados, locais e equipamentos vinculados. Deseja continuar?',
+      confirmLabel: 'ELIMINAR TUDO',
+      variant: 'danger',
+      action: executeDeleteClient
+    });
   };
 
   const handleOpenEstModal = (est?: Establishment) => {
@@ -142,6 +216,8 @@ const ClientDetail: React.FC = () => {
     }
   };
 
+  // Fixed errors: Removed executeRemoveAttachment and handleRemoveAttachment which were unused and causing errors due to missing 'equipment' state in ClientDetail.
+
   const getMapLink = (address: string) => {
     if (!address) return '#';
     if (address.toLowerCase().startsWith('http')) return address;
@@ -169,6 +245,12 @@ const ClientDetail: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto pb-44 relative px-1 sm:px-0">
+      <ConfirmDialog 
+        {...confirmConfig}
+        onCancel={closeConfirm}
+        onConfirm={() => { closeConfirm(); confirmConfig.action(); }}
+      />
+
       <FloatingEditBar 
         isVisible={isDirty && isEditing}
         isSubmitting={isSubmitting}
@@ -204,7 +286,6 @@ const ClientDetail: React.FC = () => {
         </div>
 
         {!isEditing && (
-          /* Quadro Superior Compactado para consistência */
           <div className="bg-white dark:bg-slate-900 shadow-xl rounded-[2rem] p-6 border border-gray-100 dark:border-slate-800 text-center animate-in fade-in duration-300 relative group transition-colors">
             <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight">
               {client.name}
@@ -516,7 +597,6 @@ const ClientDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* BARRA DE NAVEGAÇÃO FLUTUANTE INFERIOR COM BORDA INSTITUCIONAL FINA */}
       {!isEditing && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-[#9d1c24] dark:border-[#9d1c24]/60 shadow-[0_12px_40px_rgba(157,28,36,0.15)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
           {[
@@ -537,7 +617,6 @@ const ClientDetail: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL ESTABELECIMENTO */}
       {showEstModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
