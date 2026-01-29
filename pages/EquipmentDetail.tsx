@@ -115,7 +115,7 @@ const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => 
            {scale > 1 ? `ZOOM: ${Math.round(scale * 100)}%` : 'PINCH PARA ZOOM / DUPLO TOQUE'}
          </span>
       </div>
-      <img src={src} alt={alt} className="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-75 ease-out select-none pointer-events-none" style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`, willChange: 'transform' }} />
+      <img src={src} alt={alt} className="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-75 ease-out select-none pointer-events-none" style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`, fontSmooth: 'always' }} />
       {scale > 1 && (
         <button onClick={(e) => { e.stopPropagation(); setScale(1); setPosition({x:0,y:0}); }} className="absolute bottom-10 bg-white text-slate-900 px-8 py-4 rounded-full text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 transition-all shadow-2xl border border-slate-200 z-30 active:scale-90">Repor Vista (1:1)</button>
       )}
@@ -134,6 +134,7 @@ const EquipmentDetail: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'info' | 'chapa' | 'history' | 'attachments'>('info');
   const [isUploading, setIsUploading] = useState(false);
   const [selectedAttachmentForView, setSelectedAttachmentForView] = useState<EquipmentAttachment | null>(null);
+  const [showNameplateFullscreen, setShowNameplateFullscreen] = useState(false);
   
   // Estado para controle do modal de confirmação
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -393,7 +394,11 @@ const EquipmentDetail: React.FC = () => {
                       <>
                         <img src={equipment.nameplate_url} className="w-full h-full object-contain" alt="Chapa de Características" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 z-10">
-                           <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(equipment.nameplate_url || undefined); }} className="p-4 bg-white text-slate-900 rounded-full hover:bg-blue-50 transition-colors shadow-xl">
+                           <button 
+                             type="button"
+                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowNameplateFullscreen(true); }} 
+                             className="p-4 bg-white text-slate-900 rounded-full hover:bg-blue-50 transition-colors shadow-xl active:scale-90"
+                           >
                              <Eye size={24} />
                            </button>
                            <div className="p-4 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors shadow-xl">
@@ -560,6 +565,23 @@ const EquipmentDetail: React.FC = () => {
            </div>
            <div className="flex-1 w-full h-full">
               <ZoomableImage src={selectedAttachmentForView.url} alt={selectedAttachmentForView.name} />
+           </div>
+        </div>
+      )}
+
+      {/* Visualizador da Chapa de Características (Novo, corrigindo o erro de aba em branco) */}
+      {showNameplateFullscreen && equipment.nameplate_url && (
+        <div className="fixed inset-0 z-[300] bg-slate-950 flex flex-col animate-in fade-in duration-300">
+           <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 z-[310] bg-gradient-to-b from-black/80 to-transparent">
+              <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] truncate pr-10">
+                CHAPA DE CARACTERÍSTICAS: {equipment.type}
+              </span>
+              <button onClick={() => setShowNameplateFullscreen(false)} className="p-4 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all active:scale-90 backdrop-blur-lg">
+                <X size={24} />
+              </button>
+           </div>
+           <div className="flex-1 w-full h-full">
+              <ZoomableImage src={equipment.nameplate_url} alt="Chapa de Características" />
            </div>
         </div>
       )}
