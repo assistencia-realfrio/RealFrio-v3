@@ -613,8 +613,6 @@ export const ServiceOrderDetail: React.FC = () => {
                    `Real Frio, Lda`;
 
       // 3. Abre o gestor de email com destinatário, assunto e corpo preenchidos
-      // Nota: Não é possível anexar ficheiros automaticamente via mailto por limitações do protocolo RFC 2368.
-      // O utilizador deve simplesmente anexar o PDF que acabou de ser descarregado automaticamente acima.
       const mailtoLink = `mailto:${clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       
       window.location.href = mailtoLink;
@@ -842,9 +840,16 @@ export const ServiceOrderDetail: React.FC = () => {
             </button>
           </div>
           <div className="flex-1 px-3 text-center min-w-0 overflow-hidden">
-            <span className="text-[10px] sm:text-[12px] font-black text-blue-600 uppercase tracking-tight sm:tracking-[0.2em] font-mono leading-none whitespace-nowrap block truncate">
+            <span className="text-[11px] sm:text-[13px] font-black text-blue-600 uppercase tracking-tight sm:tracking-[0.2em] font-mono leading-none whitespace-nowrap block truncate">
               {os?.code}
             </span>
+            <div className="flex items-center justify-center gap-2 mt-1">
+               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{os?.store}</span>
+               <span className="text-[8px] text-slate-300">•</span>
+               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                  {os?.created_at ? new Date(os.created_at).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '---'}
+               </span>
+            </div>
           </div>
           <div className="flex-shrink-0">
              {actionLoading ? (
@@ -1239,7 +1244,7 @@ export const ServiceOrderDetail: React.FC = () => {
                     <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Referência</label><div className="relative"><Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} /><input type="text" value={newPartForm.reference} onChange={e => setNewPartForm({...newPartForm, reference: e.target.value})} className="w-full pl-11 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-mono font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" placeholder="EX: 102030" /></div></div>
                   </div>
                 )}
-                {(selectedPartId || isCreatingNewPart) && (<div className="pt-4 flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-6 rounded-3xl animate-in slide-in-from-top-2"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">QTD:</span><div className="flex items-center gap-4"><button onClick={() => { const currentVal = parseFloat(partQuantityStr.replace(',', '.')); const newVal = Math.max(0.1, Number((currentVal - 1).toFixed(3))); setPartQuantityStr(newVal.toString().replace('.', ',')); }} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm active:scale-90 transition-all"><Minus size={18} /></button><input type="text" inputMode="decimal" value={partQuantityStr} onChange={e => { const val = e.target.value.replace(',', '.'); if (/^\d*[.]?\d*$/.test(val) || val === '') setPartQuantityStr(e.target.value); }} className="w-16 bg-transparent text-lg font-black text-slate-900 dark:text-white text-center outline-none border-b-2 border-transparent focus:border-blue-500 transition-all" /><button onClick={() => { const currentVal = parseFloat(tempQuantityStr.replace(',', '.')) || 0; const newVal = Number((currentVal + 1).toFixed(3)); setPartQuantityStr(newVal.toString().replace('.', ',')); }} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm active:scale-90 transition-all"><Plus size={18} /></button></div></div>)}
+                {(selectedPartId || isCreatingNewPart) && (<div className="pt-4 flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-6 rounded-3xl animate-in slide-in-from-top-2"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">QTD:</span><div className="flex items-center gap-4"><button onClick={() => { const currentVal = parseFloat(partQuantityStr.replace(',', '.')); const newVal = Math.max(0.1, Number((currentVal - 1).toFixed(3))); setPartQuantityStr(newVal.toString().replace('.', ',')); }} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm active:scale-90 transition-all"><Minus size={18} /></button><input type="text" inputMode="decimal" value={partQuantityStr} onChange={e => { const val = e.target.value.replace(',', '.'); if (/^\d*[.]?\d*$/.test(val) || val === '') setPartQuantityStr(e.target.value); }} className="w-16 bg-transparent text-lg font-black text-slate-900 dark:text-white text-center outline-none border-b-2 border-transparent focus:border-blue-500 transition-all" /><button onClick={() => { const currentVal = parseFloat(partQuantityStr.replace(',', '.')) || 0; const newVal = Number((currentVal + 1).toFixed(3)); setPartQuantityStr(newVal.toString().replace('.', ',')); }} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm active:scale-90 transition-all"><Plus size={18} /></button></div></div>)}
                 <button onClick={isCreatingNewPart ? handleCreateAndAddPart : handleAddPart} disabled={(isCreatingNewPart ? !newPartForm.name : !selectedPartId) || actionLoading} className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50">{actionLoading ? <Loader2 size={20} className="animate-spin mx-auto" /> : isCreatingNewPart ? 'REGISTAR E APLICAR' : 'CONFIRMAR APLICAÇÃO'}</button>
               </div>
            </div>
@@ -1263,7 +1268,7 @@ export const ServiceOrderDetail: React.FC = () => {
       {showDeletePartModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
-              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Trash2 size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Remover Material?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</p><button onClick={handleDeletePart} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">REMOVER</button></div>
+              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Trash2 size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Remover Material?</h3><div className="grid grid-cols-2 gap-3 mt-8"><button onClick={() => setShowDeletePartModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button><button onClick={handleDeletePart} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">REMOVER</button></div></div>
            </div>
         </div>
       )}
@@ -1271,7 +1276,7 @@ export const ServiceOrderDetail: React.FC = () => {
       {showDeletePhotoModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
-              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Camera size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Eliminar Foto?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</p><button onClick={handleDeletePhoto} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ELIMINAR</button></div>
+              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Camera size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Eliminar Foto?</h3><div className="grid grid-cols-2 gap-3 mt-8"><button onClick={() => setShowDeletePhotoModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button><button onClick={handleDeletePhoto} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ELIMINAR</button></div></div>
            </div>
         </div>
       )}
