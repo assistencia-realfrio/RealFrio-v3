@@ -4,7 +4,7 @@
 -- EXECUTE ESTE BLOCO NO SQL EDITOR DO SUPABASE
 -- ======================================================
 
--- 1. Tabela de Perfis (Já existente, mas garantindo integridade)
+-- 1. Tabela de Perfis
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT,
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS public.clients (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 3. Tabela de Estabelecimentos (Locais de Intervenção)
+-- 3. Tabela de Estabelecimentos
 CREATE TABLE IF NOT EXISTS public.establishments (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     client_id UUID REFERENCES public.clients(id) ON DELETE CASCADE,
@@ -46,16 +46,23 @@ CREATE TABLE IF NOT EXISTS public.equipments (
     client_id UUID REFERENCES public.clients(id) ON DELETE CASCADE,
     establishment_id UUID REFERENCES public.establishments(id) ON DELETE CASCADE,
     type TEXT NOT NULL,
-    brand TEXT NOT NULL,
+    brand TEXT, -- Tornado Opcional
     model TEXT,
-    serial_number TEXT NOT NULL,
+    serial_number TEXT, -- Tornado Opcional
     install_date DATE,
     nameplate_url TEXT,
     attachments JSONB DEFAULT '[]',
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 5. Tabela de Catálogo (Artigos / Peças)
+-- CORREÇÃO: Remover unicidade do Serial Number (SN) para evitar erro 23505
+ALTER TABLE IF EXISTS public.equipments DROP CONSTRAINT IF EXISTS equipments_serial_number_key;
+
+-- Garantir que as colunas existentes aceitem nulos caso o script seja re-executado
+ALTER TABLE public.equipments ALTER COLUMN brand DROP NOT NULL;
+ALTER TABLE public.equipments ALTER COLUMN serial_number DROP NOT NULL;
+
+-- 5. Tabela de Catálogo
 CREATE TABLE IF NOT EXISTS public.catalog (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL,
@@ -70,7 +77,7 @@ CREATE TABLE IF NOT EXISTS public.service_orders (
     code TEXT NOT NULL UNIQUE,
     client_id UUID REFERENCES public.clients(id) ON DELETE CASCADE,
     establishment_id UUID REFERENCES public.establishments(id) ON DELETE SET NULL,
-    equipment_id UUID REFERENCES public.equipments(id) ON DELETE SET NULL,
+    equipment_id REFERENCES public.equipments(id) ON DELETE SET NULL,
     technician_id UUID REFERENCES auth.users(id),
     type TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'por_iniciar',
@@ -143,10 +150,7 @@ CREATE TABLE IF NOT EXISTS public.vacations (
 
 -- ======================================================
 -- POLÍTICAS DE SEGURANÇA (RLS)
--- Garante que utilizadores autenticados possam ver e editar
 -- ======================================================
-
--- Ativar RLS em todas as tabelas
 ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.establishments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.equipments ENABLE ROW LEVEL SECURITY;
@@ -158,8 +162,6 @@ ALTER TABLE public.os_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.os_activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vacations ENABLE ROW LEVEL SECURITY;
 
--- Criar políticas genéricas para acesso total de utilizadores autenticados
--- (Simplificado para o contexto atual)
 DO $$ 
 DECLARE 
     t TEXT;
@@ -170,29 +172,3 @@ BEGIN
         EXECUTE format('CREATE POLICY "Acesso total autenticados" ON public.%I FOR ALL TO authenticated USING (true) WITH CHECK (true)', t);
     END LOOP;
 END $$;
-
--- 12. Trigger de Perfil (Repetido para garantir funcionalidade)
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email, full_name, role, store)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', 'Novo Utilizador'),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'tecnico'),
-    COALESCE(NEW.raw_user_meta_data->>'store', 'Todas')
-  )
-  ON CONFLICT (id) DO UPDATE SET
-    email = EXCLUDED.email,
-    full_name = COALESCE(EXCLUDED.full_name, profiles.full_name),
-    role = COALESCE(EXCLUDED.role, profiles.role),
-    store = COALESCE(EXCLUDED.store, profiles.store);
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

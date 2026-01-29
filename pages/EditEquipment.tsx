@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
-  Save, ArrowLeft, HardDrive, ChevronDown, MapPin, Trash2
+  Save, ArrowLeft, HardDrive, ChevronDown, MapPin, Trash2, Loader2
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { Establishment, Equipment } from '../types';
@@ -37,9 +37,9 @@ const EditEquipment: React.FC = () => {
         setFormData({
           establishment_id: eq.establishment_id,
           type: eq.type,
-          brand: eq.brand,
-          model: eq.model,
-          serial_number: eq.serial_number,
+          brand: eq.brand || '',
+          model: eq.model || '',
+          serial_number: eq.serial_number || '',
           install_date: eq.install_date || ''
         });
         
@@ -62,14 +62,24 @@ const EditEquipment: React.FC = () => {
     if (!id) return;
     setIsSubmitting(true);
     try {
-      if (!formData.establishment_id || !formData.type || !formData.brand || !formData.serial_number) {
-        throw new Error("Por favor, preencha os campos obrigatórios.");
+      if (!formData.establishment_id || !formData.type) {
+        throw new Error("Por favor, preencha a Localização e o Tipo de Máquina.");
       }
-      await mockData.updateEquipment(id, formData);
-      alert("Ativo atualizado com sucesso!");
+
+      const payload = {
+        establishment_id: formData.establishment_id,
+        type: formData.type.toUpperCase().trim(),
+        brand: formData.brand.trim() ? formData.brand.toUpperCase().trim() : null,
+        model: formData.model.trim() ? formData.model.toUpperCase().trim() : null,
+        serial_number: formData.serial_number.trim() ? formData.serial_number.toUpperCase().trim() : null,
+        install_date: formData.install_date || null
+      };
+
+      await mockData.updateEquipment(id, payload);
       navigate(-1);
     } catch (err: any) {
-      alert(err.message || "Erro ao atualizar equipamento.");
+      console.error("Erro ao atualizar equipamento:", err);
+      alert("ERRO AO ATUALIZAR: " + (err.message || "Verifique os dados."));
     } finally {
       setIsSubmitting(false);
     }
@@ -103,16 +113,16 @@ const EditEquipment: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-12">
       <div className="flex items-center gap-4 px-2">
-        <button onClick={() => navigate(-1)} className="p-3 bg-white text-slate-500 hover:text-blue-600 rounded-2xl shadow-sm transition-all active:scale-95">
+        <button onClick={() => navigate(-1)} className="p-3 bg-white dark:bg-slate-900 text-slate-500 hover:text-blue-600 rounded-2xl shadow-sm transition-all active:scale-95 border border-transparent dark:border-slate-800">
           <ArrowLeft size={22} />
         </button>
         <div>
-           <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Editar Ativo</h1>
-           <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Gestão de Equipamento</p>
+           <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Editar Ativo</h1>
+           <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Gestão de Equipamento</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-slate-800 overflow-hidden">
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
@@ -125,7 +135,7 @@ const EditEquipment: React.FC = () => {
                   value={formData.establishment_id}
                   onChange={handleChange}
                   required
-                  className="w-full pl-12 pr-10 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 outline-none appearance-none"
+                  className="w-full pl-12 pr-10 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none appearance-none transition-all"
                 >
                   <option value="">Selecione um local...</option>
                   {establishments.map(est => (
@@ -135,37 +145,42 @@ const EditEquipment: React.FC = () => {
                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={16} />
               </div>
             </div>
+
             <div className="md:col-span-2">
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Tipo de Máquina *</label>
               <div className="relative">
                 <HardDrive className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                <input required type="text" name="type" className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 outline-none transition-all" value={formData.type} onChange={handleChange} placeholder="Ex: Ar Condicionado" />
+                <input required type="text" name="type" className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase" value={formData.type} onChange={handleChange} placeholder="Ex: Ar Condicionado" />
               </div>
             </div>
+
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Marca *</label>
-              <input required type="text" name="brand" className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 outline-none" value={formData.brand} onChange={handleChange} />
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Marca <span className="text-blue-500">(Recomendado)</span></label>
+              <input type="text" name="brand" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase" value={formData.brand} onChange={handleChange} placeholder="---" />
             </div>
+
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Modelo</label>
-              <input type="text" name="model" className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 outline-none" value={formData.model} onChange={handleChange} />
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Modelo <span className="text-blue-500">(Recomendado)</span></label>
+              <input type="text" name="model" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase" value={formData.model} onChange={handleChange} placeholder="---" />
             </div>
+
             <div className="md:col-span-2">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Número de Série (S/N) *</label>
-              <input required type="text" name="serial_number" className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-mono font-bold focus:ring-4 focus:ring-blue-500/10 outline-none" value={formData.serial_number} onChange={handleChange} />
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Número de Série (S/N) <span className="text-blue-500">(Recomendado)</span></label>
+              <input type="text" name="serial_number" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-mono font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase" value={formData.serial_number} onChange={handleChange} placeholder="S/N OU DESCONHECIDO" />
             </div>
+
             <div className="md:col-span-2">
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Data Instalação</label>
-              <input type="date" name="install_date" className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 outline-none" value={formData.install_date} onChange={handleChange} />
+              <input type="date" name="install_date" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none" value={formData.install_date} onChange={handleChange} />
             </div>
           </div>
 
           <div className="pt-6 flex flex-col gap-4">
             <button type="submit" disabled={isSubmitting} className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3">
-              <Save size={20} />
+              {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save size={20} />}
               {isSubmitting ? 'A GUARDAR...' : 'GUARDAR ALTERAÇÕES'}
             </button>
-            <button type="button" onClick={handleDelete} className="w-full text-red-500 font-black text-[10px] uppercase tracking-widest py-3 border border-red-100 rounded-2xl hover:bg-red-50 transition-all flex items-center justify-center gap-2">
+            <button type="button" onClick={handleDelete} className="w-full text-red-500 font-black text-[10px] uppercase tracking-widest py-3 border border-red-100 dark:border-red-900/30 rounded-2xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex items-center justify-center gap-2">
               <Trash2 size={16} /> Eliminar Ativo
             </button>
           </div>

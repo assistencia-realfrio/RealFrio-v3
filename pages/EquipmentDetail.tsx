@@ -1,13 +1,127 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, HardDrive, Edit2, History, Image as ImageIcon, 
   Paperclip, Plus, Trash2, Camera, MapPin, Building2, ExternalLink,
-  ChevronRight, Download, FileText, X, Eye, Activity, Tag
+  ChevronRight, Download, FileText, X, Eye, Activity, Tag, UploadCloud,
+  FileImage, AlertTriangle, ShieldAlert
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { Equipment, ServiceOrder, EquipmentAttachment, OSStatus } from '../types';
 import OSStatusBadge from '../components/OSStatusBadge';
+
+// Componente de Diálogo de Confirmação para consistência e fiabilidade
+interface ConfirmDialogProps {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  variant: 'danger' | 'warning';
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ isOpen, title, message, confirmLabel, variant, onConfirm, onCancel }) => {
+  if (!isOpen) return null;
+  const isDanger = variant === 'danger';
+
+  return (
+    <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-200">
+        <div className="p-8 text-center">
+          <div className={`w-16 h-16 ${isDanger ? 'bg-red-50 text-red-500' : 'bg-orange-50 text-orange-500'} dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner`}>
+            {isDanger ? <ShieldAlert size={32} /> : <AlertTriangle size={32} />}
+          </div>
+          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">{title}</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">{message}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={onCancel} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button>
+            <button onClick={onConfirm} className={`py-4 ${isDanger ? 'bg-red-600' : 'bg-orange-500'} text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all`}>{confirmLabel}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Componente de visualização com zoom
+const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const touchStartRef = useRef<{ dist: number; x: number; y: number; scale: number; pos: { x: number; y: number } } | null>(null);
+  const lastTapRef = useRef<number>(0);
+
+  const handleWheel = (e: React.WheelEvent) => {
+    const delta = e.deltaY * -0.01;
+    const newScale = Math.min(Math.max(1, scale + delta), 5);
+    setScale(newScale);
+    if (newScale === 1) setPosition({ x: 0, y: 0 });
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+    if (e.touches.length === 1 && (now - lastTapRef.current) < DOUBLE_TAP_DELAY) {
+      if (scale > 1) {
+        setScale(1);
+        setPosition({ x: 0, y: 0 });
+      } else {
+        setScale(2.5);
+      }
+      lastTapRef.current = 0;
+      return;
+    }
+    lastTapRef.current = now;
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+      touchStartRef.current = { dist, x: 0, y: 0, scale, pos: { ...position } };
+    } else if (e.touches.length === 1 && scale > 1) {
+      touchStartRef.current = { dist: 0, x: e.touches[0].pageX, y: e.touches[0].pageY, scale, pos: { ...position } };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    if (e.touches.length === 2 && touchStartRef.current.dist > 0) {
+      const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+      const ratio = dist / touchStartRef.current.dist;
+      const newScale = Math.min(Math.max(1, touchStartRef.current.scale * ratio), 6);
+      setScale(newScale);
+    } else if (e.touches.length === 1 && scale > 1) {
+      touchStartRef.current.x = touchStartRef.current.x || 0;
+      const dx = e.touches[0].pageX - touchStartRef.current.x;
+      const dy = e.touches[0].pageY - touchStartRef.current.y;
+      const limit = (scale - 1) * 200;
+      setPosition({
+        x: Math.min(Math.max(touchStartRef.current.pos.x + dx, -limit), limit),
+        y: Math.min(Math.max(touchStartRef.current.y + dy, -limit), limit)
+      });
+    }
+  };
+
+  return (
+    <div 
+      ref={containerRef}
+      className="relative w-full h-full flex items-center justify-center overflow-hidden touch-none bg-slate-950"
+      onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={() => { touchStartRef.current = null; }}
+    >
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+         <span className="bg-white/10 backdrop-blur-md text-white/50 text-[8px] font-black uppercase tracking-[0.3em] px-4 py-1.5 rounded-full border border-white/5">
+           {scale > 1 ? `ZOOM: ${Math.round(scale * 100)}%` : 'PINCH PARA ZOOM / DUPLO TOQUE'}
+         </span>
+      </div>
+      <img src={src} alt={alt} className="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-75 ease-out select-none pointer-events-none" style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`, willChange: 'transform' }} />
+      {scale > 1 && (
+        <button onClick={(e) => { e.stopPropagation(); setScale(1); setPosition({x:0,y:0}); }} className="absolute bottom-10 bg-white text-slate-900 px-8 py-4 rounded-full text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 transition-all shadow-2xl border border-slate-200 z-30 active:scale-90">Repor Vista (1:1)</button>
+      )}
+    </div>
+  );
+};
 
 const EquipmentDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +133,30 @@ const EquipmentDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'info' | 'chapa' | 'history' | 'attachments'>('info');
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedAttachmentForView, setSelectedAttachmentForView] = useState<EquipmentAttachment | null>(null);
+  
+  // Estado para controle do modal de confirmação
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning';
+    action: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmLabel: '',
+    variant: 'warning',
+    action: () => {}
+  });
+
+  const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+
+  // Drag and Drop states
+  const [isDraggingNameplate, setIsDraggingNameplate] = useState(false);
+  const [isDraggingAttachment, setIsDraggingAttachment] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -55,8 +193,14 @@ const EquipmentDetail: React.FC = () => {
     }
   };
 
-  const handleUploadNameplate = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleUploadNameplate = async (fileOrEvent: React.ChangeEvent<HTMLInputElement> | File) => {
+    let file: File | undefined;
+    if (fileOrEvent instanceof File) {
+      file = fileOrEvent;
+    } else {
+      file = fileOrEvent.target.files?.[0];
+    }
+    
     if (file && equipment) {
       setIsUploading(true);
       const reader = new FileReader();
@@ -70,8 +214,14 @@ const EquipmentDetail: React.FC = () => {
     }
   };
 
-  const handleAddAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleAddAttachment = async (fileOrEvent: React.ChangeEvent<HTMLInputElement> | File) => {
+    let file: File | undefined;
+    if (fileOrEvent instanceof File) {
+      file = fileOrEvent;
+    } else {
+      file = fileOrEvent.target.files?.[0];
+    }
+    
     if (file && equipment) {
       const fileName = prompt("Nome amigável para este anexo:", file.name) || file.name;
       const reader = new FileReader();
@@ -91,12 +241,38 @@ const EquipmentDetail: React.FC = () => {
     }
   };
 
-  const handleRemoveAttachment = async (attachmentId: string) => {
-    if (equipment && confirm("Eliminar este anexo definitivamente?")) {
+  const executeRemoveAttachment = async (attachmentId: string) => {
+    if (!equipment) return;
+    try {
       const updated = (equipment.attachments || []).filter(a => a.id !== attachmentId);
       await mockData.updateEquipment(equipment.id, { attachments: updated });
       setEquipment(prev => prev ? { ...prev, attachments: updated } : null);
+    } catch (err) {
+      console.error("Erro ao remover anexo:", err);
+      alert("ERRO AO REMOVER ANEXO.");
     }
+  };
+
+  const handleRemoveAttachment = (e: React.MouseEvent, attachmentId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Eliminar Anexo',
+      message: 'Tem a certeza que deseja eliminar este documento/imagem permanentemente?',
+      confirmLabel: 'ELIMINAR',
+      variant: 'danger',
+      action: () => executeRemoveAttachment(attachmentId)
+    });
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const isImageAttachment = (url: string) => {
+    return url.startsWith('data:image/') || /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url);
   };
 
   if (loading) return (
@@ -109,6 +285,12 @@ const EquipmentDetail: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto pb-44 relative px-1 sm:px-0">
+      <ConfirmDialog 
+        {...confirmConfig}
+        onCancel={closeConfirm}
+        onConfirm={() => { closeConfirm(); confirmConfig.action(); }}
+      />
+
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2 px-1">
           <button onClick={() => navigate(-1)} className="p-3 text-slate-500 dark:text-slate-400 hover:text-blue-600 rounded-2xl transition-all bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm active:scale-95">
@@ -116,7 +298,6 @@ const EquipmentDetail: React.FC = () => {
           </button>
         </div>
 
-        {/* Quadro Superior Compactado */}
         <div className="bg-white dark:bg-slate-900 shadow-xl rounded-[2rem] p-6 border border-gray-100 dark:border-slate-800 text-center animate-in fade-in duration-300 relative transition-colors">
           <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight">
             {equipment.type}
@@ -183,26 +364,51 @@ const EquipmentDetail: React.FC = () => {
             <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 space-y-6 text-center transition-colors">
                <div className="flex flex-col items-center">
                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-8">Chapa de Características</h3>
-                  {equipment.nameplate_url ? (
-                    <div className="relative group w-full max-w-md mx-auto aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl border border-gray-100 dark:border-slate-800 mb-8">
-                       <img src={equipment.nameplate_url} className="w-full h-full object-contain bg-slate-50 dark:bg-slate-950" alt="Chapa de Características" />
-                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
-                          <button onClick={() => window.open(equipment.nameplate_url)} className="p-4 bg-white text-slate-900 rounded-full hover:bg-blue-50 transition-colors shadow-xl">
-                            <Eye size={24} />
-                          </button>
-                          <label className="p-4 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors shadow-xl cursor-pointer">
-                            <Camera size={24} />
-                            <input type="file" accept="image/*" className="hidden" onChange={handleUploadNameplate} />
-                          </label>
-                       </div>
-                    </div>
-                  ) : (
-                    <label className="flex flex-col items-center justify-center w-full max-w-md mx-auto aspect-[4/3] bg-slate-50 dark:bg-slate-950 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-[3rem] cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:border-blue-200 transition-all group mb-8">
-                       <Camera size={48} className="text-gray-300 group-hover:text-blue-400 mb-4 transition-colors" />
-                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest group-hover:text-blue-500">Adicionar Foto da Chapa</p>
-                       <input type="file" accept="image/*" className="hidden" onChange={handleUploadNameplate} />
-                    </label>
-                  )}
+                  
+                  <label 
+                    onDragOver={handleDrag}
+                    onDragEnter={(e) => { handleDrag(e); setIsDraggingNameplate(true); }}
+                    onDragLeave={(e) => { handleDrag(e); setIsDraggingNameplate(false); }}
+                    onDrop={(e) => {
+                      handleDrag(e);
+                      setIsDraggingNameplate(false);
+                      const files = e.dataTransfer.files;
+                      if (files && files.length > 0) {
+                        const file = files[0];
+                        if (file.type.startsWith('image/')) handleUploadNameplate(file);
+                      }
+                    }}
+                    className={`relative group w-full max-w-md mx-auto aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl border-2 border-dashed transition-all cursor-pointer ${isDraggingNameplate ? 'border-blue-500 bg-blue-50/50 scale-105 ring-4 ring-blue-500/10' : 'border-gray-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:border-blue-200'}`}
+                  >
+                    {isDraggingNameplate && (
+                      <div className="absolute inset-0 bg-blue-600/10 backdrop-blur-[2px] flex items-center justify-center z-20 pointer-events-none">
+                        <div className="flex flex-col items-center gap-2 animate-bounce">
+                          <UploadCloud size={48} className="text-blue-600" />
+                          <span className="text-[12px] font-black text-blue-600 uppercase">Largar para Carregar</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {equipment.nameplate_url ? (
+                      <>
+                        <img src={equipment.nameplate_url} className="w-full h-full object-contain" alt="Chapa de Características" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 z-10">
+                           <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(equipment.nameplate_url); }} className="p-4 bg-white text-slate-900 rounded-full hover:bg-blue-50 transition-colors shadow-xl">
+                             <Eye size={24} />
+                           </button>
+                           <div className="p-4 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors shadow-xl">
+                             <Camera size={24} />
+                           </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full">
+                         <Camera size={48} className={`mb-4 transition-colors ${isDraggingNameplate ? 'text-blue-600' : 'text-gray-300 group-hover:text-blue-400'}`} />
+                         <p className={`text-[10px] font-black uppercase tracking-widest ${isDraggingNameplate ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-500'}`}>Adicionar Foto da Chapa</p>
+                      </div>
+                    )}
+                    <input type="file" accept="image/*" className="hidden" onChange={handleUploadNameplate} />
+                  </label>
                </div>
             </div>
           )}
@@ -255,45 +461,110 @@ const EquipmentDetail: React.FC = () => {
                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Anexos & Documentação</h3>
                  <label className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer hover:bg-blue-700 shadow-lg active:scale-95 transition-all">
                     <Plus size={14} /> ADICIONAR
-                    <input type="file" className="hidden" onChange={handleAddAttachment} />
+                    <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleAddAttachment} />
                  </label>
               </div>
-              {(equipment.attachments || []).length === 0 ? (
-                <div className="text-center py-16 bg-slate-50 dark:bg-slate-950 rounded-[2rem] border-2 border-dashed border-slate-100 dark:border-slate-800 transition-colors">
-                   <Paperclip size={32} className="mx-auto text-slate-200 dark:text-slate-800 mb-3" />
-                   <p className="text-[10px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-widest px-8">Nenhum esquema ou manual anexado</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                   {equipment.attachments?.map(att => (
-                     <div key={att.id} className="flex items-center justify-between p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 transition-all group">
-                        <div className="flex items-center gap-4 min-w-0">
-                           <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:text-blue-500">
-                              <FileText size={18} />
-                           </div>
-                           <div className="min-w-0">
-                              <p className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase truncate mb-0.5">{att.name}</p>
-                              <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{new Date(att.created_at).toLocaleDateString()}</p>
-                           </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                           <button onClick={() => window.open(att.url)} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all" title="Ver Anexo">
-                              <ExternalLink size={16} />
-                           </button>
-                           <button onClick={() => handleRemoveAttachment(att.id)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all" title="Remover">
-                              <Trash2 size={16} />
-                           </button>
-                        </div>
+              
+              <div 
+                onDragOver={handleDrag}
+                onDragEnter={(e) => { handleDrag(e); setIsDraggingAttachment(true); }}
+                onDragLeave={(e) => { handleDrag(e); setIsDraggingAttachment(false); }}
+                onDrop={(e) => {
+                  handleDrag(e);
+                  setIsDraggingAttachment(false);
+                  const files = e.dataTransfer.files;
+                  if (files && files.length > 0) {
+                    handleAddAttachment(files[0]);
+                  }
+                }}
+                className={`min-h-[200px] transition-all rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center relative overflow-hidden ${isDraggingAttachment ? 'border-blue-500 bg-blue-50/50 scale-[1.02]' : 'border-transparent'}`}
+              >
+                {isDraggingAttachment && (
+                  <div className="absolute inset-0 bg-blue-600/10 backdrop-blur-[2px] flex items-center justify-center z-20 pointer-events-none">
+                    <div className="flex flex-col items-center gap-2 animate-bounce">
+                      <UploadCloud size={48} className="text-blue-600" />
+                      <span className="text-[12px] font-black text-blue-600 uppercase">Largar Arquivo Aqui</span>
+                    </div>
+                  </div>
+                )}
+
+                {(equipment.attachments || []).length === 0 ? (
+                  <div className="text-center py-10 transition-colors">
+                     <Paperclip size={32} className={`mx-auto mb-3 transition-colors ${isDraggingAttachment ? 'text-blue-600' : 'text-slate-200 dark:text-slate-800'}`} />
+                     <p className={`text-[10px] font-black uppercase tracking-widest px-8 transition-colors ${isDraggingAttachment ? 'text-blue-600' : 'text-slate-300 dark:text-slate-700'}`}>
+                       Nenhum esquema ou manual anexado.<br/>
+                       <span className="text-[8px] opacity-60">Pode arrastar arquivos diretamente para aqui.</span>
+                     </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 w-full p-2">
+                     {equipment.attachments?.map(att => {
+                       const isImage = isImageAttachment(att.url);
+                       return (
+                         <div key={att.id} className="flex items-center justify-between p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 transition-all group">
+                            <div className="flex items-center gap-4 min-w-0 flex-1">
+                               <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:text-blue-500 overflow-hidden">
+                                  {isImage ? (
+                                    <img src={att.url} alt={att.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <FileText size={20} />
+                                  )}
+                               </div>
+                               <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase truncate mb-0.5">{att.name}</p>
+                                  <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                                    {isImage ? 'Imagem' : 'Documento'} • {new Date(att.created_at).toLocaleDateString()}
+                                  </p>
+                               </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                               <button 
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); isImage ? setSelectedAttachmentForView(att) : window.open(att.url); }} 
+                                className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all" 
+                                title={isImage ? "Visualizar Imagem" : "Abrir Documento"}
+                               >
+                                  {isImage ? <Eye size={18} /> : <ExternalLink size={18} />}
+                               </button>
+                               <button 
+                                onClick={(e) => handleRemoveAttachment(e, att.id)} 
+                                className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all" 
+                                title="Remover"
+                               >
+                                  <Trash2 size={18} />
+                               </button>
+                            </div>
+                         </div>
+                       );
+                     })}
+                     <div className="text-center py-4 opacity-30">
+                       <p className="text-[8px] font-black uppercase tracking-widest">Arraste mais arquivos para adicionar</p>
                      </div>
-                   ))}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* BARRA DE NAVEGAÇÃO FLUTUANTE INFERIOR COM BORDA INSTITUCIONAL FINA */}
+      {/* Visualizador de Imagens (Anexos) */}
+      {selectedAttachmentForView && (
+        <div className="fixed inset-0 z-[300] bg-slate-950 flex flex-col animate-in fade-in duration-300">
+           <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 z-[310] bg-gradient-to-b from-black/80 to-transparent">
+              <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] truncate pr-10">
+                {selectedAttachmentForView.name}
+              </span>
+              <button onClick={() => setSelectedAttachmentForView(null)} className="p-4 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all active:scale-90 backdrop-blur-lg">
+                <X size={24} />
+              </button>
+           </div>
+           <div className="flex-1 w-full h-full">
+              <ZoomableImage src={selectedAttachmentForView.url} alt={selectedAttachmentForView.name} />
+           </div>
+        </div>
+      )}
+
+      {/* BARRA DE NAVEGAÇÃO FLUTUANTE INFERIOR */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-[#9d1c24] dark:border-[#9d1c24]/60 shadow-[0_12px_40px_rgba(157,28,36,0.15)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
         {[
           { id: 'info', icon: HardDrive, label: 'GERAL' },

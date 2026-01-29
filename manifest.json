@@ -1,1 +1,25 @@
 
+{
+  "name": "Real Frio - Gestão Técnica",
+  "short_name": "Real Frio",
+  "description": "Sistema de Gestão de Ordens de Serviço e Manutenção Real Frio",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#9d1c24",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192x192/9d1c24/ffffff?text=RF",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512/9d1c24/ffffff?text=Real+Frio",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

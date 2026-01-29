@@ -1,9 +1,19 @@
+
 <!DOCTYPE html>
 <html lang="pt-PT" class="h-full">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Real Frio</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Real Frio - Gestão Técnica</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#9d1c24">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Real Frio">
+    <link rel="apple-touch-icon" href="https://via.placeholder.com/192x192/9d1c24/ffffff?text=RF">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -16,6 +26,7 @@
         font-family: 'Inter', sans-serif; 
         background-color: #f3f4f6; 
         transition: background-color 0.3s ease, color 0.3s ease;
+        -webkit-tap-highlight-color: transparent;
       }
       
       .dark body {
@@ -54,6 +65,11 @@
       ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       
       .dark ::-webkit-scrollbar-thumb { background: #334155; }
+
+      /* Melhorias para PWA (impedir bounce no iOS e seleções de texto indesejadas) */
+      body {
+        overscroll-behavior-y: contain;
+      }
     </style>
   <script type="importmap">
 {
@@ -73,8 +89,23 @@
 }
 </script>
 </head>
-  <body class="h-full">
+  <body class="h-full overflow-hidden">
     <div id="root" class="h-full"></div>
     <script type="module" src="/index.tsx"></script>
+    
+    <!-- Registo do Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('SW registrado com sucesso:', registration.scope);
+            })
+            .catch(error => {
+              console.log('Falha no registro do SW:', error);
+            });
+        });
+      }
+    </script>
   </body>
 </html>

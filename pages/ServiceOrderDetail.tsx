@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
@@ -10,7 +11,7 @@ import {
   User, ChevronRight, ChevronDown, ChevronUp, Calendar, RotateCcw,
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
   RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
-  Settings2, FileDown, Key, Mail, Share2
+  Settings2, FileDown, Key, Mail, Share2, UploadCloud
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -152,6 +153,9 @@ export const ServiceOrderDetail: React.FC = () => {
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [loading, setLoading] = useState(true);
+  
+  // Drag and Drop state
+  const [dragActiveType, setDragActiveType] = useState<string | null>(null);
   
   // Estados para Garantia
   const [isWarranty, setIsWarranty] = useState(false);
@@ -625,8 +629,14 @@ export const ServiceOrderDetail: React.FC = () => {
     }
   };
 
-  const handleUploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>, type: 'antes' | 'depois' | 'peca' | 'geral') => {
-    const file = e.target.files?.[0];
+  const handleUploadPhoto = async (fileOrEvent: React.ChangeEvent<HTMLInputElement> | File, type: 'antes' | 'depois' | 'peca' | 'geral') => {
+    let file: File | undefined;
+    if (fileOrEvent instanceof File) {
+      file = fileOrEvent;
+    } else {
+      file = fileOrEvent.target.files?.[0];
+    }
+    
     if (!file || !id) return;
     setIsUploadingPhoto(true);
     const reader = new FileReader();
@@ -640,10 +650,48 @@ export const ServiceOrderDetail: React.FC = () => {
         setErrorMessage("ERRO AO CARREGAR FOTO.");
       } finally {
         setIsUploadingPhoto(false);
-        if (e.target) e.target.value = '';
+        // Reset input value to allow uploading same file again
+        if (!(fileOrEvent instanceof File) && fileOrEvent.target) {
+          fileOrEvent.target.value = '';
+        }
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  // Drag and Drop handlers
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragIn = (e: React.DragEvent, type: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (os?.status !== OSStatus.CONCLUIDA) {
+      setDragActiveType(type);
+    }
+  };
+
+  const handleDragOut = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActiveType(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, type: 'antes' | 'depois' | 'peca' | 'geral') => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActiveType(null);
+    if (os?.status === OSStatus.CONCLUIDA) return;
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/')) {
+        handleUploadPhoto(file, type);
+      }
+    }
   };
 
   const handleDeletePhoto = async () => {
@@ -1036,8 +1084,24 @@ export const ServiceOrderDetail: React.FC = () => {
                 <div className="flex items-center justify-between mb-6"><div className="flex items-center gap-3"><ImageIcon size={18} className="text-slate-400" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Evidências Fotográficas</h3></div></div>
                 <div className="grid grid-cols-2 gap-3 mb-8">
                    {['antes', 'depois', 'peca', 'geral'].map((type) => (
-                     <label key={type} className="flex flex-col items-center justify-center py-6 bg-slate-50 dark:bg-slate-950 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:border-blue-200 transition-all group">
-                        <Camera size={24} className="text-slate-300 group-hover:text-blue-500 mb-2" /><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{type.toUpperCase()}</span>
+                     <label 
+                        key={type} 
+                        onDragOver={handleDrag}
+                        onDragEnter={(e) => handleDragIn(e, type)}
+                        onDragLeave={handleDragOut}
+                        onDrop={(e) => handleDrop(e, type as any)}
+                        className={`flex flex-col items-center justify-center py-6 bg-slate-50 dark:bg-slate-950 border-2 border-dashed rounded-3xl cursor-pointer transition-all group relative overflow-hidden ${dragActiveType === type ? 'border-blue-500 bg-blue-50/50 scale-[1.02] ring-4 ring-blue-500/10' : 'border-slate-200 dark:border-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:border-blue-200'}`}
+                     >
+                        {dragActiveType === type && (
+                          <div className="absolute inset-0 bg-blue-600/10 backdrop-blur-[2px] flex items-center justify-center z-10 pointer-events-none">
+                            <div className="flex flex-col items-center gap-2 animate-bounce">
+                              <UploadCloud size={32} className="text-blue-600" />
+                              <span className="text-[10px] font-black text-blue-600 uppercase">Solte para Carregar</span>
+                            </div>
+                          </div>
+                        )}
+                        <Camera size={24} className={`mb-2 transition-colors ${dragActiveType === type ? 'text-blue-600' : 'text-slate-300 group-hover:text-blue-500'}`} />
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${dragActiveType === type ? 'text-blue-600' : 'text-slate-400'}`}>{type.toUpperCase()}</span>
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadPhoto(e, type as any)} disabled={os?.status === OSStatus.CONCLUIDA} />
                      </label>
                    ))}

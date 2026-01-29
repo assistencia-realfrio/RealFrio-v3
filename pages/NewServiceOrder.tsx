@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Save, ArrowLeft, Calendar, AlertTriangle, FileText, 
   MapPin, User, HardDrive, Activity, Tag, ChevronDown, Clock,
-  Search, Plus, X, Building2, Phone, Mail, CheckCircle2
+  Search, Plus, X, Building2, Phone, Mail, CheckCircle2, Loader2
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { Client, Equipment, Establishment, OSType, OSStatus } from '../types';
@@ -61,7 +61,6 @@ const NewServiceOrder: React.FC = () => {
     if (formData.client_id) {
       mockData.getEstablishmentsByClient(formData.client_id).then(ests => {
         setEstablishments(ests);
-        // Se só houver um local e o utilizador ainda não escolheu um explicitamente, selecionamos por defeito
         if (ests.length === 1 && !formData.establishment_id) {
            setFormData(prev => ({ ...prev, establishment_id: ests[0].id }));
         }
@@ -105,8 +104,6 @@ const NewServiceOrder: React.FC = () => {
 
   const filteredResults = useMemo(() => {
     const term = normalizeString(mainSearch);
-    
-    // Caso 1: Campo Vazio - Mostramos apenas a lista de Clientes para uma seleção rápida
     if (!term) {
       return clients.map(c => ({ 
         type: 'client' as const, 
@@ -114,7 +111,6 @@ const NewServiceOrder: React.FC = () => {
       })).sort((a, b) => a.data.name.localeCompare(b.data.name));
     }
 
-    // Caso 2: Pesquisa Ativa - Filtramos Clientes E Locais de Intervenção
     const clientMatches = clients.filter(c => 
       normalizeString(c.name).includes(term) || 
       normalizeString(c.billing_name || '').includes(term)
@@ -123,7 +119,7 @@ const NewServiceOrder: React.FC = () => {
     const establishmentMatches = allEstablishments.filter(e => 
       (normalizeString(e.name).includes(term) || 
       normalizeString(e.client_name || '').includes(term)) &&
-      clients.some(c => c.id === e.client_id) // Respeitar filtro de loja ativa
+      clients.some(c => c.id === e.client_id)
     ).map(e => ({ type: 'establishment' as const, data: e }));
 
     return [...clientMatches, ...establishmentMatches].sort((a, b) => {
@@ -138,8 +134,8 @@ const NewServiceOrder: React.FC = () => {
     if (!term) return equipments;
     return equipments.filter(e => 
       normalizeString(e.type).includes(term) || 
-      normalizeString(e.brand).includes(term) ||
-      normalizeString(e.serial_number).includes(term)
+      normalizeString(e.brand || '').includes(term) ||
+      normalizeString(e.serial_number || '').includes(term)
     );
   }, [equipments, equipmentSearch]);
 
@@ -167,7 +163,7 @@ const NewServiceOrder: React.FC = () => {
 
   const handleSelectEquipment = (eq: Equipment) => {
     setFormData({ ...formData, equipment_id: eq.id });
-    setEquipmentSearch(`${eq.type} - ${eq.brand} (${eq.serial_number})`);
+    setEquipmentSearch(`${eq.type} ${eq.brand ? `- ${eq.brand}` : ''} ${eq.serial_number ? `(${eq.serial_number})` : ''}`);
     setIsEqListOpen(false);
   };
 
@@ -209,11 +205,11 @@ const NewServiceOrder: React.FC = () => {
     const data = new FormData(e.currentTarget);
     try {
       const newClient = await mockData.createClient({
-        name: data.get('name') as string,
-        billing_name: data.get('billing_name') as string || data.get('name') as string,
+        name: (data.get('name') as string).toUpperCase(),
+        billing_name: (data.get('billing_name') as string || data.get('name') as string).toUpperCase(),
         phone: (data.get('phone') as string) || '',
         email: (data.get('email') as string) || '',
-        address: (data.get('address') as string) || '',
+        address: (data.get('address') as string).toUpperCase() || '',
         type: 'Empresa',
         store: currentStore === 'Todas' ? 'Caldas da Rainha' : currentStore as string
       });
@@ -231,21 +227,30 @@ const NewServiceOrder: React.FC = () => {
     e.preventDefault();
     if (!formData.establishment_id) return;
     const data = new FormData(e.currentTarget);
+    const sn = (data.get('serial_number') as string || '').toUpperCase().trim();
+    const type = (data.get('type') as string).toUpperCase();
+    const brand = (data.get('brand') as string || '').toUpperCase().trim();
+    
     try {
-      const newEq = await mockData.createEquipment({
+      const payload = {
         client_id: formData.client_id,
         establishment_id: formData.establishment_id,
-        type: data.get('type') as string,
-        brand: data.get('brand') as string,
-        model: data.get('model') as string || '',
-        serial_number: data.get('serial_number') as string,
+        type: type,
+        brand: brand || null,
+        model: (data.get('model') as string || '').toUpperCase() || null,
+        serial_number: sn || null,
         install_date: new Date().toISOString().split('T')[0]
-      });
+      };
+      const newEq = await mockData.createEquipment(payload);
       setEquipments([newEq, ...equipments]);
       handleSelectEquipment(newEq);
       setShowEqModal(false);
     } catch (err: any) {
-      alert(err.message);
+      if (err.code === '23505') {
+        alert("ESTE NÚMERO DE SÉRIE (" + sn + ") JÁ ESTÁ REGISTADO NO SISTEMA.");
+      } else {
+        alert("ERRO AO CRIAR ATIVO: " + (err.message || "Verifique os dados."));
+      }
     }
   };
 
@@ -265,7 +270,6 @@ const NewServiceOrder: React.FC = () => {
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
-            {/* PESQUISA OMNI: CLIENTE OU LOCAL */}
             <div className="md:col-span-2 relative" ref={mainContainerRef}>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Selecionar Cliente ou Pesquisar Local *</label>
               <div className="relative group">
@@ -335,7 +339,6 @@ const NewServiceOrder: React.FC = () => {
               )}
             </div>
 
-            {/* SELEÇÃO DO LOCAL (CONFIRMAÇÃO) */}
             <div className="md:col-span-2">
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Confirmar Local de Intervenção</label>
               <div className="relative">
@@ -353,7 +356,6 @@ const NewServiceOrder: React.FC = () => {
               </div>
             </div>
 
-            {/* PESQUISA DE ATIVO / EQUIPAMENTO */}
             <div className="md:col-span-2 relative" ref={eqContainerRef}>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Ativo / Equipamento</label>
               <div className="relative">
@@ -365,7 +367,7 @@ const NewServiceOrder: React.FC = () => {
                   value={equipmentSearch}
                   onChange={(e) => { setEquipmentSearch(e.target.value); setIsEqListOpen(true); }}
                   onFocus={() => setIsEqListOpen(true)}
-                  className="w-full pl-12 pr-10 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all disabled:opacity-50"
+                  className="w-full pl-12 pr-10 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all disabled:opacity-50 uppercase"
                 />
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                   {equipmentSearch && (
@@ -385,8 +387,8 @@ const NewServiceOrder: React.FC = () => {
                         key={e.id} type="button" onClick={() => handleSelectEquipment(e)}
                         className="w-full text-left px-5 py-4 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border-b border-slate-50 dark:border-slate-800/50 last:border-0 transition-colors group"
                       >
-                         <p className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{e.type} - {e.brand}</p>
-                         <p className="text-[10px] text-slate-400 font-black font-mono uppercase tracking-widest">SN: {e.serial_number}</p>
+                         <p className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{e.type} {e.brand ? `- ${e.brand}` : ''}</p>
+                         {e.serial_number && <p className="text-[10px] text-slate-400 font-black font-mono uppercase tracking-widest">SN: {e.serial_number}</p>}
                       </button>
                     ))
                   ) : (
@@ -456,12 +458,11 @@ const NewServiceOrder: React.FC = () => {
             type="submit" disabled={isSubmitting || !formData.client_id}
             className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50"
           >
-            {isSubmitting ? 'A PROCESSAR...' : 'CRIAR ORDEM DE SERVIÇO'}
+            {isSubmitting ? <Loader2 size={20} className="animate-spin mx-auto" /> : 'CRIAR ORDEM DE SERVIÇO'}
           </button>
         </form>
       </div>
 
-      {/* MODAL REGISTO RÁPIDO CLIENTE */}
       {showClientModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
@@ -473,11 +474,11 @@ const NewServiceOrder: React.FC = () => {
                  <div className="space-y-4">
                     <div>
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Nome Comercial *</label>
-                      <input required name="name" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="Ex: Café Central" />
+                      <input required name="name" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 uppercase" placeholder="Ex: Café Central" />
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Morada Sede</label>
-                      <input name="address" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="Rua..." />
+                      <input name="address" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 uppercase" placeholder="Rua..." />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -486,7 +487,7 @@ const NewServiceOrder: React.FC = () => {
                       </div>
                       <div>
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Email</label>
-                        <input name="email" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20" />
+                        <input name="email" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20" style={{textTransform: 'none'}} />
                       </div>
                     </div>
                  </div>
@@ -498,7 +499,6 @@ const NewServiceOrder: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL REGISTO RÁPIDO EQUIPAMENTO */}
       {showEqModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
@@ -509,22 +509,22 @@ const NewServiceOrder: React.FC = () => {
               <form onSubmit={handleQuickCreateEq} className="p-8 space-y-4">
                  <div className="space-y-4">
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Tipo de Máquina</label>
-                      <input required name="type" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20" placeholder="Ex: Máquina Gelo" />
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Tipo de Máquina *</label>
+                      <input required name="type" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 uppercase" placeholder="Ex: Máquina Gelo" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Marca</label>
-                        <input required name="brand" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Marca <span className="text-blue-500">(Rec.)</span></label>
+                        <input name="brand" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 uppercase" placeholder="---" />
                       </div>
                       <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Modelo</label>
-                        <input name="model" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Modelo <span className="text-blue-500">(Rec.)</span></label>
+                        <input name="model" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 uppercase" placeholder="---" />
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Número de Série (S/N)</label>
-                      <input required name="serial_number" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-mono font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20" placeholder="SN-XXXX" />
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Número de Série (S/N) <span className="text-blue-500">(Rec.)</span></label>
+                      <input name="serial_number" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-mono font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 uppercase" placeholder="S/N OU DESCONHECIDO" />
                     </div>
                  </div>
                  <button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-700 active:scale-95 transition-all mt-4">
