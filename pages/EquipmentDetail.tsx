@@ -393,7 +393,7 @@ const EquipmentDetail: React.FC = () => {
                       <>
                         <img src={equipment.nameplate_url} className="w-full h-full object-contain" alt="Chapa de Características" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 z-10">
-                           <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(equipment.nameplate_url); }} className="p-4 bg-white text-slate-900 rounded-full hover:bg-blue-50 transition-colors shadow-xl">
+                           <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(equipment.nameplate_url || undefined); }} className="p-4 bg-white text-slate-900 rounded-full hover:bg-blue-50 transition-colors shadow-xl">
                              <Eye size={24} />
                            </button>
                            <div className="p-4 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors shadow-xl">
