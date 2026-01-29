@@ -76,11 +76,11 @@ export interface Equipment {
   client_id: string;
   establishment_id: string;
   type: string;
-  brand: string;
-  model: string;
-  serial_number: string;
-  install_date?: string;
-  nameplate_url?: string;
+  brand?: string | null;
+  model?: string | null;
+  serial_number?: string | null;
+  install_date?: string | null;
+  nameplate_url?: string | null;
   attachments?: EquipmentAttachment[];
 }
 

@@ -232,7 +232,7 @@ const NewServiceOrder: React.FC = () => {
     const brand = (data.get('brand') as string || '').toUpperCase().trim();
     
     try {
-      const payload = {
+      const payload: Partial<Equipment> = {
         client_id: formData.client_id,
         establishment_id: formData.establishment_id,
         type: type,

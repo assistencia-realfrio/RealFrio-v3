@@ -66,7 +66,7 @@ const EditEquipment: React.FC = () => {
         throw new Error("Por favor, preencha a Localização e o Tipo de Máquina.");
       }
 
-      const payload = {
+      const payload: Partial<Equipment> = {
         establishment_id: formData.establishment_id,
         type: formData.type.toUpperCase().trim(),
         brand: formData.brand.trim() ? formData.brand.toUpperCase().trim() : null,

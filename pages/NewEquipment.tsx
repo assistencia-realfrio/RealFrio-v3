@@ -5,7 +5,7 @@ import {
   Save, ArrowLeft, HardDrive, MapPin, ChevronDown, Loader2
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
-import { Client, Establishment } from '../types';
+import { Client, Establishment, Equipment } from '../types';
 
 const NewEquipment: React.FC = () => {
   const navigate = useNavigate();
@@ -39,7 +39,7 @@ const NewEquipment: React.FC = () => {
         throw new Error("Por favor, preencha a Localização e o Tipo de Máquina.");
       }
 
-      const payload = {
+      const payload: Partial<Equipment> = {
         client_id: clientId,
         establishment_id: formData.establishment_id,
         type: formData.type.toUpperCase().trim(),
