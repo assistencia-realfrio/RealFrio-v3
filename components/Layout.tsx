@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench } from 'lucide-react';
+import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench, RefreshCw, Loader2 } from 'lucide-react';
 import { UserRole, OSActivity, ServiceOrder, Client, Equipment } from '../types';
 import { mockData } from '../services/mockData';
 import BrandLogo from './BrandLogo';
@@ -27,6 +27,13 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     equipments: Equipment[];
   }>({ os: [], clients: [], equipments: [] });
   
+  // Estados para Pull-to-Refresh
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const touchStartRef = useRef<number>(0);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const REFRESH_THRESHOLD = 80; // Distância necessária para ativar o refresh
+
   const location = useLocation();
   const navigate = useNavigate();
   const { currentStore, setStore, searchTerm, setSearchTerm } = useStore();
@@ -37,11 +44,58 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   const activeSessionUser = mockData.getSession() || user;
 
+  // Lógica de Pull-to-Refresh
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (mainRef.current && mainRef.current.scrollTop === 0 && !isRefreshing) {
+      touchStartRef.current = e.touches[0].clientY;
+    } else {
+      touchStartRef.current = 0;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartRef.current === 0 || isRefreshing) return;
+
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - touchStartRef.current;
+
+    if (diff > 0 && mainRef.current && mainRef.current.scrollTop === 0) {
+      // Aplicar resistência parabólica para o "feel" nativo
+      const resistance = 0.4;
+      const pull = Math.min(diff * resistance, 120);
+      setPullDistance(pull);
+      
+      // Impedir o scroll nativo se estivermos a puxar
+      if (pull > 5 && e.cancelable) {
+        e.preventDefault();
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullDistance >= REFRESH_THRESHOLD) {
+      triggerRefresh();
+    } else {
+      setPullDistance(0);
+    }
+    touchStartRef.current = 0;
+  };
+
+  const triggerRefresh = () => {
+    setIsRefreshing(true);
+    setPullDistance(60); // Mantém visível durante o refresh
+    
+    // Simular o tempo de atualização antes do reload real
+    setTimeout(() => {
+      window.location.reload();
+    }, 800);
+  };
+
   useEffect(() => {
     const handleScroll = () => {
-      const mainElement = document.querySelector('main');
-      const scrolled = (mainElement && mainElement.scrollTop > 300) || window.scrollY > 300;
-      setShowScrollTop(scrolled);
+      if (mainRef.current) {
+        setShowScrollTop(mainRef.current.scrollTop > 300);
+      }
     };
 
     const handleClickOutside = (event: MouseEvent) => {
@@ -53,15 +107,13 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
-    document.addEventListener('mousedown', handleClickOutside);
-    const mainEl = document.querySelector('main');
+    const mainEl = mainRef.current;
     if (mainEl) mainEl.addEventListener('scroll', handleScroll);
+    document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
-      window.removeEventListener('scroll', handleScroll);
-      document.removeEventListener('mousedown', handleClickOutside);
       if (mainEl) mainEl.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
 
@@ -128,9 +180,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   };
 
   const scrollToTop = () => {
-    const mainEl = document.querySelector('main');
-    if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (mainRef.current) mainRef.current.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const navigateToResult = (path: string) => {
@@ -175,15 +225,37 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-slate-950 overflow-hidden font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300">
+      {/* Indicador Pull-to-Refresh */}
+      <div 
+        className="fixed top-0 left-0 right-0 z-[100] flex justify-center pointer-events-none transition-transform duration-200"
+        style={{ transform: `translateY(${pullDistance - 50}px)` }}
+      >
+        <div className={`
+          w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-xl border border-gray-100 dark:border-slate-700
+          flex items-center justify-center transition-all duration-300
+          ${pullDistance > 0 ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}
+        `}>
+          {isRefreshing ? (
+            <Loader2 size={18} className="text-blue-600 animate-spin" />
+          ) : (
+            <RefreshCw 
+              size={18} 
+              className="text-blue-600 transition-transform" 
+              style={{ transform: `rotate(${pullDistance * 4}deg)` }}
+            />
+          )}
+        </div>
+      </div>
+
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm lg:hidden" 
+          className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm lg:hidden" 
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       <aside className={`
-        fixed inset-y-0 left-0 z-[60] w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none
+        fixed inset-y-0 left-0 z-[80] w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none
         lg:relative lg:translate-x-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
@@ -447,7 +519,13 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 pt-6 scroll-smooth bg-slate-50/50 dark:bg-slate-950/50 transition-colors duration-300">
+        <main 
+          ref={mainRef}
+          className="flex-1 overflow-y-auto p-4 md:p-8 pt-6 scroll-smooth bg-slate-50/50 dark:bg-slate-950/50 transition-colors duration-300 touch-pan-y"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
           {children}
         </main>
 

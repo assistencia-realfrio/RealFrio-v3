@@ -27,6 +27,8 @@
         background-color: #f3f4f6; 
         transition: background-color 0.3s ease, color 0.3s ease;
         -webkit-tap-highlight-color: transparent;
+        /* Impedir o pull-to-refresh nativo do Chrome para usar a nossa implementação customizada */
+        overscroll-behavior-y: contain;
       }
       
       .dark body {
@@ -66,9 +68,9 @@
       
       .dark ::-webkit-scrollbar-thumb { background: #334155; }
 
-      /* Melhorias para PWA (impedir bounce no iOS e seleções de texto indesejadas) */
-      body {
-        overscroll-behavior-y: contain;
+      /* Ajuste para iOS PWA */
+      main {
+        -webkit-overflow-scrolling: touch;
       }
     </style>
   <script type="importmap">
