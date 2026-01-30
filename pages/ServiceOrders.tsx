@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HardDrive, Filter, MapPin, ChevronDown, RefreshCw, Calendar, LayoutList, StretchHorizontal, ShieldAlert, X, Timer, Clock } from 'lucide-react';
+import { HardDrive, Filter, MapPin, ChevronDown, RefreshCw, Calendar, LayoutList, StretchHorizontal, ShieldAlert, X } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { ServiceOrder, OSStatus } from '../types';
 import { useStore } from '../contexts/StoreContext';
@@ -32,43 +31,6 @@ const getStatusLabelText = (status: string) => {
   }
 };
 
-// Sub-componente para gerir o tempo decorrido individualmente sem re-renderizar a lista toda
-const ActiveTimerBadge: React.FC<{ startTime: string; compact?: boolean }> = ({ startTime, compact }) => {
-  const [elapsed, setElapsed] = useState<string>('00:00:00');
-
-  useEffect(() => {
-    const start = new Date(startTime).getTime();
-    const update = () => {
-      const diff = Math.max(0, Date.now() - start);
-      const h = Math.floor(diff / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      setElapsed(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
-    };
-    
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [startTime]);
-
-  if (compact) {
-    return (
-      <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800 animate-in fade-in duration-300">
-        <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_5px_rgba(239,68,68,0.5)]"></div>
-        <span className="text-[8px] font-black text-blue-600 dark:text-blue-400 font-mono tracking-tighter">{elapsed}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1 rounded-full shadow-lg shadow-blue-500/20 animate-in zoom-in-95 duration-300">
-      <Timer size={10} className="animate-spin-slow" style={{ animationDuration: '3s' }} />
-      <span className="text-[9px] font-black tracking-widest font-mono">{elapsed}</span>
-      <div className="w-1 h-1 rounded-full bg-red-400 animate-pulse"></div>
-    </div>
-  );
-};
-
 const ServiceOrders: React.FC = () => {
   const [allOrders, setAllOrders] = useState<ServiceOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +38,7 @@ const ServiceOrders: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<OSStatus | 'all'>('all');
   const [viewMode, setViewMode] = useState<'compact' | 'complete'>('compact');
   
+  // Estados para validação de fecho na lista
   const [showValidationErrorModal, setShowValidationErrorModal] = useState(false);
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [osIdToValidate, setOsIdToValidate] = useState<string | null>(null);
@@ -85,20 +48,17 @@ const ServiceOrders: React.FC = () => {
   
   useEffect(() => {
     fetchOrders();
-    // Poll periódico para atualizar estados de cronómetro de outros utilizadores
-    const interval = setInterval(() => fetchOrders(false), 10000);
-    return () => clearInterval(interval);
   }, []);
 
-  const fetchOrders = async (showLoader = true) => {
-    if (showLoader) setLoading(true);
+  const fetchOrders = async () => {
+    setLoading(true);
     try {
       const data = await mockData.getServiceOrders();
       setAllOrders(data || []);
     } catch (error) {
       console.error('Erro ao carregar OS:', error);
     } finally {
-      if (showLoader) setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -159,14 +119,8 @@ const ServiceOrders: React.FC = () => {
         return matchesStatus;
       })
       .sort((a, b) => {
-        // Prioridade absoluta para OS com cronómetro ativo
-        if (a.timer_is_active && !b.timer_is_active) return -1;
-        if (!a.timer_is_active && b.timer_is_active) return 1;
-
-        const weightKeyA = a.status as string;
-        const weightKeyB = b.status as string;
-        const weightA = STATUS_ORDER_WEIGHT[weightKeyA] ?? 99;
-        const weightB = STATUS_ORDER_WEIGHT[weightKeyB] ?? 99;
+        const weightA = STATUS_ORDER_WEIGHT[a.status] ?? 99;
+        const weightB = STATUS_ORDER_WEIGHT[b.status] ?? 99;
         if (weightA !== weightB) return weightA - weightB;
         const timeA = new Date(a.created_at).getTime();
         const timeB = new Date(b.created_at).getTime();
@@ -269,19 +223,14 @@ const ServiceOrders: React.FC = () => {
               <div 
                 key={os.id} 
                 onClick={() => navigate(`/os/${os.id}`)}
-                className={`group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 border-l-4 hover:shadow-lg transition-all duration-200 block cursor-pointer ${getStoreColorClass(os.store)} ${viewMode === 'compact' ? 'p-3' : 'p-5'} ${os.timer_is_active ? 'ring-2 ring-blue-500 ring-inset bg-blue-50/10 dark:bg-blue-900/5' : ''}`}
+                className={`group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 border-l-4 hover:shadow-lg transition-all duration-200 block cursor-pointer ${getStoreColorClass(os.store)} ${viewMode === 'compact' ? 'p-3' : 'p-5'}`}
               >
                 {viewMode === 'compact' ? (
                   <div className="flex flex-col gap-1.5">
                     <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`text-[10px] font-mono font-black uppercase tracking-tighter ${getStoreTextColorClass(os.store)}`}>
-                          {os.code}
-                        </span>
-                        {os.timer_is_active && os.timer_start_time && (
-                          <ActiveTimerBadge startTime={os.timer_start_time} compact />
-                        )}
-                      </div>
+                      <span className={`text-[10px] font-mono font-black uppercase tracking-tighter ${getStoreTextColorClass(os.store)}`}>
+                        {os.code}
+                      </span>
                       <div className="relative" onClick={(e) => e.stopPropagation()}>
                         {updatingId === os.id ? (
                           <RefreshCw size={12} className="animate-spin text-blue-600" />
@@ -317,18 +266,11 @@ const ServiceOrders: React.FC = () => {
                   </div>
                 ) : (
                   <>
-                    <div className="flex justify-between items-start mb-1 gap-2">
-                      <div className="flex flex-col gap-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-black uppercase tracking-widest truncate ${getStoreTextColorClass(os.store)}`}>
-                            {os.code}
-                          </span>
-                        </div>
-                        {os.timer_is_active && os.timer_start_time && (
-                          <div className="mt-1">
-                             <ActiveTimerBadge startTime={os.timer_start_time} />
-                          </div>
-                        )}
+                    <div className="flex justify-between items-center mb-1 gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`text-[10px] font-black uppercase tracking-widest truncate ${getStoreTextColorClass(os.store)}`}>
+                          {os.code}
+                        </span>
                       </div>
                       <div className="relative flex-shrink-0 mr-1" onClick={(e) => e.stopPropagation()}>
                         {updatingId === os.id ? (
@@ -355,7 +297,7 @@ const ServiceOrders: React.FC = () => {
                       </div>
                     </div>
 
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight uppercase group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate mb-2 mt-2">
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight uppercase group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate mb-2">
                       {os.client?.name}
                     </h3>
 
