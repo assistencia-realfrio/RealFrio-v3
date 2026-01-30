@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'realfrio-tech-v3.1';
+const CACHE_NAME = 'realfrio-tech-v3.2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -36,9 +36,7 @@ self.addEventListener('activate', (event) => {
 });
 
 // Estratégia: Stale While Revalidate
-// Serve o conteúdo do cache instantaneamente, mas atualiza-o em background se houver rede.
 self.addEventListener('fetch', (event) => {
-  // Ignorar pedidos para o Supabase e Gemini API (devem ser sempre live ou geridos pelas suas próprias libs)
   if (event.request.url.includes('supabase.co') || event.request.url.includes('googleapis.com')) {
     return;
   }
@@ -46,7 +44,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
-        // Apenas faz cache de respostas válidas do nosso próprio domínio
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -55,7 +52,6 @@ self.addEventListener('fetch', (event) => {
         }
         return networkResponse;
       }).catch(() => {
-        // Se falhar e não houver cache, podemos retornar uma página de offline (opcional)
         console.log('[SW] Fetch falhou e sem cache para:', event.request.url);
       });
 
