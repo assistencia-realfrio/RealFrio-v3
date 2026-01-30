@@ -11,7 +11,8 @@ import {
   User, ChevronRight, ChevronDown, ChevronUp, Calendar, RotateCcw,
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
   RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
-  Settings2, FileDown, Key, Mail, Share2, UploadCloud, Play, Square as StopIcon, Timer, CloudRain
+  Settings2, FileDown, Key, Mail, Share2, UploadCloud, Play, Square as StopIcon, Timer, CloudRain,
+  Wrench, Snowflake
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -165,6 +166,7 @@ export const ServiceOrderDetail: React.FC = () => {
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [showPartModal, setShowPartModal] = useState(false);
   const [showEditQuantityModal, setShowEditQuantityModal] = useState(false);
+  const [showTimerTypeModal, setShowTimerTypeModal] = useState(false);
   
   const [partToDelete, setPartToDelete] = useState<PartUsed | null>(null);
   const [partToEditQuantity, setPartToEditQuantity] = useState<PartUsed | null>(null);
@@ -258,15 +260,25 @@ export const ServiceOrderDetail: React.FC = () => {
     }
   };
 
-  const handleStopTimer = async () => {
+  const handleStopTimer = () => {
+    if (!id || !os?.timer_start_time) return;
+    setShowTimerTypeModal(true);
+  };
+
+  const handleConfirmTimerRegistration = async (type: 'GERAL' | 'FRIO') => {
     if (!id || !os?.timer_start_time) return;
     setActionLoading(true);
+    setShowTimerTypeModal(false);
+    
     try {
       const startTime = new Date(os.timer_start_time).getTime();
       const finalElapsed = Date.now() - startTime;
       const minutes = Math.max(1, Math.round(finalElapsed / 60000));
       const hours = Number((minutes / 60).toFixed(2));
       
+      const designation = type === 'FRIO' ? "MÃO DE OBRA FRIO" : "MÃO DE OBRA GERAL";
+      const reference = type === 'FRIO' ? "MO-FRIO" : "MO-GERAL";
+
       // 1. Limpar estado na OS
       await mockData.updateServiceOrder(id, { 
         timer_is_active: false, 
@@ -275,8 +287,8 @@ export const ServiceOrderDetail: React.FC = () => {
 
       // 2. Adicionar à lista de materiais
       await mockData.addOSPart(id, {
-        name: "MÃO DE OBRA (CRONÓMETRO)",
-        reference: "MO-AUTO",
+        name: designation,
+        reference: reference,
         quantity: hours
       });
 
@@ -285,11 +297,11 @@ export const ServiceOrderDetail: React.FC = () => {
         os_id: id,
         start_time: os.timer_start_time,
         duration_minutes: minutes,
-        description: "Registo automático via cronómetro global"
+        description: `Registo cronómetro: ${designation}`
       });
 
       await mockData.addOSActivity(id, { 
-        description: `PAROU CRONÓMETRO GLOBAL: ${minutes} MINUTOS REGISTADOS (${hours}H)` 
+        description: `PAROU CRONÓMETRO: REGISTADO ${minutes} MINUTOS COMO ${designation}` 
       });
 
       setElapsedTime(0);
@@ -1287,6 +1299,58 @@ export const ServiceOrderDetail: React.FC = () => {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
               <div className="p-8"><div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><CheckCircle size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Finalizar Intervenção?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase">TODOS OS DADOS SERÃO BLOQUEADOS E O RELATÓRIO SERÁ GERADO.</p><div className="grid grid-cols-2 gap-4"><button onClick={() => setShowFinalizeModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button><button onClick={async () => { await mockData.updateServiceOrder(id!, { status: OSStatus.CONCLUIDA, anomaly_detected: anomaly, resolution_notes: resolutionNotes, client_signature: clientSignature, technician_signature: technicianSignature, is_warranty: isWarranty, warranty_info: warrantyInfo }); await mockData.addOSActivity(id!, { description: "FINALIZOU A ORDEM DE SERVIÇO" }); setShowFinalizeModal(false); setActiveTab('info'); fetchOSDetails(false); }} className="py-4 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">CONFIRMAR</button></div></div>
+           </div>
+        </div>
+      )}
+
+      {/* NOVO MODAL: TIPO DE MÃO DE OBRA */}
+      {showTimerTypeModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4 animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-white/10">
+              <div className="p-10 text-center">
+                 <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
+                    <Clock size={40} />
+                 </div>
+                 <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-3">Registar Tempo</h3>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-10 uppercase tracking-widest">
+                    Selecione o tipo de intervenção efetuada para contabilização:
+                 </p>
+                 
+                 <div className="grid grid-cols-1 gap-4">
+                    <button 
+                      onClick={() => handleConfirmTimerRegistration('GERAL')}
+                      className="group flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 hover:bg-blue-600 hover:text-white rounded-[2rem] transition-all active:scale-95 border border-transparent hover:shadow-xl hover:shadow-blue-600/20"
+                    >
+                       <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 text-blue-600 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white">
+                             <Wrench size={20} />
+                          </div>
+                          <span className="text-sm font-black uppercase tracking-tight">Mão de Obra Geral</span>
+                       </div>
+                       <ChevronRight size={18} className="opacity-30 group-hover:opacity-100" />
+                    </button>
+
+                    <button 
+                      onClick={() => handleConfirmTimerRegistration('FRIO')}
+                      className="group flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 hover:bg-emerald-600 hover:text-white rounded-[2rem] transition-all active:scale-95 border border-transparent hover:shadow-xl hover:shadow-emerald-600/20"
+                    >
+                       <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white">
+                             <Snowflake size={20} />
+                          </div>
+                          <span className="text-sm font-black uppercase tracking-tight">Mão de Obra Frio</span>
+                       </div>
+                       <ChevronRight size={18} className="opacity-30 group-hover:opacity-100" />
+                    </button>
+                 </div>
+
+                 <button 
+                    onClick={() => setShowTimerTypeModal(false)}
+                    className="mt-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] hover:text-red-500 transition-colors"
+                 >
+                    CANCELAR E MANTER ATIVO
+                 </button>
+              </div>
            </div>
         </div>
       )}

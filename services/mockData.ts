@@ -14,6 +14,9 @@ const cleanPayload = (data: any) => {
   delete cleaned.client;
   delete cleaned.establishment;
   delete cleaned.equipment;
+  // Prevenir envio de campos gerados ou IDs em updates se presentes por engano
+  delete cleaned.id;
+  delete cleaned.created_at;
   return cleaned;
 };
 
@@ -121,7 +124,18 @@ export const mockData = {
   },
 
   updateServiceOrder: async (id: string, updates: Partial<ServiceOrder>) => {
-    return supabase.from('service_orders').update(cleanPayload(updates)).eq('id', id);
+    const { data, error } = await supabase
+      .from('service_orders')
+      .update(cleanPayload(updates))
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error("Erro no Update OS:", error);
+      throw error;
+    }
+    return data;
   },
 
   // Clients
