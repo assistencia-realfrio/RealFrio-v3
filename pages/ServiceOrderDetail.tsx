@@ -11,7 +11,7 @@ import {
   User, ChevronRight, ChevronDown, ChevronUp, Calendar, RotateCcw,
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
   RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
-  Settings2, FileDown, Key, Mail, Share2, UploadCloud
+  Settings2, FileDown, Key, Mail, Share2, UploadCloud, Play, Square as StopIcon, Timer
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -92,7 +92,7 @@ const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => 
            {scale > 1 ? `ZOOM: ${Math.round(scale * 100)}%` : 'PINCH PARA ZOOM / DUPLO TOQUE'}
          </span>
       </div>
-      <img src={src} alt={alt} className="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-75 ease-out select-none pointer-events-none" style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`, willChange: 'transform' }} />
+      <img src={src} alt={alt} className="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-75 ease-out select-none pointer-events-none" style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`, fontSmooth: 'always' }} />
       {scale > 1 && (
         <button onClick={(e) => { e.stopPropagation(); setScale(1); setPosition({x:0,y:0}); }} className="absolute bottom-10 bg-white text-slate-900 px-8 py-4 rounded-full text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 transition-all shadow-2xl border border-slate-200 z-30 active:scale-90">Repor Vista (1:1)</button>
       )}
@@ -154,14 +154,10 @@ export const ServiceOrderDetail: React.FC = () => {
   const [scheduledTime, setScheduledTime] = useState('');
   const [loading, setLoading] = useState(true);
   
-  // Drag and Drop state
   const [dragActiveType, setDragActiveType] = useState<string | null>(null);
-  
-  // Estados para Garantia
   const [isWarranty, setIsWarranty] = useState(false);
   const [warrantyInfo, setWarrantyInfo] = useState<ServiceOrder['warranty_info']>({});
   
-  // Modais
   const [showDeletePartModal, setShowDeletePartModal] = useState(false);
   const [showDeletePhotoModal, setShowDeletePhotoModal] = useState(false);
   const [showValidationErrorModal, setShowValidationErrorModal] = useState(false);
@@ -172,8 +168,6 @@ export const ServiceOrderDetail: React.FC = () => {
   
   const [partToDelete, setPartToDelete] = useState<PartUsed | null>(null);
   const [partToEditQuantity, setPartToEditQuantity] = useState<PartUsed | null>(null);
-  
-  // Estados para Quantidade com suporte Decimal
   const [partQuantityStr, setPartQuantityStr] = useState<string>("1");
   const [tempQuantityStr, setTempQuantityStr] = useState<string>("1");
 
@@ -184,24 +178,26 @@ export const ServiceOrderDetail: React.FC = () => {
   const [showValidationErrors, setShowValidationErrors] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Estados para Adição de Peças
   const [partSearchTerm, setPartSearchTerm] = useState('');
   const [selectedPartId, setSelectedPartId] = useState('');
   const [isCreatingNewPart, setIsCreatingNewPart] = useState(false);
   const [newPartForm, setNewPartForm] = useState({ name: '', reference: '' });
 
-  // Estados para cartões colapsáveis
   const [expandedClient, setExpandedClient] = useState(false);
   const [expandedEquip, setExpandedEquip] = useState(false);
   const [expandedWarranty, setExpandedWarranty] = useState(false);
   const [expandedPlanning, setExpandedPlanning] = useState(false);
   const [expandedLog, setExpandedLog] = useState(false);
 
+  // Estados do Cronómetro
+  const [timerActive, setTimerActive] = useState(false);
+  const [timerStartTime, setTimerStartTime] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const timerIntervalRef = useRef<number | null>(null);
+
   const descTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    fetchOSDetails();
-  }, [id]);
+  useEffect(() => { fetchOSDetails(); }, [id]);
 
   useEffect(() => {
     if (activeTab === 'info' && descTextareaRef.current) {
@@ -210,12 +206,99 @@ export const ServiceOrderDetail: React.FC = () => {
     }
   }, [description, activeTab, loading]);
 
-  // Carregar catálogo ao abrir modal de material
   useEffect(() => {
     if (showPartModal && catalog.length === 0) {
       mockData.getCatalog().then(setCatalog).catch(() => setErrorMessage("ERRO AO CARREGAR CATÁLOGO."));
     }
   }, [showPartModal]);
+
+  // Efeito para persistência do cronómetro
+  useEffect(() => {
+    if (!id) return;
+    const saved = localStorage.getItem(`os_timer_${id}`);
+    if (saved) {
+      const { startTime, active } = JSON.parse(saved);
+      if (active && startTime) {
+        setTimerActive(true);
+        setTimerStartTime(startTime);
+        setElapsedTime(Date.now() - startTime);
+      }
+    }
+
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, [id]);
+
+  // Efeito do Ticker do Cronómetro
+  useEffect(() => {
+    if (timerActive && timerStartTime) {
+      timerIntervalRef.current = window.setInterval(() => {
+        setElapsedTime(Date.now() - timerStartTime);
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    }
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, [timerActive, timerStartTime]);
+
+  const handleStartTimer = async () => {
+    if (!id || timerActive) return;
+    const now = Date.now();
+    setTimerActive(true);
+    setTimerStartTime(now);
+    localStorage.setItem(`os_timer_${id}`, JSON.stringify({ startTime: now, active: true }));
+    await mockData.addOSActivity(id, { description: "INICIOU CONTAGEM DE TEMPO DE TRABALHO" });
+  };
+
+  const handleStopTimer = async () => {
+    if (!id || !timerStartTime) return;
+    setActionLoading(true);
+    try {
+      const finalElapsed = Date.now() - timerStartTime;
+      const minutes = Math.max(1, Math.round(finalElapsed / 60000));
+      const hours = Number((minutes / 60).toFixed(2));
+      
+      // Adicionar à lista de materiais
+      await mockData.addOSPart(id, {
+        name: "MÃO DE OBRA (CRONÓMETRO)",
+        reference: "MO-AUTO",
+        quantity: hours
+      });
+
+      // Adicionar entrada de tempo oficial
+      await mockData.createTimeEntry({
+        os_id: id,
+        start_time: new Date(timerStartTime).toISOString(),
+        duration_minutes: minutes,
+        description: "Registo automático via cronómetro OS"
+      });
+
+      await mockData.addOSActivity(id, { 
+        description: `PAROU CRONÓMETRO: ${minutes} MINUTOS REGISTADOS COMO MATERIAL (${hours}H)` 
+      });
+
+      setTimerActive(false);
+      setTimerStartTime(null);
+      setElapsedTime(0);
+      localStorage.removeItem(`os_timer_${id}`);
+      fetchOSDetails(false);
+    } catch (e) {
+      setErrorMessage("ERRO AO FINALIZAR REGISTO DE TEMPO.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const formatElapsedTime = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   const missingFields = useMemo(() => {
     const list = [];
@@ -305,18 +388,15 @@ export const ServiceOrderDetail: React.FC = () => {
     }
     setActionLoading(true);
     try {
-      const updates: Partial<ServiceOrder> = { status: newStatus };
-      await mockData.updateServiceOrder(id, updates);
+      const oldStatusLabel = getStatusLabelText(os.status).toUpperCase();
+      const newStatusLabel = getStatusLabelText(newStatus).toUpperCase();
+      
+      await mockData.updateServiceOrder(id, { status: newStatus });
       await mockData.addOSActivity(id, {
-        description: `ESTADO DA OS ALTERADO PARA ${getStatusLabelText(newStatus)}`
+        description: `ALTEROU ESTADO: DE ${oldStatusLabel} PARA ${newStatusLabel}`
       });
       
-      if (newStatus === OSStatus.CONCLUIDA) {
-        setActiveTab('info');
-        fetchOSDetails(false);
-      } else {
-        fetchOSDetails(false);
-      }
+      fetchOSDetails(false);
     } catch (e: any) {
       setErrorMessage("ERRO AO ATUALIZAR ESTADO.");
     } finally {
@@ -328,24 +408,45 @@ export const ServiceOrderDetail: React.FC = () => {
     if (!id || !os) return;
     setActionLoading(true);
     try {
+      // Deteção detalhada de alterações para o log
+      const changes = [];
+      if (description !== (os.description || '')) changes.push("PEDIDO/AVARIA");
+      if (anomaly !== (os.anomaly_detected || '')) changes.push("ANOMALIA DETETADA");
+      if (resolutionNotes !== (os.resolution_notes || '')) changes.push("RESUMO DA RESOLUÇÃO");
+      if (observations !== (os.observations || '')) changes.push("OBSERVAÇÕES");
+      
+      const originalDate = os.scheduled_date?.split(/[T ]/)[0] || '';
+      const originalTime = os.scheduled_date?.split(/[T ]/)[1]?.substring(0, 5) || '';
+      if (scheduledDate !== originalDate || scheduledTime !== originalTime) {
+        changes.push(`AGENDAMENTO (${scheduledDate} ${scheduledTime})`);
+      }
+      
+      if (clientSignature !== (os.client_signature || null)) changes.push("ASSINATURA CLIENTE");
+      if (technicianSignature !== (os.technician_signature || null)) changes.push("ASSINATURA TÉCNICO");
+      if (isWarranty !== !!os.is_warranty) changes.push(isWarranty ? "ATIVOU GARANTIA" : "DESATIVOU GARANTIA");
+
       const finalScheduled = scheduledDate 
         ? `${scheduledDate}T${scheduledTime || '00:00'}:00` 
         : null;
 
       await mockData.updateServiceOrder(id, {
-        description: description,
+        description,
         anomaly_detected: anomaly,
         resolution_notes: resolutionNotes,
-        observations: observations,
+        observations,
         client_signature: clientSignature,
         technician_signature: technicianSignature,
         scheduled_date: finalScheduled as any,
         is_warranty: isWarranty,
         warranty_info: warrantyInfo
       });
-      await mockData.addOSActivity(id, {
-        description: 'GUARDOU ALTERAÇÕES NA ORDEM DE SERVIÇO'
-      });
+
+      if (changes.length > 0) {
+        await mockData.addOSActivity(id, {
+          description: `ATUALIZOU: ${changes.join(', ')}`
+        });
+      }
+
       setShowValidationErrors(false);
       fetchOSDetails(false);
     } catch (e: any) {
@@ -377,17 +478,16 @@ export const ServiceOrderDetail: React.FC = () => {
     if (!id || !os) return;
     setActionLoading(true);
     try {
-      const updates: Partial<ServiceOrder> = { 
+      await mockData.updateServiceOrder(id, { 
         status: targetStatus,
         anomaly_detected: '',
         resolution_notes: '',
         client_signature: null,
         technician_signature: null
-      };
-
-      await mockData.updateServiceOrder(id, updates);
+      });
+      
       await mockData.addOSActivity(id, {
-        description: `OS REABERTA COM ESTADO: ${getStatusLabelText(targetStatus).toUpperCase()} (DADOS DE FECHO RESETADOS)`
+        description: `REABERTA: ESTADO ${getStatusLabelText(targetStatus).toUpperCase()} (RESETOU DADOS DE FECHO)`
       });
 
       setAnomaly('');
@@ -404,112 +504,79 @@ export const ServiceOrderDetail: React.FC = () => {
     }
   };
 
-  /**
-   * Geração de PDF Ultra-Compacto (Mínimo espaço vazio e ficheiro leve)
-   */
   const createPDFDocument = async () => {
     if (!os) return null;
-    
-    const doc = new jsPDF({ 
-      compress: true,
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
-
+    const doc = new jsPDF({ compress: true, orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageWidth = doc.internal.pageSize.width;
-    const margin = 10; // Reduzido para o mínimo aceitável
+    const margin = 10;
     const contentWidth = pageWidth - (margin * 2);
     
-    // 1. HEADER COMPACTO
     doc.setFillColor(15, 23, 42); 
     doc.rect(0, 0, pageWidth, 28, 'F'); 
-    
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     doc.text("REAL FRIO", margin, 12);
-    
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
     doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 18);
-    
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.text(os.code, pageWidth - margin, 12, { align: 'right' });
-    
     doc.setFontSize(6);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(180, 180, 180);
     doc.text(`EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 18, { align: 'right' });
 
     let currentY = 32;
-
-    // 2. BLOCO DE DADOS CLIENTE/EQUIPAMENTO
     doc.setDrawColor(241, 245, 249);
     doc.setFillColor(252, 252, 253);
     doc.roundedRect(margin, currentY, contentWidth, 22, 1, 1, 'FD'); 
-    
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.text("DADOS DO CLIENTE", margin + 3, currentY + 5);
     doc.text("EQUIPAMENTO", margin + (contentWidth / 2) + 3, currentY + 5);
-    
     doc.setDrawColor(226, 232, 240);
     doc.line(margin + 3, currentY + 7, margin + (contentWidth / 2) - 3, currentY + 7);
     doc.line(margin + (contentWidth / 2) + 3, currentY + 7, margin + contentWidth - 3, currentY + 7);
-
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.5);
     doc.setTextColor(71, 85, 105);
-    
-    // Coluna Cliente
     doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 3, currentY + 11);
     doc.text(`FIRMA: ${os.client?.billing_name || '---'}`, margin + 3, currentY + 14.5, { maxWidth: (contentWidth / 2) - 8 });
     doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 3, currentY + 18);
-    
-    // Coluna Equipamento
     doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 3, currentY + 11);
     doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 3, currentY + 14.5);
     doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 3, currentY + 18);
 
     currentY += 26;
-
-    // 3. SECÇÕES DE TEXTO
     const narrativeFields = [
       { label: "DESCRIÇÃO DO PEDIDO / AVARIA:", value: os.description || 'N/A' },
       { label: "ANOMALIA DETETADA NO LOCAL:", value: os.anomaly_detected || 'N/A' },
       { label: "TRABALHO EFETUADO E RESOLUÇÃO:", value: os.resolution_notes || 'N/A' }
     ];
-
     narrativeFields.forEach(field => {
       doc.setFontSize(7);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.text(field.label, margin, currentY);
-      
       currentY += 3;
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5); 
       doc.setTextColor(51, 65, 85);
-      
       const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth);
       doc.text(splitText, margin, currentY);
-      
-      currentY += (splitText.length * 4) + 3; // Menor espaço entre blocos
-
+      currentY += (splitText.length * 4) + 3;
       if (currentY > 275) { doc.addPage(); currentY = 15; }
     });
 
-    // 4. MATERIAL
     if (partsUsed.length > 0) {
       doc.setFontSize(7);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.text("MATERIAL APLICADO:", margin, currentY);
       currentY += 2;
-
       autoTable(doc, {
         startY: currentY,
         margin: { left: margin, right: margin },
@@ -522,47 +589,28 @@ export const ServiceOrderDetail: React.FC = () => {
       });
       currentY = (doc as any).lastAutoTable.finalY + 8;
     }
-
-    // 5. ASSINATURAS
     if (currentY > 250) { doc.addPage(); currentY = 15; }
-
     doc.setDrawColor(226, 232, 240);
     doc.line(margin, currentY, pageWidth - margin, currentY);
     currentY += 5;
-    
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.text("VALIDAÇÃO E CONFORMIDADE", margin, currentY);
     currentY += 3;
-
     const sigBoxWidth = (contentWidth / 2) - 5;
-    
-    // Assinatura Cliente
-    if (clientSignature) { 
-      try { 
-        doc.addImage(clientSignature, 'JPEG', margin, currentY, 40, 15, undefined, 'FAST'); 
-      } catch (e) {} 
-    }
+    if (clientSignature) { try { doc.addImage(clientSignature, 'JPEG', margin, currentY, 40, 15, undefined, 'FAST'); } catch (e) {} }
     doc.setDrawColor(203, 213, 225);
     doc.line(margin, currentY + 16, margin + sigBoxWidth, currentY + 16);
     doc.setFontSize(5.5);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(148, 163, 184);
     doc.text("ASSINATURA CLIENTE", margin + (sigBoxWidth / 2), currentY + 20, { align: 'center' });
-
-    // Assinatura Técnico
-    if (technicianSignature) { 
-      try { 
-        doc.addImage(technicianSignature, 'JPEG', margin + (contentWidth / 2) + 5, currentY, 40, 15, undefined, 'FAST'); 
-      } catch (e) {} 
-    }
+    if (technicianSignature) { try { doc.addImage(technicianSignature, 'JPEG', margin + (contentWidth / 2) + 5, currentY, 40, 15, undefined, 'FAST'); } catch (e) {} }
     doc.line(margin + (contentWidth / 2) + 5, currentY + 16, margin + contentWidth, currentY + 16);
     doc.text("ASSINATURA TÉCNICO", margin + (contentWidth / 2) + 5 + (sigBoxWidth / 2), currentY + 20, { align: 'center' });
-
     doc.setFontSize(5);
     doc.setTextColor(148, 163, 184);
     doc.text("Documento oficial Real Frio. Emitido via Plataforma Cloud Técnica.", pageWidth / 2, 290, { align: 'center' });
-    
     return doc;
   };
 
@@ -578,49 +626,21 @@ export const ServiceOrderDetail: React.FC = () => {
     }
   };
 
-  /**
-   * Envio de email com texto padrão e destinatário automático via MAILTO:
-   */
   const handleSendEmailShortcut = async () => {
     if (!os) return;
-    
     const clientEmail = os.client?.email?.trim();
-    if (!clientEmail) {
-      alert("ATENÇÃO: Este cliente não tem um email registado. Por favor, adicione o destinatário manualmente no seu gestor de email.");
-    }
-
+    if (!clientEmail) alert("CLIENTE SEM EMAIL REGISTADO.");
     setIsExportingPDF(true);
     try {
-      // 1. Descarrega o ficheiro primeiro (para estar disponível no dispositivo)
       const doc = await createPDFDocument();
-      if (!doc) throw new Error("Falha ao gerar documento");
-      
-      const filename = `RELATORIO_REALFRIO_${os.code}.pdf`;
-      doc.save(filename);
-
-      // 2. Prepara dados para o link mailto
+      if (!doc) throw new Error("Falha");
+      doc.save(`RELATORIO_REALFRIO_${os.code}.pdf`);
       const interventionDate = new Date(os.created_at).toLocaleDateString('pt-PT');
-      const equipmentInfo = os.equipment ? `${os.equipment.type} - ${os.equipment.brand}` : '---';
-      
       const subject = `RELATÓRIO TÉCNICO - ${os.code} - ${os.client?.name}`;
-      
-      // Texto padrão solicitado
-      const body = `Exmos. Srs.\n\n` +
-                   `Junto enviamos o relatório técnico relativo à intervenção efetuada em ${interventionDate}.\n\n` +
-                   `Código OS: ${os.code}\n` +
-                   `Equipamento: ${equipmentInfo}\n\n` +
-                   `Com os melhores cumprimentos,\n` +
-                   `Real Frio, Lda`;
-
-      // 3. Abre o gestor de email com destinatário, assunto e corpo preenchidos
-      const mailtoLink = `mailto:${clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      
-      window.location.href = mailtoLink;
-      
+      const body = `Exmos. Srs.\n\nJunto enviamos o relatório técnico relativo à intervenção efetuada em ${interventionDate}.\n\nCódigo OS: ${os.code}\n\nCom os melhores cumprimentos,\nReal Frio, Lda`;
+      window.location.href = `mailto:${clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       await mockData.addOSActivity(os.id, { description: `EMAIL ABERTO PARA: ${clientEmail || '(MANUAL)'}` });
-      
     } catch (err) {
-      console.error(err);
       setErrorMessage("ERRO AO PREPARAR ENVIO.");
     } finally {
       setIsExportingPDF(false);
@@ -628,84 +648,39 @@ export const ServiceOrderDetail: React.FC = () => {
   };
 
   const handleUploadPhoto = async (fileOrEvent: React.ChangeEvent<HTMLInputElement> | File, type: 'antes' | 'depois' | 'peca' | 'geral') => {
-    let file: File | undefined;
-    if (fileOrEvent instanceof File) {
-      file = fileOrEvent;
-    } else {
-      file = fileOrEvent.target.files?.[0];
-    }
-    
+    let file = fileOrEvent instanceof File ? fileOrEvent : fileOrEvent.target.files?.[0];
     if (!file || !id) return;
     setIsUploadingPhoto(true);
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
-        const base64 = reader.result as string;
-        await mockData.addOSPhoto(id, { url: base64, type: type });
-        await mockData.addOSActivity(id, { description: `ADICIONOU FOTO (${type.toUpperCase()})` });
+        await mockData.addOSPhoto(id, { url: reader.result as string, type });
+        await mockData.addOSActivity(id, { description: `ADICIONOU FOTO: ${type.toUpperCase()}` });
         fetchOSDetails(false);
       } catch (err: any) {
         setErrorMessage("ERRO AO CARREGAR FOTO.");
       } finally {
         setIsUploadingPhoto(false);
-        // Reset input value to allow uploading same file again
-        if (!(fileOrEvent instanceof File) && fileOrEvent.target) {
-          fileOrEvent.target.value = '';
-        }
       }
     };
     reader.readAsDataURL(file);
   };
 
-  // Drag and Drop handlers
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDragIn = (e: React.DragEvent, type: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (os?.status !== OSStatus.CONCLUIDA) {
-      setDragActiveType(type);
-    }
-  };
-
-  const handleDragOut = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActiveType(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, type: 'antes' | 'depois' | 'peca' | 'geral') => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActiveType(null);
-    if (os?.status === OSStatus.CONCLUIDA) return;
-    
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      if (file.type.startsWith('image/')) {
-        handleUploadPhoto(file, type);
-      }
-    }
-  };
+  const handleDrag = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); };
+  const handleDragIn = (e: React.DragEvent, type: string) => { e.preventDefault(); e.stopPropagation(); if (os?.status !== OSStatus.CONCLUIDA) setDragActiveType(type); };
+  const handleDragOut = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setDragActiveType(null); };
+  const handleDrop = (e: React.DragEvent, type: 'antes' | 'depois' | 'peca' | 'geral') => { e.preventDefault(); e.stopPropagation(); setDragActiveType(null); if (os?.status === OSStatus.CONCLUIDA) return; const files = e.dataTransfer.files; if (files?.[0]?.type.startsWith('image/')) handleUploadPhoto(files[0], type); };
 
   const handleDeletePhoto = async () => {
     if (!photoToDelete) return;
     setActionLoading(true);
     try {
       await mockData.deleteOSPhoto(photoToDelete.id);
-      await mockData.addOSActivity(id!, { description: `REMOVEU FOTO (${photoToDelete.type.toUpperCase()})` });
+      await mockData.addOSActivity(id!, { description: `REMOVEU FOTO: ${photoToDelete.type.toUpperCase()}` });
       setShowDeletePhotoModal(false);
       setPhotoToDelete(null);
       fetchOSDetails(false);
-    } catch (e: any) {
-      setErrorMessage("ERRO AO REMOVER FOTO.");
-    } finally {
-      setActionLoading(false);
-    }
+    } finally { setActionLoading(false); }
   };
 
   const handleAddPart = async () => {
@@ -715,7 +690,6 @@ export const ServiceOrderDetail: React.FC = () => {
     setActionLoading(true);
     try {
       const numericQuantity = parseFloat(partQuantityStr.replace(',', '.'));
-      if (isNaN(numericQuantity)) throw new Error("Quantidade inválida.");
       await mockData.addOSPart(id, { part_id: part.id, name: part.name, reference: part.reference, quantity: numericQuantity });
       await mockData.addOSActivity(id, { description: `APLICOU MATERIAL: ${numericQuantity.toLocaleString('pt-PT')}x ${part.name}` });
       setShowPartModal(false);
@@ -723,39 +697,24 @@ export const ServiceOrderDetail: React.FC = () => {
       setPartQuantityStr("1");
       setPartSearchTerm('');
       fetchOSDetails(false);
-    } catch (e: any) {
-      setErrorMessage("ERRO AO ADICIONAR MATERIAL.");
-    } finally {
-      setActionLoading(false);
-    }
+    } finally { setActionLoading(false); }
   };
 
   const handleCreateAndAddPart = async () => {
     if (!id || !newPartForm.name) return;
     setActionLoading(true);
     try {
-      const finalReference = newPartForm.reference.trim() 
-        ? newPartForm.reference.replace(/\D/g, '') 
-        : Math.floor(1000000 + Math.random() * 9000000).toString();
-      const numericQuantity = parseFloat(partQuantityStr.replace(',', '.'));
-      if (isNaN(numericQuantity)) throw new Error("Quantidade inválida.");
-      const createdPart = await mockData.addCatalogItem({ name: newPartForm.name.toUpperCase(), reference: finalReference, stock: 0 });
-      await mockData.addOSPart(id, { part_id: createdPart.id, name: createdPart.name, reference: createdPart.reference, quantity: numericQuantity });
-      await mockData.addOSActivity(id, { description: `REGISTOU E APLICOU NOVO MATERIAL: ${numericQuantity.toLocaleString('pt-PT')}x ${createdPart.name}` });
+      const ref = newPartForm.reference.trim() || Math.floor(1000000 + Math.random() * 9000000).toString();
+      const qty = parseFloat(partQuantityStr.replace(',', '.'));
+      const created = await mockData.addCatalogItem({ name: newPartForm.name.toUpperCase(), reference: ref, stock: 0 });
+      await mockData.addOSPart(id, { part_id: created.id, name: created.name, reference: created.reference, quantity: qty });
+      await mockData.addOSActivity(id, { description: `CRIOU E APLICOU: ${qty.toLocaleString('pt-PT')}x ${created.name}` });
       setShowPartModal(false);
       setIsCreatingNewPart(false);
       setNewPartForm({ name: '', reference: '' });
-      setSelectedPartId('');
-      setPartQuantityStr("1");
-      setPartSearchTerm('');
       fetchOSDetails(false);
-      const newCatalog = await mockData.getCatalog();
-      setCatalog(newCatalog);
-    } catch (e: any) {
-      setErrorMessage("ERRO AO CRIAR MATERIAL.");
-    } finally {
-      setActionLoading(false);
-    }
+      mockData.getCatalog().then(setCatalog);
+    } finally { setActionLoading(false); }
   };
 
   const handleUpdatePartQuantity = async (partUsedId: string, newQuantityStr: string) => {
@@ -763,13 +722,11 @@ export const ServiceOrderDetail: React.FC = () => {
     if (isNaN(numericQuantity) || numericQuantity < 0 || !id) return;
     setActionLoading(true);
     try {
+      const part = partsUsed.find(p => p.id === partUsedId);
       await mockData.updateOSPart(partUsedId, { quantity: numericQuantity });
+      await mockData.addOSActivity(id, { description: `AJUSTOU QTD MATERIAL (${part?.name}): PARA ${numericQuantity.toLocaleString('pt-PT')}` });
       fetchOSDetails(false);
-    } catch (e: any) {
-      setErrorMessage("ERRO AO ATUALIZAR QUANTIDADE.");
-    } finally {
-      setActionLoading(false);
-    }
+    } finally { setActionLoading(false); }
   };
 
   const handleDeletePart = async () => {
@@ -781,45 +738,27 @@ export const ServiceOrderDetail: React.FC = () => {
       setShowDeletePartModal(false);
       setPartToDelete(null);
       fetchOSDetails(false);
-    } finally {
-      setActionLoading(false);
-    }
+    } finally { setActionLoading(false); }
   };
 
   const handleGenerateAISummary = async () => {
-    if (!anomaly || !anomaly.trim()) {
-      setErrorMessage("DESCREVA A ANOMALIA PRIMEIRO.");
-      return;
-    }
-    
+    if (!anomaly?.trim()) { setErrorMessage("DESCREVA A ANOMALIA PRIMEIRO."); return; }
     setIsGenerating(true);
     try {
-      const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity.toLocaleString('pt-PT')}x ${p.name}`), os?.type || "INTERVENÇÃO TÉCNICA");
+      const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity.toLocaleString('pt-PT')}x ${p.name}`), os?.type || "INTERVENÇÃO");
       if (summary) {
         setResolutionNotes(summary.toUpperCase());
-        await mockData.addOSActivity(id!, { description: "GEROU RESUMO TÉCNICO VIA IA (PT-PT)" });
+        await mockData.addOSActivity(id!, { description: "GEROU RESUMO VIA IA" });
       }
     } catch (e: any) {
-      setErrorMessage(e.message || "ERRO AO COMUNICAR COM A IA.");
-    } finally {
-      setIsGenerating(false);
-    }
+      setErrorMessage("ERRO IA.");
+    } finally { setIsGenerating(false); }
   };
 
   const handleResetAnomaly = () => setAnomaly('');
   const handleResetResolution = () => setResolutionNotes('');
-
-  const filteredCatalog = useMemo(() => {
-    const term = normalizeString(partSearchTerm);
-    if (!term) return catalog;
-    return catalog.filter(p => normalizeString(p.name).includes(term) || normalizeString(p.reference).includes(term));
-  }, [catalog, partSearchTerm]);
-
-  const groupedPhotos = useMemo(() => {
-    const groups: Record<string, OSPhoto[]> = { antes: [], depois: [], peca: [], geral: [] };
-    photos.forEach(photo => { if (groups[photo.type]) groups[photo.type].push(photo); });
-    return groups;
-  }, [photos]);
+  const filteredCatalog = useMemo(() => { const term = normalizeString(partSearchTerm); return term ? catalog.filter(p => normalizeString(p.name).includes(term) || normalizeString(p.reference).includes(term)) : catalog; }, [catalog, partSearchTerm]);
+  const groupedPhotos = useMemo(() => { const groups: Record<string, OSPhoto[]> = { antes: [], depois: [], peca: [], geral: [] }; photos.forEach(photo => { if (groups[photo.type]) groups[photo.type].push(photo); }); return groups; }, [photos]);
 
   if (loading) return (
     <div className="h-full flex flex-col items-center justify-center p-20">
@@ -877,6 +816,55 @@ export const ServiceOrderDetail: React.FC = () => {
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {activeTab === 'info' && (
           <div className="space-y-3">
+            {/* CRONÓMETRO DE TRABALHO */}
+            <div className="bg-slate-900 dark:bg-slate-900 p-6 rounded-[2rem] shadow-xl border border-slate-800 transition-all overflow-hidden relative group">
+               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <Timer size={80} className="text-white" />
+               </div>
+               
+               <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-4">
+                     <div className={`w-2.5 h-2.5 rounded-full ${timerActive ? 'bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]' : 'bg-slate-600'}`}></div>
+                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Registo de Tempo Local</h3>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                     <div className="text-center sm:text-left">
+                        <div className="text-4xl sm:text-5xl font-black text-white font-mono tracking-tight leading-none">
+                           {formatElapsedTime(elapsedTime)}
+                        </div>
+                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-2">Horas : Minutos : Segundos</p>
+                     </div>
+
+                     <div className="flex items-center gap-3 w-full sm:w-auto">
+                        {!timerActive ? (
+                          <button 
+                            onClick={handleStartTimer}
+                            disabled={os?.status === OSStatus.CONCLUIDA}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-3 bg-blue-600 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-900/40 disabled:opacity-30"
+                          >
+                             <Play size={16} fill="currentColor" /> INICIAR
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={handleStopTimer}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-3 bg-red-600 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-900/40 animate-in zoom-in-95"
+                          >
+                             <StopIcon size={16} fill="currentColor" /> PARAR & REGISTAR
+                          </button>
+                        )}
+                     </div>
+                  </div>
+                  
+                  {timerActive && (
+                    <div className="mt-6 pt-4 border-t border-slate-800 flex items-center gap-2">
+                       <Sparkles size={12} className="text-blue-500 animate-pulse" />
+                       <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Ao parar, o tempo será contabilizado automaticamente no material.</p>
+                    </div>
+                  )}
+               </div>
+            </div>
+
             {os?.status === OSStatus.CONCLUIDA && (
               <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/50 p-6 rounded-[2rem] shadow-sm animate-in zoom-in-95 duration-300 transition-colors">
                 <div className="flex items-center gap-4 mb-6">
@@ -986,7 +974,7 @@ export const ServiceOrderDetail: React.FC = () => {
                )}
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
                <button onClick={() => setExpandedClient(!expandedClient)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                  <div className="flex items-center gap-3"><Building2 size={18} className="text-blue-500" /><div className="text-left"><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Cliente & Contactos</h3>{!expandedClient && os?.client && <p className="text-[11px] font-bold text-blue-600 uppercase tracking-tight mt-0.5">{os.client.name}</p>}</div></div>
                  {expandedClient ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
@@ -1000,7 +988,7 @@ export const ServiceOrderDetail: React.FC = () => {
                )}
             </div>
             
-            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
                <button onClick={() => setExpandedPlanning(!expandedPlanning)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                  <div className="flex items-center gap-3"><Calendar size={18} className="text-blue-500" /><div className="text-left"><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Planeamento / Agendamento</h3>{!expandedPlanning && (scheduledDate || scheduledTime) && <p className="text-[11px] font-bold text-blue-600 uppercase tracking-tight mt-0.5">{scheduledDate ? new Date(scheduledDate).toLocaleDateString() : ''} {scheduledTime ? ` às ${scheduledTime}` : ''}</p>}</div></div>
                  {expandedPlanning ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
@@ -1015,8 +1003,8 @@ export const ServiceOrderDetail: React.FC = () => {
                )}
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
-               <button onClick={() => setExpandedLog(!expandedLog)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"><div className="flex items-center gap-3"><History size={18} className="text-slate-400" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Log de Atividade</h3></div>{expandedLog ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}</button>
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
+               <button onClick={() => setExpandedLog(!expandedLog)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"><div className="flex items-center gap-3"><History size={18} className="text-slate-400" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Log de Atividade Detalhado</h3></div>{expandedLog ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}</button>
                {expandedLog && (
                  <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-200">
                     <div className="space-y-4 relative ml-2">
@@ -1170,7 +1158,6 @@ export const ServiceOrderDetail: React.FC = () => {
         )}
       </div>
 
-      {/* MENU FLUTUANTE INFERIOR */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-[#9d1c24] dark:border-[#9d1c24]/60 shadow-[0_12px_40px_rgba(157,28,36,0.25)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
         {[
           { id: 'info', icon: Info, label: 'INFO' },
@@ -1190,7 +1177,6 @@ export const ServiceOrderDetail: React.FC = () => {
         ))}
       </div>
 
-      {/* MODAL ERRO DE VALIDAÇÃO */}
       {showValidationErrorModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
@@ -1205,7 +1191,6 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL REABRIR OS */}
       {showReopenModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
@@ -1225,7 +1210,6 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL MATERIAL */}
       {showPartModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
@@ -1251,7 +1235,6 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL AJUSTAR QUANTIDADE */}
       {showEditQuantityModal && partToEditQuantity && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
@@ -1264,7 +1247,6 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
-      {/* MODAIS DE CONFIRMAÇÃO DE REMOÇÃO */}
       {showDeletePartModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
@@ -1276,7 +1258,7 @@ export const ServiceOrderDetail: React.FC = () => {
       {showDeletePhotoModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
-              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Camera size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Eliminar Foto?</h3><div className="grid grid-cols-2 gap-3 mt-8"><button onClick={() => setShowDeletePhotoModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button><button onClick={handleDeletePhoto} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ELIMINAR</button></div></div>
+              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Camera size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Eliminar Foto?</h3><div className="grid grid-cols-2 gap-3 mt-8"><button onClick={() => setShowDeletePhotoModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button><button onClick={handleUploadPhoto} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ELIMINAR</button></div></div>
            </div>
         </div>
       )}
@@ -1284,7 +1266,7 @@ export const ServiceOrderDetail: React.FC = () => {
       {showFinalizeModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
-              <div className="p-8"><div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><CheckCircle size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Finalizar Intervenção?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase">TODOS OS DADOS SERÃO BLOQUEADOS E O RELATÓRIO SERÁ GERADO.</p><div className="grid grid-cols-2 gap-4"><button onClick={() => setShowFinalizeModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button><button onClick={async () => { await mockData.updateServiceOrder(id!, { status: OSStatus.CONCLUIDA, anomaly_detected: anomaly, resolution_notes: resolutionNotes, client_signature: clientSignature, technician_signature: technicianSignature, is_warranty: isWarranty, warranty_info: warrantyInfo }); setShowFinalizeModal(false); setActiveTab('info'); fetchOSDetails(false); }} className="py-4 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">CONFIRMAR</button></div></div>
+              <div className="p-8"><div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><CheckCircle size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Finalizar Intervenção?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase">TODOS OS DADOS SERÃO BLOQUEADOS E O RELATÓRIO SERÁ GERADO.</p><div className="grid grid-cols-2 gap-4"><button onClick={() => setShowFinalizeModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button><button onClick={async () => { await mockData.updateServiceOrder(id!, { status: OSStatus.CONCLUIDA, anomaly_detected: anomaly, resolution_notes: resolutionNotes, client_signature: clientSignature, technician_signature: technicianSignature, is_warranty: isWarranty, warranty_info: warrantyInfo }); await mockData.addOSActivity(id!, { description: "FINALIZOU A ORDEM DE SERVIÇO" }); setShowFinalizeModal(false); setActiveTab('info'); fetchOSDetails(false); }} className="py-4 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">CONFIRMAR</button></div></div>
            </div>
         </div>
       )}

@@ -323,10 +323,14 @@ export const mockData = {
   getAllActivities: async () => {
     const { data, error } = await supabase
       .from('os_activities')
-      .select('*, service_orders(code)')
+      .select('*, service_orders(code, client:clients(name))')
       .order('created_at', { ascending: false });
     if (error) console.error("Supabase Error (All Activities):", error);
-    return (data || []).map(a => ({ ...a, os_code: (a.service_orders as any)?.code }));
+    return (data || []).map(a => ({ 
+      ...a, 
+      os_code: (a.service_orders as any)?.code,
+      client_name: (a.service_orders as any)?.client?.name
+    }));
   },
 
   addOSActivity: async (osId: string, act: Partial<OSActivity>) => {
@@ -361,6 +365,16 @@ export const mockData = {
   },
 
   // Time Entries
+  createTimeEntry: async (entry: Partial<TimeEntry>) => {
+    const { data, error } = await supabase
+      .from('time_entries')
+      .insert([entry])
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   getAllTimeEntries: async () => {
     const { data, error } = await supabase
       .from('time_entries')
