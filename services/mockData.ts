@@ -94,21 +94,16 @@ export const mockData = {
   },
 
   createServiceOrder: async (os: Partial<ServiceOrder>) => {
-    // Gerar código baseado na Loja, Data e Hora
     const now = new Date();
-    
-    // Sigla da Loja
-    let storePrefix = 'RF'; // Default Real Frio
+    let storePrefix = 'RF';
     if (os.store === 'Caldas da Rainha') storePrefix = 'CR';
     else if (os.store === 'Porto de Mós') storePrefix = 'PM';
 
-    // Data AAAAMMDD
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
     const datePart = `${year}${month}${day}`;
 
-    // Hora HHMMSS
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const seconds = String(now.getSeconds()).padStart(2, '0');

@@ -1,4 +1,5 @@
 
+
 export enum UserRole {
   ADMIN = 'admin',
   BACKOFFICE = 'backoffice',
@@ -157,6 +158,9 @@ export interface ServiceOrder {
     has_photo_parts?: boolean;
     has_failure_reason?: boolean;
   };
+  // Fix: added timer fields to support the global shared timer functionality used in ServiceOrderDetail.tsx
+  timer_is_active?: boolean;
+  timer_start_time?: string | null;
 }
 
 export interface Profile {

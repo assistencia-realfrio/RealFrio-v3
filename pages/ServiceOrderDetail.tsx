@@ -11,7 +11,7 @@ import {
   User, ChevronRight, ChevronDown, ChevronUp, Calendar, RotateCcw,
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
   RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
-  Settings2, FileDown, Key, Mail, Share2, UploadCloud, Play, Square as StopIcon, Timer
+  Settings2, FileDown, Key, Mail, Share2, UploadCloud, Play, Square as StopIcon, Timer, CloudRain
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -134,7 +134,7 @@ export const ServiceOrderDetail: React.FC = () => {
     }
     return 'info';
   });
-  const [os, setOs] = useState<ServiceOrder | null>(null);
+  const [os, setOs] = useState<any | null>(null);
   const [partsUsed, setPartsUsed] = useState<PartUsed[]>([]);
   const [photos, setPhotos] = useState<OSPhoto[]>([]);
   const [notesList, setNotesList] = useState<OSNote[]>([]);
@@ -189,9 +189,7 @@ export const ServiceOrderDetail: React.FC = () => {
   const [expandedPlanning, setExpandedPlanning] = useState(false);
   const [expandedLog, setExpandedLog] = useState(false);
 
-  // Estados do Cronómetro
-  const [timerActive, setTimerActive] = useState(false);
-  const [timerStartTime, setTimerStartTime] = useState<number | null>(null);
+  // Estados do Cronómetro PARTILHADO
   const [elapsedTime, setElapsedTime] = useState(0);
   const timerIntervalRef = useRef<number | null>(null);
 
@@ -212,78 +210,89 @@ export const ServiceOrderDetail: React.FC = () => {
     }
   }, [showPartModal]);
 
-  // Efeito para persistência do cronómetro
+  // Efeito do Ticker do Cronómetro Baseado no Estado Global da OS
+  useEffect(() => {
+    if (os?.timer_is_active && os?.timer_start_time) {
+      const startTime = new Date(os.timer_start_time).getTime();
+      
+      const updateElapsed = () => {
+        setElapsedTime(Date.now() - startTime);
+      };
+      
+      updateElapsed();
+      timerIntervalRef.current = window.setInterval(updateElapsed, 1000);
+    } else {
+      setElapsedTime(0);
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    }
+    
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, [os?.timer_is_active, os?.timer_start_time]);
+
+  // Sincronização periódica da OS para apanhar mudanças de timer de outros utilizadores
   useEffect(() => {
     if (!id) return;
-    const saved = localStorage.getItem(`os_timer_${id}`);
-    if (saved) {
-      const { startTime, active } = JSON.parse(saved);
-      if (active && startTime) {
-        setTimerActive(true);
-        setTimerStartTime(startTime);
-        setElapsedTime(Date.now() - startTime);
-      }
-    }
-
-    return () => {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    };
+    const syncInterval = setInterval(() => {
+      fetchOSDetails(false);
+    }, 5000); // Sincroniza a cada 5 segundos
+    return () => clearInterval(syncInterval);
   }, [id]);
 
-  // Efeito do Ticker do Cronómetro
-  useEffect(() => {
-    if (timerActive && timerStartTime) {
-      timerIntervalRef.current = window.setInterval(() => {
-        setElapsedTime(Date.now() - timerStartTime);
-      }, 1000);
-    } else {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    }
-    return () => {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    };
-  }, [timerActive, timerStartTime]);
-
   const handleStartTimer = async () => {
-    if (!id || timerActive) return;
-    const now = Date.now();
-    setTimerActive(true);
-    setTimerStartTime(now);
-    localStorage.setItem(`os_timer_${id}`, JSON.stringify({ startTime: now, active: true }));
-    await mockData.addOSActivity(id, { description: "INICIOU CONTAGEM DE TEMPO DE TRABALHO" });
+    if (!id || os?.timer_is_active) return;
+    setActionLoading(true);
+    try {
+      const now = new Date().toISOString();
+      await mockData.updateServiceOrder(id, { 
+        timer_is_active: true, 
+        timer_start_time: now 
+      });
+      await mockData.addOSActivity(id, { description: "INICIOU CRONÓMETRO GLOBAL" });
+      await fetchOSDetails(false);
+    } catch (e) {
+      setErrorMessage("ERRO AO INICIAR CRONÓMETRO.");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleStopTimer = async () => {
-    if (!id || !timerStartTime) return;
+    if (!id || !os?.timer_start_time) return;
     setActionLoading(true);
     try {
-      const finalElapsed = Date.now() - timerStartTime;
+      const startTime = new Date(os.timer_start_time).getTime();
+      const finalElapsed = Date.now() - startTime;
       const minutes = Math.max(1, Math.round(finalElapsed / 60000));
       const hours = Number((minutes / 60).toFixed(2));
       
-      // Adicionar à lista de materiais
+      // 1. Limpar estado na OS
+      await mockData.updateServiceOrder(id, { 
+        timer_is_active: false, 
+        timer_start_time: null 
+      });
+
+      // 2. Adicionar à lista de materiais
       await mockData.addOSPart(id, {
         name: "MÃO DE OBRA (CRONÓMETRO)",
         reference: "MO-AUTO",
         quantity: hours
       });
 
-      // Adicionar entrada de tempo oficial
+      // 3. Adicionar entrada de tempo oficial
       await mockData.createTimeEntry({
         os_id: id,
-        start_time: new Date(timerStartTime).toISOString(),
+        start_time: os.timer_start_time,
         duration_minutes: minutes,
-        description: "Registo automático via cronómetro OS"
+        description: "Registo automático via cronómetro global"
       });
 
       await mockData.addOSActivity(id, { 
-        description: `PAROU CRONÓMETRO: ${minutes} MINUTOS REGISTADOS COMO MATERIAL (${hours}H)` 
+        description: `PAROU CRONÓMETRO GLOBAL: ${minutes} MINUTOS REGISTADOS (${hours}H)` 
       });
 
-      setTimerActive(false);
-      setTimerStartTime(null);
       setElapsedTime(0);
-      localStorage.removeItem(`os_timer_${id}`);
       fetchOSDetails(false);
     } catch (e) {
       setErrorMessage("ERRO AO FINALIZAR REGISTO DE TEMPO.");
@@ -293,7 +302,7 @@ export const ServiceOrderDetail: React.FC = () => {
   };
 
   const formatElapsedTime = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000);
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;
@@ -343,23 +352,28 @@ export const ServiceOrderDetail: React.FC = () => {
       const osData = await mockData.getServiceOrderById(id);
       if (osData) {
         setOs(osData);
-        setDescription(osData.description || '');
-        setAnomaly(osData.anomaly_detected || '');
-        setResolutionNotes(osData.resolution_notes || '');
-        setObservations(osData.observations || '');
-        setClientSignature(osData.client_signature && osData.client_signature.trim() !== '' ? osData.client_signature : null);
-        setTechnicianSignature(osData.technician_signature && osData.technician_signature.trim() !== '' ? osData.technician_signature : null);
-        setIsWarranty(!!osData.is_warranty);
-        setWarrantyInfo(osData.warranty_info || {});
-        
-        if (osData.scheduled_date) {
-          const parts = osData.scheduled_date.split(/[T ]/);
-          setScheduledDate(parts[0] || '');
-          setScheduledTime((parts[1] || '').substring(0, 5));
-        } else {
-          setScheduledDate('');
-          setScheduledTime('');
+        // Só atualiza os campos de formulário se o utilizador não estiver a editar (simplificação para evitar sobrescrever o que o user está a escrever)
+        // Numa app real, usaríamos debounce ou tracking de foco
+        if (showLoader || !isDirty) {
+          setDescription(osData.description || '');
+          setAnomaly(osData.anomaly_detected || '');
+          setResolutionNotes(osData.resolution_notes || '');
+          setObservations(osData.observations || '');
+          setClientSignature(osData.client_signature && osData.client_signature.trim() !== '' ? osData.client_signature : null);
+          setTechnicianSignature(osData.technician_signature && osData.technician_signature.trim() !== '' ? osData.technician_signature : null);
+          setIsWarranty(!!osData.is_warranty);
+          setWarrantyInfo(osData.warranty_info || {});
+          
+          if (osData.scheduled_date) {
+            const parts = osData.scheduled_date.split(/[T ]/);
+            setScheduledDate(parts[0] || '');
+            setScheduledTime((parts[1] || '').substring(0, 5));
+          } else {
+            setScheduledDate('');
+            setScheduledTime('');
+          }
         }
+
         const [p, ph, n, act] = await Promise.all([
           mockData.getOSParts(id),
           mockData.getOSPhotos(id),
@@ -408,7 +422,6 @@ export const ServiceOrderDetail: React.FC = () => {
     if (!id || !os) return;
     setActionLoading(true);
     try {
-      // Deteção detalhada de alterações para o log
       const changes = [];
       if (description !== (os.description || '')) changes.push("PEDIDO/AVARIA");
       if (anomaly !== (os.anomaly_detected || '')) changes.push("ANOMALIA DETETADA");
@@ -816,16 +829,22 @@ export const ServiceOrderDetail: React.FC = () => {
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {activeTab === 'info' && (
           <div className="space-y-3">
-            {/* CRONÓMETRO DE TRABALHO */}
+            {/* CRONÓMETRO GLOBAL PARTILHADO */}
             <div className="bg-slate-900 dark:bg-slate-900 p-6 rounded-[2rem] shadow-xl border border-slate-800 transition-all overflow-hidden relative group">
                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                   <Timer size={80} className="text-white" />
                </div>
                
                <div className="relative z-10">
-                  <div className="flex items-center gap-3 mb-4">
-                     <div className={`w-2.5 h-2.5 rounded-full ${timerActive ? 'bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]' : 'bg-slate-600'}`}></div>
-                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Registo de Tempo Local</h3>
+                  <div className="flex items-center justify-between mb-4">
+                     <div className="flex items-center gap-3">
+                        <div className={`w-2.5 h-2.5 rounded-full ${os?.timer_is_active ? 'bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]' : 'bg-slate-600'}`}></div>
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Cronómetro de Equipa</h3>
+                     </div>
+                     <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 border border-white/10 rounded-full">
+                        <Cloud size={10} className="text-blue-400" />
+                        <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Sincronizado Cloud</span>
+                     </div>
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
@@ -837,29 +856,30 @@ export const ServiceOrderDetail: React.FC = () => {
                      </div>
 
                      <div className="flex items-center gap-3 w-full sm:w-auto">
-                        {!timerActive ? (
+                        {!os?.timer_is_active ? (
                           <button 
                             onClick={handleStartTimer}
-                            disabled={os?.status === OSStatus.CONCLUIDA}
+                            disabled={os?.status === OSStatus.CONCLUIDA || actionLoading}
                             className="flex-1 sm:flex-none flex items-center justify-center gap-3 bg-blue-600 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-900/40 disabled:opacity-30"
                           >
-                             <Play size={16} fill="currentColor" /> INICIAR
+                             {actionLoading ? <RefreshCw className="animate-spin" size={16} /> : <Play size={16} fill="currentColor" />} INICIAR PARA TODOS
                           </button>
                         ) : (
                           <button 
                             onClick={handleStopTimer}
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-3 bg-red-600 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-900/40 animate-in zoom-in-95"
+                            disabled={actionLoading}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-3 bg-red-600 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-900/40 animate-in zoom-in-95 disabled:opacity-50"
                           >
-                             <StopIcon size={16} fill="currentColor" /> PARAR & REGISTAR
+                             {actionLoading ? <RefreshCw className="animate-spin" size={16} /> : <StopIcon size={16} fill="currentColor" />} PARAR & REGISTAR
                           </button>
                         )}
                      </div>
                   </div>
                   
-                  {timerActive && (
+                  {os?.timer_is_active && (
                     <div className="mt-6 pt-4 border-t border-slate-800 flex items-center gap-2">
                        <Sparkles size={12} className="text-blue-500 animate-pulse" />
-                       <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Ao parar, o tempo será contabilizado automaticamente no material.</p>
+                       <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">O cronómetro está ativo para toda a equipa nesta OS.</p>
                     </div>
                   )}
                </div>
