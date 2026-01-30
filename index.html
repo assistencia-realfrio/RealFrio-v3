@@ -6,12 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Real Frio - Gestão Técnica</title>
     
-    <!-- Nomes de ficheiros alterados para forçar renovação de cache -->
-    <link rel="icon" type="image/png" href="/rf-favicon-v3.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/rf-apple-v3.png">
+    <!-- Forçar ícone v4 para o novo domínio -->
+    <link rel="icon" type="image/png" href="/rf-favicon-v4.png">
+    <link rel="shortcut icon" type="image/png" href="/rf-favicon-v4.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/rf-apple-v4.png">
 
     <!-- PWA Meta Tags -->
-    <link rel="manifest" href="/manifest.json?v=3">
+    <link rel="manifest" href="/manifest.json?v=4">
     <meta name="theme-color" content="#9d1c24">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -101,7 +102,6 @@
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then(registration => {
-              // Forçar atualização do SW se houver um novo
               registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
                 if (installingWorker) {
@@ -112,7 +112,6 @@
                   };
                 }
               };
-              console.log('SW registrado');
             })
             .catch(error => {
               console.log('Falha no SW:', error);
