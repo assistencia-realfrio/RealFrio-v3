@@ -6,14 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Real Frio - Gestão Técnica</title>
     
-    <!-- Forçar ícone v4 para o novo domínio -->
-    <link rel="icon" type="image/png" href="/rf-favicon-v4.png">
-    <link rel="shortcut icon" type="image/png" href="/rf-favicon-v4.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/rf-apple-v4.png">
+    <!-- Ícones v5 para forçar renovação total -->
+    <link rel="icon" type="image/png" href="/rf-favicon-v5.png">
+    <link rel="shortcut icon" type="image/png" href="/rf-favicon-v5.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/rf-apple-v5.png">
 
-    <!-- PWA Meta Tags -->
-    <link rel="manifest" href="/manifest.json?v=4">
+    <!-- PWA Meta Tags com Query String para forçar refresh do ficheiro -->
+    <link rel="manifest" href="/manifest.json?v=5">
     <meta name="theme-color" content="#9d1c24">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Real Frio">
@@ -100,7 +101,8 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+          // Registrar com uma query string para forçar o update do SW
+          navigator.serviceWorker.register('/sw.js?v=3.5')
             .then(registration => {
               registration.onupdatefound = () => {
                 const installingWorker = registration.installing;

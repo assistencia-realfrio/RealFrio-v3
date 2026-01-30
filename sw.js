@@ -1,12 +1,12 @@
 
-const CACHE_NAME = 'realfrio-tech-v3.4';
+const CACHE_NAME = 'realfrio-tech-v3.5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/rf-favicon-v4.png',
-  '/rf-apple-v4.png',
-  '/rf-icon-192-v4.png',
-  '/rf-icon-512-v4.png',
+  '/rf-favicon-v5.png',
+  '/rf-apple-v5.png',
+  '/rf-icon-192-v5.png',
+  '/rf-icon-512-v5.png',
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap'
 ];
