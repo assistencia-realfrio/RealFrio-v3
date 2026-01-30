@@ -1,7 +1,7 @@
 
 {
   "name": "Real Frio - Assistência Técnica",
-  "short_name": "Real Frio",
+  "short_name": "Real Frio - Assistência",
   "description": "Sistema de Gestão de Ordens de Serviço e Manutenção Real Frio",
   "start_url": "/",
   "display": "standalone",
