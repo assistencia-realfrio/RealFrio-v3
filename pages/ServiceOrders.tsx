@@ -243,7 +243,7 @@ const ServiceOrders: React.FC = () => {
                 <div 
                   key={os.id} 
                   onClick={() => navigate(`/os/${os.id}`)}
-                  className={`group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 border-l-4 hover:shadow-lg transition-all duration-200 block cursor-pointer relative overflow-hidden ${getStoreColorClass(os.store)} ${viewMode === 'compact' ? 'p-3' : 'p-5'} ${isTimerActive ? 'ring-2 ring-red-500 ring-offset-2 dark:ring-offset-slate-950 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.2)] z-10 scale-[1.01]' : ''}`}
+                  className={`group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 border-l-4 hover:shadow-lg transition-all duration-200 block cursor-pointer relative overflow-hidden ${getStoreColorClass(os.store)} ${viewMode === 'compact' ? 'p-3' : 'p-5'} ${isTimerActive ? 'shadow-[0_0_20px_rgba(239,68,68,0.15)] z-10' : ''}`}
                 >
                   {isTimerActive && (
                     <div className="absolute top-0 right-0 p-1.5 bg-red-500 text-white rounded-bl-xl z-20 shadow-md">
