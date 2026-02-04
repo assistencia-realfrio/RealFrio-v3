@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'realfrio-tech-v3.5';
+const CACHE_NAME = 'realfrio-tech-v3.6';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

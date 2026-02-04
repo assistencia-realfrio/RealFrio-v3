@@ -1,5 +1,6 @@
 
 
+
 export enum UserRole {
   ADMIN = 'admin',
   BACKOFFICE = 'backoffice',
@@ -98,6 +99,10 @@ export interface PartUsed {
   name: string;
   reference: string;
   quantity: number;
+  // Fix: Added technician_name, work_date and created_at to support tracking and fix errors in mockData.ts
+  technician_name?: string;
+  work_date?: string;
+  created_at?: string;
 }
 
 export interface OSPhoto {

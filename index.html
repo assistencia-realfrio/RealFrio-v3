@@ -6,13 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Real Frio - Gestão Técnica</title>
     
-    <!-- Ícones v5 para forçar renovação total -->
     <link rel="icon" type="image/png" href="/rf-favicon-v5.png">
     <link rel="shortcut icon" type="image/png" href="/rf-favicon-v5.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/rf-apple-v5.png">
 
-    <!-- PWA Meta Tags com Query String para forçar refresh do ficheiro -->
-    <link rel="manifest" href="/manifest.json?v=5">
+    <link rel="manifest" href="/manifest.json?v=6">
     <meta name="theme-color" content="#9d1c24">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -34,47 +32,19 @@
         -webkit-tap-highlight-color: transparent;
         overscroll-behavior-y: contain;
       }
-      
-      .dark body {
-        background-color: #020617;
-      }
-
-      .dark select, 
-      .dark select option {
-        background-color: #0f172a !important;
-        color: #f1f5f9 !important;
-      }
-
-      *:not(.lowercase-container, .lowercase-container *) {
-        text-transform: uppercase;
-      }
-
-      * {
-        font-weight: 400;
-      }
-
-      .font-light, .font-thin, .font-extralight {
-        font-weight: 300 !important;
-      }
-      
-      .font-medium {
-        font-weight: 500 !important;
-      }
-
-      .font-semibold, .font-bold, .font-black {
-        font-weight: 600 !important;
-      }
-
+      .dark body { background-color: #020617; }
+      .dark select, .dark select option { background-color: #0f172a !important; color: #f1f5f9 !important; }
+      *:not(.lowercase-container, .lowercase-container *) { text-transform: uppercase; }
+      * { font-weight: 400; }
+      .font-light, .font-thin, .font-extralight { font-weight: 300 !important; }
+      .font-medium { font-weight: 500 !important; }
+      .font-semibold, .font-bold, .font-black { font-weight: 600 !important; }
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
       ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-      
       .dark ::-webkit-scrollbar-thumb { background: #334155; }
-
-      main {
-        -webkit-overflow-scrolling: touch;
-      }
+      main { -webkit-overflow-scrolling: touch; }
     </style>
   <script type="importmap">
 {
@@ -86,8 +56,8 @@
     "@google/genai": "https://esm.sh/@google/genai@^1.37.0",
     "react-router-dom": "https://esm.sh/react-router-dom@^7.12.0",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "jspdf": "https://esm.sh/jspdf@^4.0.0",
-    "jspdf-autotable": "https://esm.sh/jspdf-autotable@^5.0.7",
+    "jspdf": "https://esm.sh/jspdf@^2.5.1",
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@^3.8.4",
     "vite": "https://esm.sh/vite@^7.3.1",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
@@ -97,12 +67,10 @@
   <body class="h-full overflow-hidden">
     <div id="root" class="h-full"></div>
     <script type="module" src="/index.tsx"></script>
-    
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          // Registrar com uma query string para forçar o update do SW
-          navigator.serviceWorker.register('/sw.js?v=3.5')
+          navigator.serviceWorker.register('/sw.js?v=3.6')
             .then(registration => {
               registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
@@ -115,9 +83,7 @@
                 }
               };
             })
-            .catch(error => {
-              console.log('Falha no SW:', error);
-            });
+            .catch(error => { console.log('Falha no SW:', error); });
         });
       }
     </script>

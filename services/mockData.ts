@@ -14,9 +14,10 @@ const cleanPayload = (data: any) => {
   delete cleaned.client;
   delete cleaned.establishment;
   delete cleaned.equipment;
-  // Prevenir envio de campos gerados ou IDs em updates se presentes por engano
   delete cleaned.id;
-  delete cleaned.created_at;
+  if (!data.created_at) {
+    delete cleaned.created_at;
+  }
   return cleaned;
 };
 
@@ -97,7 +98,7 @@ export const mockData = {
   },
 
   createServiceOrder: async (os: Partial<ServiceOrder>) => {
-    const now = new Date();
+    const now = os.created_at ? new Date(os.created_at) : new Date();
     let storePrefix = 'RF';
     if (os.store === 'Caldas da Rainha') storePrefix = 'CR';
     else if (os.store === 'Porto de Mós') storePrefix = 'PM';
@@ -112,7 +113,8 @@ export const mockData = {
     const seconds = String(now.getSeconds()).padStart(2, '0');
     const timePart = `${hours}${minutes}${seconds}`;
 
-    const code = `${storePrefix}-${datePart}-${timePart}`;
+    const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const code = `${storePrefix}-${datePart}-${timePart}${randomSuffix}`;
 
     const { data, error } = await supabase
       .from('service_orders')
@@ -228,8 +230,13 @@ export const mockData = {
 
   // Material Usado (Parts Used)
   getOSParts: async (osId: string) => {
-    const { data, error } = await supabase.from('parts_used').select('*').eq('os_id', osId);
-    if (error) console.error("Supabase Error (OS Parts):", error);
+    // CORREÇÃO: Removida ordenação por 'created_at' que não existe na tabela do Supabase
+    const { data, error } = await supabase
+      .from('parts_used')
+      .select('*')
+      .eq('os_id', osId);
+      
+    if (error) console.error("Supabase Error (OS Parts Fetch):", error);
     return data || [];
   },
 
@@ -239,7 +246,9 @@ export const mockData = {
       part_id: part.part_id,
       name: part.name,
       reference: part.reference,
-      quantity: part.quantity
+      quantity: part.quantity,
+      technician_name: part.technician_name,
+      work_date: part.work_date
     };
     const { data, error } = await supabase.from('parts_used').insert([payload]).select().single();
     if (error) throw error;
@@ -254,7 +263,7 @@ export const mockData = {
     return supabase.from('parts_used').delete().eq('id', id);
   },
 
-  // Catálogo (Tabela 'catalog')
+  // Catálogo
   getCatalog: async () => {
     const { data, error } = await supabase.from('catalog').select('*').order('name');
     if (error) {
@@ -276,7 +285,7 @@ export const mockData = {
 
   // Photos
   getOSPhotos: async (osId: string) => {
-    const { data, error } = await supabase.from('os_photos').select('*').eq('os_id', osId).order('created_at');
+    const { data, error } = await supabase.from('os_photos').select('*').eq('os_id', osId);
     if (error) console.error("Supabase Error (Photos):", error);
     return data || [];
   },
@@ -398,63 +407,58 @@ export const mockData = {
     }));
   },
 
-  // Diagnostic & Repair Tools
+  // Diagnostic Tools
   repairMissingSedes: async (onProgress: (msg: string) => void) => {
-    console.log("Iniciando repairMissingSedes...");
-    onProgress("A ler lista de clientes do Supabase...");
-    
     const { data: clients, error: ce } = await supabase.from('clients').select('id, name, address, phone');
-    if (ce) {
-      console.error("Erro ao ler clientes:", ce);
-      throw new Error(`Erro Supabase (Clientes): ${ce.message}. Verifique as permissões RLS.`);
-    }
-
-    onProgress(`Verificando locais para ${clients?.length} clientes...`);
+    if (ce) throw ce;
     const { data: ests, error: ee } = await supabase.from('establishments').select('client_id');
-    if (ee) {
-      console.error("Erro ao ler estabelecimentos:", ee);
-      throw new Error(`Erro Supabase (Locais): ${ee.message}`);
-    }
-
+    if (ee) throw ee;
     const clientsWithEsts = new Set(ests?.map(e => e.client_id) || []);
     const clientsMissingSedes = clients?.filter(c => !clientsWithEsts.has(c.id)) || [];
-
-    if (clientsMissingSedes.length === 0) {
-      onProgress("Integridade OK: Todos os clientes têm locais.");
-      return 0;
-    }
-
-    onProgress(`A criar ${clientsMissingSedes.length} locais sede...`);
+    if (clientsMissingSedes.length === 0) return 0;
     let count = 0;
-    
     for (const c of clientsMissingSedes) {
-      const payload = {
-        client_id: c.id,
-        name: 'SEDE / PRINCIPAL',
-        address: c.address || 'MORADA NÃO DEFINIDA',
-        phone: c.phone || 'SEM TELEFONE',
-        contact_person: c.name
-      };
-
+      const payload = { client_id: c.id, name: 'SEDE / PRINCIPAL', address: c.address || 'MORADA NÃO DEFINIDA', phone: c.phone || 'SEM TELEFONE', contact_person: c.name };
       const { error: ie } = await supabase.from('establishments').insert([payload]);
-      
-      if (ie) {
-        console.warn(`Falha ao criar sede para cliente ${c.name}:`, ie.message);
-      } else {
-        count++;
-      }
-      
+      if (!ie) count++;
       onProgress(`Processado: ${count} de ${clientsMissingSedes.length}...`);
     }
-
     return count;
   },
 
-  // Maintenance
+  seedTestData: async (onProgress: (msg: string) => void) => {
+    onProgress("A iniciar seeding...");
+    let { data: clients } = await supabase.from('clients').select('id, name, store');
+    const stores = ['Caldas da Rainha', 'Porto de Mós'];
+    const clientMap: Record<string, any[]> = { 'Caldas da Rainha': [], 'Porto de Mós': [] };
+    clients?.forEach(c => { if (clientMap[c.store]) clientMap[c.store].push(c); });
+    for (const store of stores) {
+      if (clientMap[store].length === 0) {
+        const dummyClient = await mockData.createClient({ name: `CLIENTE TESTE ${store.toUpperCase()}`, store, address: `RUA DE TESTE, ${store.toUpperCase()}`, phone: '912345678', email: `teste@${store.replace(/\s/g, '').toLowerCase()}.pt`, billing_name: `TESTE SEED ${store.toUpperCase()} LDA` });
+        const { data: ests } = await supabase.from('establishments').select('id').eq('client_id', dummyClient.id);
+        if (ests?.[0]?.id) { await mockData.createEquipment({ client_id: dummyClient.id, establishment_id: ests[0].id, type: 'EQUIPAMENTO TESTE SEED', brand: 'BRAND-TEST', model: 'X-5000', serial_number: `SN-${store.substring(0, 2).toUpperCase()}-${Date.now()}` }); }
+        clientMap[store].push(dummyClient);
+      }
+    }
+    const statuses = Object.values(OSStatus);
+    const types = Object.values(OSType);
+    let totalCreated = 0;
+    for (const store of stores) {
+      const storeClients = clientMap[store];
+      for (let i = 1; i <= 15; i++) {
+        const client = storeClients[Math.floor(Math.random() * storeClients.length)];
+        const { data: ests } = await supabase.from('establishments').select('id').eq('client_id', client.id);
+        const { data: eqs } = await supabase.from('equipments').select('id').eq('client_id', client.id);
+        const payload: Partial<ServiceOrder> = { client_id: client.id, establishment_id: ests?.[0]?.id, equipment_id: eqs?.[0]?.id, store, type: types[i % types.length], status: statuses[i % statuses.length], priority: 'media', description: `INTERVENÇÃO TESTE #${i} (${store.toUpperCase()}).` };
+        try { await mockData.createServiceOrder(payload); totalCreated++; onProgress(`Criada OS ${totalCreated} de 30 (${store})...`); } catch (e) { console.error(e); }
+      }
+    }
+    return totalCreated;
+  },
+
   exportFullSystemData: async () => {
     const tables = ['profiles', 'clients', 'establishments', 'equipments', 'catalog', 'service_orders', 'parts_used', 'os_photos', 'os_notes', 'os_activities', 'vacations', 'time_entries'];
     const backup: any = { timestamp: new Date().toISOString(), data: {} };
-    
     for (const table of tables) {
       const { data } = await supabase.from(table).select('*');
       backup.data[table] = data || [];
@@ -464,12 +468,10 @@ export const mockData = {
 
   importFullSystemData: async (backup: any, onProgress: (msg: string) => void) => {
     const tables = ['time_entries', 'vacations', 'os_activities', 'os_notes', 'os_photos', 'parts_used', 'service_orders', 'equipments', 'establishments', 'clients', 'catalog', 'profiles'];
-    
     for (const table of tables) {
       onProgress(`A limpar tabela ${table}...`);
       await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000'); 
     }
-
     const insertOrder = [...tables].reverse();
     for (const table of insertOrder) {
       const rows = backup.data[table];

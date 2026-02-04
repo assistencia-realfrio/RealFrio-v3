@@ -17,8 +17,9 @@ import {
   Terminal,
   AlertCircle,
   Check,
-  // Added Info import to fix the "Cannot find name 'Info'" error
-  Info
+  Info,
+  Beaker,
+  Sparkles
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 
@@ -213,6 +214,35 @@ const Maintenance: React.FC = () => {
     });
   };
 
+  const executeSeeding = async () => {
+    setLoading(true);
+    setError(null);
+    setProgress(5);
+    try {
+      await mockData.seedTestData((msg) => {
+        setStatus(msg);
+        setProgress(prev => Math.min(prev + 3, 98));
+      });
+      setProgress(100);
+      setStatus("Seeding concluído com sucesso!");
+    } catch (err: any) {
+      setError(err.message || "Falha ao gerar dados de teste.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSeedTestData = () => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Dados de Demonstração',
+      message: 'Deseja gerar 30 Ordens de Serviço fictícias (15 por loja) para fins de teste?',
+      confirmLabel: 'GERAR DADOS',
+      variant: 'info',
+      action: executeSeeding
+    });
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
       <ConfirmDialog 
@@ -265,18 +295,37 @@ const Maintenance: React.FC = () => {
           </button>
         </div>
 
+        {/* DADOS DE TESTE (NOVO) */}
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-emerald-100 dark:border-emerald-900/30 flex flex-col items-center text-center">
+          <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+            <Beaker size={32} />
+          </div>
+          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Seeding de Dados</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight leading-relaxed mb-8 px-4">
+            Adiciona instantaneamente 30 Ordens de Serviço (15 CR / 15 PM) para testes de interface e relatórios.
+          </p>
+          <button 
+            onClick={handleSeedTestData}
+            disabled={loading}
+            className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95"
+          >
+            <Sparkles size={18} />
+            GERAR 30 OS DE TESTE
+          </button>
+        </div>
+
         {/* RESTAURAR BACKUP */}
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-red-100 dark:border-red-900/30 flex flex-col items-center text-center md:col-span-2">
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-red-100 dark:border-red-900/30 flex flex-col items-center text-center">
           <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
             <ShieldAlert size={32} />
           </div>
-          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Substituir Sistema (Wipe & Load)</h3>
+          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Substituir Sistema</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight leading-relaxed mb-8 px-4">
             Importa um backup e SUBSTITUI todos os dados atuais. CUIDADO: Os dados existentes serão apagados.
           </p>
-          <label className={`w-full max-w-md py-4 bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 border-2 border-dashed border-red-200 dark:border-red-900/50 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-red-50 transition-all flex items-center justify-center gap-3 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}>
+          <label className={`w-full py-4 bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 border-2 border-dashed border-red-200 dark:border-red-900/50 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-red-50 transition-all flex items-center justify-center gap-3 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}>
             <Upload size={18} />
-            SELECIONAR FICHA DE RESTAURO
+            FICHA DE RESTAURO
             <input 
               type="file" 
               accept=".rf-backup,.json" 
@@ -362,7 +411,7 @@ const Maintenance: React.FC = () => {
       </div>
 
       <div className="flex justify-center pt-4">
-         <p className="text-[8px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.5em]">Real Frio Maintenance Agent v3.2</p>
+         <p className="text-[8px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.5em]">Real Frio Maintenance Agent v3.3</p>
       </div>
     </div>
   );

@@ -12,7 +12,7 @@ import {
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
   RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
   Settings2, FileDown, Key, Mail, Share2, UploadCloud, Play, Square as StopIcon, Timer, CloudRain,
-  Wrench, Snowflake
+  Wrench, Snowflake, Printer
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -167,7 +167,9 @@ export const ServiceOrderDetail: React.FC = () => {
   const [showPartModal, setShowPartModal] = useState(false);
   const [showEditQuantityModal, setShowEditQuantityModal] = useState(false);
   const [showTimerTypeModal, setShowTimerTypeModal] = useState(false);
+  const [showTagPreview, setShowTagPreview] = useState(false);
   
+  const [tagPdfUrl, setTagPdfUrl] = useState<string | null>(null);
   const [partToDelete, setPartToDelete] = useState<PartUsed | null>(null);
   const [partToEditQuantity, setPartToEditQuantity] = useState<PartUsed | null>(null);
   const [partQuantityStr, setPartQuantityStr] = useState<string>("1");
@@ -364,8 +366,7 @@ export const ServiceOrderDetail: React.FC = () => {
       const osData = await mockData.getServiceOrderById(id);
       if (osData) {
         setOs(osData);
-        // Só atualiza os campos de formulário se o utilizador não estiver a editar (simplificação para evitar sobrescrever o que o user está a escrever)
-        // Numa app real, usaríamos debounce ou tracking de foco
+        // Só atualiza os campos de formulário se o utilizador não estiver a editar
         if (showLoader || !isDirty) {
           setDescription(osData.description || '');
           setAnomaly(osData.anomaly_detected || '');
@@ -526,6 +527,97 @@ export const ServiceOrderDetail: React.FC = () => {
       setErrorMessage("ERRO AO REABRIR OS.");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const generateEquipmentTag = () => {
+    if (!os) return;
+    
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 10;
+
+    // Moldura Principal
+    doc.setLineWidth(1.2);
+    doc.rect(margin, margin, pageWidth - (margin * 2), 170);
+
+    // Título Superior
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("REAL FRIO - IDENTIFICAÇÃO TÉCNICA", pageWidth / 2, margin + 10, { align: "center" });
+
+    // CÓDIGO DA OS (Ajustado para não sobrepor nada)
+    doc.setFontSize(38); // Reduzido de 50 para evitar overflow
+    doc.setFont("helvetica", "bold");
+    doc.text(os.code, pageWidth / 2, margin + 30, { align: "center" });
+
+    // Linha Separadora Principal
+    doc.setLineWidth(0.6);
+    doc.line(margin + 5, margin + 38, pageWidth - margin - 5, margin + 38);
+
+    // Secção Cliente
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("CLIENTE:", margin + 8, margin + 50);
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    const clientName = (os.client?.name || "---").toUpperCase();
+    const splitClient = doc.splitTextToSize(clientName, pageWidth - (margin * 2) - 20);
+    doc.text(splitClient, margin + 8, margin + 60);
+
+    // Secção Equipamento
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("EQUIPAMENTO / ATIVO:", margin + 8, margin + 85);
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    const equipText = (os.equipment?.type || 'NÃO DEFINIDO').toUpperCase();
+    doc.text(equipText, margin + 8, margin + 95);
+    
+    doc.setFontSize(14);
+    const brandModel = `${os.equipment?.brand || ''} ${os.equipment?.model ? '- ' + os.equipment.model : ''}`.toUpperCase();
+    doc.text(brandModel, margin + 8, margin + 105);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`S/N: ${os.equipment?.serial_number || '---'}`.toUpperCase(), margin + 8, margin + 112);
+
+    // Secção Pedido / Avaria (Destaque conforme imagem)
+    doc.setLineWidth(0.3);
+    doc.line(margin + 5, margin + 120, pageWidth - margin - 5, margin + 120);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("PEDIDO DO CLIENTE / AVARIA:", margin + 8, margin + 128);
+    
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    const pedidoText = (os.description || "NÃO ESPECIFICADO").toUpperCase();
+    const splitDesc = doc.splitTextToSize(pedidoText, pageWidth - (margin * 2) - 25);
+    doc.text(splitDesc, margin + 8, margin + 138);
+    
+    // Data de Entrada (Canto inferior direito)
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    const dateStr = `ENTRADA: ${new Date(os.created_at).toLocaleDateString('pt-PT')}`;
+    doc.text(dateStr, pageWidth - margin - 8, margin + 164, { align: "right" });
+
+    doc.autoPrint();
+    const blobUrl = doc.output('bloburl');
+    setTagPdfUrl(blobUrl);
+    setShowTagPreview(true);
+  };
+
+  const handlePrintTag = () => {
+    if (tagPdfUrl) {
+      window.open(tagPdfUrl, '_blank');
     }
   };
 
@@ -804,16 +896,9 @@ export const ServiceOrderDetail: React.FC = () => {
             </button>
           </div>
           <div className="flex-1 px-3 text-center min-w-0 overflow-hidden">
-            <span className="text-[11px] sm:text-[13px] font-black text-blue-600 uppercase tracking-tight sm:tracking-[0.2em] font-mono leading-none whitespace-nowrap block truncate">
+            <span className="text-[13px] sm:text-[15px] font-black text-blue-600 uppercase tracking-tight sm:tracking-[0.2em] font-mono leading-none whitespace-nowrap block truncate">
               {os?.code}
             </span>
-            <div className="flex items-center justify-center gap-2 mt-1">
-               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{os?.store}</span>
-               <span className="text-[8px] text-slate-300">•</span>
-               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
-                  {os?.created_at ? new Date(os.created_at).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '---'}
-               </span>
-            </div>
           </div>
           <div className="flex-shrink-0">
              {actionLoading ? (
@@ -841,30 +926,29 @@ export const ServiceOrderDetail: React.FC = () => {
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {activeTab === 'info' && (
           <div className="space-y-3">
-            {/* CRONÓMETRO GLOBAL PARTILHADO */}
-            <div className="bg-slate-900 dark:bg-slate-900 p-6 rounded-[2rem] shadow-xl border border-slate-800 transition-all overflow-hidden relative group">
+            {/* CRONÓMETRO GLOBAL PARTILHADO - COMPACTO */}
+            <div className="bg-slate-900 dark:bg-slate-900 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-xl border border-slate-800 transition-all overflow-hidden relative group">
                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <Timer size={80} className="text-white" />
+                  <Timer size={60} className="text-white" />
                </div>
                
                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-4">
-                     <div className="flex items-center gap-3">
-                        <div className={`w-2.5 h-2.5 rounded-full ${os?.timer_is_active ? 'bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]' : 'bg-slate-600'}`}></div>
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Cronómetro de Equipa</h3>
+                  <div className="flex items-center justify-between mb-3">
+                     <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${os?.timer_is_active ? 'bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]' : 'bg-slate-600'}`}></div>
+                        <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Cronómetro</h3>
                      </div>
-                     <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 border border-white/10 rounded-full">
+                     <div className="flex items-center gap-1.5 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full">
                         <Cloud size={10} className="text-blue-400" />
-                        <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Sincronizado Cloud</span>
+                        <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest hidden sm:inline">Sincronizado</span>
                      </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                      <div className="text-center sm:text-left">
-                        <div className="text-4xl sm:text-5xl font-black text-white font-mono tracking-tight leading-none">
+                        <div className="text-3xl sm:text-5xl font-black text-white font-mono tracking-tight leading-none">
                            {formatElapsedTime(elapsedTime)}
                         </div>
-                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-2">Horas : Minutos : Segundos</p>
                      </div>
 
                      <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -872,28 +956,21 @@ export const ServiceOrderDetail: React.FC = () => {
                           <button 
                             onClick={handleStartTimer}
                             disabled={os?.status === OSStatus.CONCLUIDA || actionLoading}
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-3 bg-blue-600 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-900/40 disabled:opacity-30"
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-900/40 disabled:opacity-30"
                           >
-                             {actionLoading ? <RefreshCw className="animate-spin" size={16} /> : <Play size={16} fill="currentColor" />} INICIAR PARA TODOS
+                             {actionLoading ? <RefreshCw className="animate-spin" size={14} /> : <Play size={14} fill="currentColor" />} INICIAR
                           </button>
                         ) : (
                           <button 
                             onClick={handleStopTimer}
                             disabled={actionLoading}
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-3 bg-red-600 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-900/40 animate-in zoom-in-95 disabled:opacity-50"
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-900/40 animate-in zoom-in-95 disabled:opacity-50"
                           >
-                             {actionLoading ? <RefreshCw className="animate-spin" size={16} /> : <StopIcon size={16} fill="currentColor" />} PARAR & REGISTAR
+                             {actionLoading ? <RefreshCw className="animate-spin" size={14} /> : <StopIcon size={14} fill="currentColor" />} PARAR
                           </button>
                         )}
                      </div>
                   </div>
-                  
-                  {os?.timer_is_active && (
-                    <div className="mt-6 pt-4 border-t border-slate-800 flex items-center gap-2">
-                       <Sparkles size={12} className="text-blue-500 animate-pulse" />
-                       <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">O cronómetro está ativo para toda a equipa nesta OS.</p>
-                    </div>
-                  )}
                </div>
             </div>
 
@@ -943,7 +1020,17 @@ export const ServiceOrderDetail: React.FC = () => {
                </button>
                {expandedEquip && (
                  <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-200">
-                    {os?.equipment ? <button onClick={() => navigate(`/equipments/${os.equipment_id}`)} className="w-full text-left p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-900 transition-all group"><p className="text-sm font-black text-slate-900 dark:text-white uppercase group-hover:text-blue-600 transition-colors">{os.equipment.type} - {os.equipment.brand}</p><p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mt-1">S/N: {os.equipment.serial_number}</p><p className="text-[8px] font-black text-blue-500 uppercase tracking-widest mt-2">Ver Ficha Técnica Integral ➜</p></button> : <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest">Sem equipamento registado</div>}
+                    {os?.equipment ? (
+                      <div className="space-y-4">
+                        <button onClick={() => navigate(`/equipments/${os.equipment_id}`)} className="w-full text-left p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-900 transition-all group">
+                          <p className="text-sm font-black text-slate-900 dark:text-white uppercase group-hover:text-blue-600 transition-colors">{os.equipment.type} - {os.equipment.brand}</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mt-1">S/N: {os.equipment.serial_number}</p>
+                          <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest mt-2">Ver Ficha Técnica Integral ➜</p>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest">Sem equipamento registado</div>
+                    )}
                  </div>
                )}
             </div>
@@ -1035,6 +1122,16 @@ export const ServiceOrderDetail: React.FC = () => {
                )}
             </div>
 
+            {/* BOTÃO IMPRIMIR ETIQUETA (NOVA POSIÇÃO: ENTRE PLANEAMENTO E LOG) */}
+            {os?.equipment && (
+              <button 
+                onClick={generateEquipmentTag}
+                className="w-full py-3 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-2xl text-[10px] font-black uppercase tracking-[0.25em] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center justify-center gap-2.5 shadow-sm active:scale-95"
+              >
+                <Printer size={16} /> IMPRIMIR ETIQUETA
+              </button>
+            )}
+
             <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
                <button onClick={() => setExpandedLog(!expandedLog)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"><div className="flex items-center gap-3"><History size={18} className="text-slate-400" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Log de Atividade Detalhado</h3></div>{expandedLog ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}</button>
                {expandedLog && (
@@ -1085,7 +1182,7 @@ export const ServiceOrderDetail: React.FC = () => {
                <div className="space-y-2">
                   {partsUsed.length === 0 ? <div className="text-center py-10 opacity-20"><Package size={32} className="mx-auto mb-2" /><p className="text-[10px] font-black uppercase tracking-widest">Nenhum material registado</p></div> : partsUsed.map((part) => (
                     <div key={part.id} className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center gap-3 transition-all hover:border-blue-100 dark:hover:border-blue-900/30 group">
-                       <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 text-slate-300 dark:text-slate-600 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:text-blue-500 group-hover:bg-blue-50 transition-all"><Package size={14} /></div>
+                       <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 text-slate-300 dark:text-slate-600 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:text-blue-500 group-hover:text-white transition-all"><Package size={14} /></div>
                        <div className="flex-1 min-w-0">
                           <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase leading-tight truncate">{part.name}</p>
                           <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mt-0.5">REF: {part.reference} • <span className="text-blue-600 dark:text-blue-400 font-black">{part.quantity.toLocaleString('pt-PT', { maximumFractionDigits: 3 })} UN</span></p>
@@ -1223,87 +1320,38 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
-      {showReopenModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
-              <div className="p-8 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-                 <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Reabrir Intervenção</h3>
-                 <button onClick={() => setShowReopenModal(false)} className="text-gray-400 hover:text-gray-600 p-2"><X size={24}/></button>
-              </div>
-              <div className="p-8 space-y-4">
-                 <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-2xl border border-orange-100 dark:border-orange-800/50 mb-2"><p className="text-[9px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest leading-relaxed">Atenção: Os dados de fecho (anomalia, notas e assinaturas) serão resetados.</p></div>
-                 <div className="grid grid-cols-1 gap-2.5">
-                   {[OSStatus.POR_INICIAR, OSStatus.INICIADA, OSStatus.PARA_ORCAMENTO, OSStatus.ORCAMENTO_ENVIADO, OSStatus.AGUARDA_PECAS, OSStatus.PECAS_RECEBIDAS].map((status) => (
-                     <button key={status} onClick={() => handleSelectReopenStatus(status)} disabled={actionLoading} className="w-full p-4 rounded-2xl border border-slate-100 dark:border-slate-800 text-left hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all flex items-center justify-between"><span className="text-xs font-black uppercase text-slate-700 dark:text-slate-300">{getStatusLabelText(status)}</span><ChevronRight size={16} className="text-slate-200" /></button>
-                   ))}
+      {/* MODAL: PREVIEW DA ETIQUETA */}
+      {showTagPreview && tagPdfUrl && (
+        <div className="fixed inset-0 z-[500] bg-slate-900/90 backdrop-blur-md flex flex-col p-4 sm:p-8 animate-in fade-in duration-300">
+           <div className="w-full max-w-5xl mx-auto flex-1 flex flex-col bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden border border-white/10">
+              <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                 <div className="flex items-center gap-3">
+                   <Printer size={20} className="text-blue-600" />
+                   <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Pré-visualização da Etiqueta</h3>
                  </div>
+                 <button onClick={() => { setShowTagPreview(false); setTagPdfUrl(null); }} className="text-gray-400 hover:text-red-500 p-2 transition-colors"><X size={28}/></button>
+              </div>
+              <div className="flex-1 relative bg-slate-100 dark:bg-slate-950 p-4 sm:p-8 flex items-center justify-center">
+                 <iframe 
+                   id="tag-preview-iframe"
+                   src={tagPdfUrl} 
+                   className="w-full h-full rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 bg-white"
+                   title="PDF Preview"
+                 />
+              </div>
+              <div className="p-8 border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+                 <button 
+                  onClick={handlePrintTag}
+                  className="w-full bg-blue-600 text-white py-5 rounded-[2rem] text-sm font-black uppercase tracking-[0.25em] shadow-2xl hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-3"
+                 >
+                   <Printer size={24} /> ENVIAR PARA A IMPRESSORA
+                 </button>
               </div>
            </div>
         </div>
       )}
 
-      {showPartModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
-              <div className="p-8 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50"><h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">{isCreatingNewPart ? 'Novo Artigo' : 'Aplicar Material'}</h3><button onClick={() => { setShowPartModal(false); setIsCreatingNewPart(false); }} className="text-gray-400 hover:text-gray-600 p-2"><X size={24}/></button></div>
-              <div className="p-8 space-y-6">
-                {!isCreatingNewPart ? (
-                  <>
-                    <div className="relative"><Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" /><input type="text" placeholder="Pesquisar catálogo..." value={partSearchTerm} onChange={e => setPartSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 transition-all" /></div>
-                    <div className="max-h-60 overflow-y-auto no-scrollbar space-y-2">
-                       {filteredCatalog.length === 0 ? (<div className="text-center py-6 space-y-4"><p className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">Nenhum artigo encontrado.</p><button onClick={() => { setIsCreatingNewPart(true); setNewPartForm({ name: partSearchTerm, reference: '' }); }} className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all"><Plus size={10} /> CRIAR NOVO ARTIGO</button></div>) : filteredCatalog.map(p => (<button key={p.id} onClick={() => { setSelectedPartId(p.id); setPartQuantityStr("1"); }} className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between group ${selectedPartId === p.id ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20' : 'bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800'}`}><div className="min-w-0 pr-4"><p className={`text-sm font-black uppercase truncate ${selectedPartId === p.id ? 'text-blue-600' : 'text-slate-900 dark:text-white'}`}>{p.name}</p><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">REF: {p.reference}</p></div>{selectedPartId === p.id && <CheckCircle2 size={18} className="text-blue-600 flex-shrink-0" />}</button>))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="space-y-4 animate-in slide-in-from-right-2 duration-300">
-                    <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Designação *</label><input type="text" value={newPartForm.name} onChange={e => setNewPartForm({...newPartForm, name: e.target.value})} className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" placeholder="EX: FILTRO DESIDRATADOR" /></div>
-                    <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Referência</label><div className="relative"><Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} /><input type="text" value={newPartForm.reference} onChange={e => setNewPartForm({...newPartForm, reference: e.target.value})} className="w-full pl-11 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-mono font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" placeholder="EX: 102030" /></div></div>
-                  </div>
-                )}
-                {(selectedPartId || isCreatingNewPart) && (<div className="pt-4 flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-6 rounded-3xl animate-in slide-in-from-top-2"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">QTD:</span><div className="flex items-center gap-4"><button onClick={() => { const currentVal = parseFloat(partQuantityStr.replace(',', '.')); const newVal = Math.max(0.1, Number((currentVal - 1).toFixed(3))); setPartQuantityStr(newVal.toString().replace('.', ',')); }} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm active:scale-90 transition-all"><Minus size={18} /></button><input type="text" inputMode="decimal" value={partQuantityStr} onChange={e => { const val = e.target.value.replace(',', '.'); if (/^\d*[.]?\d*$/.test(val) || val === '') setPartQuantityStr(e.target.value); }} className="w-16 bg-transparent text-lg font-black text-slate-900 dark:text-white text-center outline-none border-b-2 border-transparent focus:border-blue-500 transition-all" /><button onClick={() => { const currentVal = parseFloat(partQuantityStr.replace(',', '.')) || 0; const newVal = Number((currentVal + 1).toFixed(3)); setPartQuantityStr(newVal.toString().replace('.', ',')); }} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm active:scale-90 transition-all"><Plus size={18} /></button></div></div>)}
-                <button onClick={isCreatingNewPart ? handleCreateAndAddPart : handleAddPart} disabled={(isCreatingNewPart ? !newPartForm.name : !selectedPartId) || actionLoading} className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50">{actionLoading ? <Loader2 size={20} className="animate-spin mx-auto" /> : isCreatingNewPart ? 'REGISTAR E APLICAR' : 'CONFIRMAR APLICAÇÃO'}</button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {showEditQuantityModal && partToEditQuantity && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">
-              <div className="p-8 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50"><h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Ajustar Quantidade</h3><button onClick={() => setShowEditQuantityModal(false)} className="text-gray-400 hover:text-gray-600 p-2"><X size={24}/></button></div>
-              <div className="p-8 space-y-8">
-                 <div className="text-center"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 px-4 line-clamp-2">{partToEditQuantity.name}</p><div className="flex items-center justify-center gap-6"><button onClick={() => { const currentVal = parseFloat(tempQuantityStr.replace(',', '.')); const newVal = Math.max(0.1, Number((currentVal - 1).toFixed(3))); setTempQuantityStr(newVal.toString().replace('.', ',')); }} className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center shadow-sm active:scale-90 transition-all"><Minus size={28} /></button><input type="text" inputMode="decimal" value={tempQuantityStr} onChange={e => { const val = e.target.value.replace(',', '.'); if (/^\d*[.]?\d*$/.test(val) || val === '') setTempQuantityStr(e.target.value); }} className="w-24 bg-transparent text-5xl font-black text-slate-900 dark:text-white text-center outline-none border-b-4 border-transparent focus:border-blue-500 transition-all" /><button onClick={() => { const currentVal = parseFloat(tempQuantityStr.replace(',', '.')) || 0; const newVal = Number((currentVal + 1).toFixed(3)); setTempQuantityStr(newVal.toString().replace('.', ',')); }} className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center shadow-sm active:scale-90 transition-all"><Plus size={28} /></button></div></div>
-                 <button onClick={async () => { await handleUpdatePartQuantity(partToEditQuantity.id, tempQuantityStr); setShowEditQuantityModal(false); }} disabled={actionLoading} className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-[0.98] transition-all">{actionLoading ? <Loader2 size={20} className="animate-spin mx-auto" /> : 'CONFIRMAR AJUSTE'}</button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {showDeletePartModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
-              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Trash2 size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Remover Material?</h3><div className="grid grid-cols-2 gap-3 mt-8"><button onClick={() => setShowDeletePartModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button><button onClick={handleDeletePart} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">REMOVER</button></div></div>
-           </div>
-        </div>
-      )}
-
-      {showDeletePhotoModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
-              <div className="p-8"><div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Camera size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Eliminar Foto?</h3><div className="grid grid-cols-2 gap-3 mt-8"><button onClick={() => setShowDeletePhotoModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button><button onClick={handleDeletePhoto} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ELIMINAR</button></div></div>
-           </div>
-        </div>
-      )}
-
-      {showFinalizeModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm text-center transition-colors">
-              <div className="p-8"><div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><CheckCircle size={32}/></div><h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Finalizar Intervenção?</h3><p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase">TODOS OS DADOS SERÃO BLOQUEADOS E O RELATÓRIO SERÁ GERADO.</p><div className="grid grid-cols-2 gap-4"><button onClick={() => setShowFinalizeModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95">CANCELAR</button><button onClick={async () => { await mockData.updateServiceOrder(id!, { status: OSStatus.CONCLUIDA, anomaly_detected: anomaly, resolution_notes: resolutionNotes, client_signature: clientSignature, technician_signature: technicianSignature, is_warranty: isWarranty, warranty_info: warrantyInfo }); await mockData.addOSActivity(id!, { description: "FINALIZOU A ORDEM DE SERVIÇO" }); setShowFinalizeModal(false); setActiveTab('info'); fetchOSDetails(false); }} className="py-4 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">CONFIRMAR</button></div></div>
-           </div>
-        </div>
-      )}
-
-      {/* NOVO MODAL: TIPO DE MÃO DE OBRA */}
+      {/* MODAL: TIPO DE MÃO DE OBRA */}
       {showTimerTypeModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-white/10">
