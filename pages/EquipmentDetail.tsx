@@ -5,19 +5,20 @@ import {
   ArrowLeft, HardDrive, Edit2, History, Image as ImageIcon, 
   Paperclip, Plus, Trash2, Camera, MapPin, Building2, ExternalLink,
   ChevronRight, Download, FileText, X, Eye, Activity, Tag, UploadCloud,
-  FileImage, AlertTriangle, ShieldAlert
+  FileImage, AlertTriangle, ShieldAlert, Printer, FileImage as ImageIcon2
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import { mockData } from '../services/mockData';
 import { Equipment, ServiceOrder, EquipmentAttachment, OSStatus } from '../types';
 import OSStatusBadge from '../components/OSStatusBadge';
 
-// Componente de Diálogo de Confirmação para consistência e fiabilidade
+// Componente de Diálogo de Confirmação
 interface ConfirmDialogProps {
   isOpen: boolean;
   title: string;
   message: string;
   confirmLabel: string;
-  variant: 'danger' | 'warning';
+  variant: 'danger' | 'warning' | 'info';
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -136,26 +137,23 @@ const EquipmentDetail: React.FC = () => {
   const [selectedAttachmentForView, setSelectedAttachmentForView] = useState<EquipmentAttachment | null>(null);
   const [showNameplateFullscreen, setShowNameplateFullscreen] = useState(false);
   
-  // Estado para controle do modal de confirmação
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
     message: string;
     confirmLabel: string;
-    variant: 'danger' | 'warning';
+    variant: 'danger' | 'warning' | 'info';
     action: () => void;
   }>({
     isOpen: false,
     title: '',
     message: '',
     confirmLabel: '',
-    variant: 'warning',
+    variant: 'info',
     action: () => {}
   });
 
   const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
-
-  // Drag and Drop states
   const [isDraggingNameplate, setIsDraggingNameplate] = useState(false);
   const [isDraggingAttachment, setIsDraggingAttachment] = useState(false);
 
@@ -192,6 +190,103 @@ const EquipmentDetail: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * Geração de etiqueta em PNG de alta resolução (300 DPI)
+   * Dimensões: 127.0 mm x 59.2 mm
+   * - Texto Uniforme em PRETO (Tamanho e Fonte Iguais para todas as linhas)
+   * - Conteúdo: REAL FRIO, EQUIPAMENTO, MARCA/MODELO (Sem S/N)
+   * - QR Code aumentado em 25% (ocupa ~94% da altura)
+   * - Truncagem caso sobreponha o QR Code
+   */
+  const generateAssetPNG = async () => {
+    if (!equipment) return;
+
+    // 1. Configuração de Dimensões (300 DPI)
+    const widthMM = 127.0;
+    const heightMM = 59.2;
+    const dpi = 300;
+    const mmToPx = dpi / 25.4;
+    const widthPX = Math.round(widthMM * mmToPx);
+    const heightPX = Math.round(heightMM * mmToPx);
+
+    // 2. Preparação do Canvas (Fundo Transparente)
+    const canvas = document.createElement('canvas');
+    canvas.width = widthPX;
+    canvas.height = heightPX;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 3. QR Code (Lado Direito - Aumentado em 25% em relação aos 75% anteriores -> 93.75% da altura)
+    const qrSize = Math.round(heightPX * 0.75 * 1.25); 
+    const marginMM = 4;
+    const marginPX = Math.round(marginMM * mmToPx);
+    
+    const baseUrl = window.location.href.split('#')[0];
+    const qrUrl = `${baseUrl}#/equipments/${equipment.id}`;
+    
+    const qrDataUrl = await QRCode.toDataURL(qrUrl, { 
+      margin: 1, 
+      width: qrSize,
+      color: { dark: '#000000', light: '#00000000' } 
+    });
+
+    const qrImage = new Image();
+    qrImage.src = qrDataUrl;
+    
+    await new Promise((resolve) => {
+      qrImage.onload = () => {
+        const qrX = widthPX - qrSize - marginPX;
+        const qrY = (heightPX - qrSize) / 2;
+        ctx.drawImage(qrImage, qrX, qrY);
+        resolve(true);
+      };
+    });
+
+    // 4. Configuração de Texto (UNIFORME E PRETO)
+    const textMarginX = Math.round(5 * mmToPx);
+    // Espaço máximo reduzido pelo QR Code maior
+    const textMaxWidth = widthPX - qrSize - (marginPX * 3);
+    
+    // Tamanho uniforme para 3 linhas
+    const fontSize = Math.round(14 * mmToPx); 
+    const lineSpacing = Math.round(4 * mmToPx);
+    
+    const totalBlockHeight = (fontSize * 3) + (lineSpacing * 2);
+    let currentY = (heightPX - totalBlockHeight) / 2 + (fontSize * 0.85);
+
+    ctx.fillStyle = '#000000';
+    const fontStyle = `bold ${fontSize}px Inter, "Segoe UI", Helvetica, Arial, sans-serif`;
+    ctx.font = fontStyle;
+
+    // 4.1. REAL FRIO
+    ctx.fillText("REAL FRIO", textMarginX, currentY, textMaxWidth);
+    currentY += fontSize + lineSpacing;
+
+    // 4.2. EQUIPAMENTO
+    const equipType = equipment.type.toUpperCase();
+    ctx.fillText(equipType, textMarginX, currentY, textMaxWidth);
+    currentY += fontSize + lineSpacing;
+
+    // 4.3. MARCA / MODELO
+    const brandModel = `${equipment.brand || ''} ${equipment.model ? '- ' + equipment.model : ''}`.toUpperCase();
+    ctx.fillText(brandModel, textMarginX, currentY, textMaxWidth);
+
+    // 5. Exportar ficheiro PNG com nome detalhado
+    const safeClient = clientName.replace(/\s+/g, '_').toUpperCase();
+    const safeType = equipment.type.replace(/\s+/g, '_').toUpperCase();
+    const safeBrand = (equipment.brand || '').replace(/\s+/g, '_').toUpperCase();
+    const safeModel = (equipment.model || '').replace(/\s+/g, '_').toUpperCase();
+    const safeSerial = (equipment.serial_number || 'S-N').replace(/\s+/g, '_').toUpperCase();
+    
+    const finalFileName = `ETIQUETA_MAXQR_${safeClient}_${safeType}_${safeBrand}_${safeModel}_${safeSerial}.png`;
+    
+    const pngUrl = canvas.toDataURL('image/png', 1.0);
+    const link = document.createElement('a');
+    link.href = pngUrl;
+    link.download = finalFileName;
+    link.click();
   };
 
   const handleUploadNameplate = async (fileOrEvent: React.ChangeEvent<HTMLInputElement> | File) => {
@@ -350,7 +445,13 @@ const EquipmentDetail: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6">
+                <button 
+                  onClick={generateAssetPNG}
+                  className="w-full bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 py-5 rounded-3xl font-black text-[10px] uppercase tracking-[0.2em] shadow-sm hover:bg-blue-50 transition-all flex items-center justify-center gap-3 active:scale-95"
+                >
+                  <ImageIcon2 size={16} /> EXPORTAR ETIQUETA (127x59)
+                </button>
                 <Link 
                   to={`/equipments/${equipment.id}/edit`}
                   className="w-full bg-slate-900 dark:bg-blue-600 text-white py-5 rounded-3xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95"
@@ -569,7 +670,7 @@ const EquipmentDetail: React.FC = () => {
         </div>
       )}
 
-      {/* Visualizador da Chapa de Características (Novo, corrigindo o erro de aba em branco) */}
+      {/* Visualizador da Chapa de Características */}
       {showNameplateFullscreen && equipment.nameplate_url && (
         <div className="fixed inset-0 z-[300] bg-slate-950 flex flex-col animate-in fade-in duration-300">
            <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 z-[310] bg-gradient-to-b from-black/80 to-transparent">

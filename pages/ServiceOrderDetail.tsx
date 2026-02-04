@@ -200,6 +200,39 @@ export const ServiceOrderDetail: React.FC = () => {
 
   const descTextareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Lógica de Detecção de Alterações (isDirty)
+  const isDirty = useMemo(() => {
+    if (!os) return false;
+    let origDate = '';
+    let origTime = '';
+    if (os.scheduled_date) {
+      const parts = os.scheduled_date.split(/[T ]/);
+      origDate = parts[0] || '';
+      origTime = (parts[1] || '').substring(0, 5);
+    }
+    const currentClientSig = clientSignature || '';
+    const originalClientSig = os.client_signature || '';
+    const currentTechSig = technicianSignature || '';
+    const originalTechSig = os.technician_signature || '';
+    
+    // Comparação profunda para warranty_info para evitar falsos negativos
+    const currentWarrantyInfoStr = JSON.stringify(warrantyInfo || {});
+    const originalWarrantyInfoStr = JSON.stringify(os.warranty_info || {});
+
+    return (
+      description !== (os.description || '') ||
+      anomaly !== (os.anomaly_detected || '') ||
+      resolutionNotes !== (os.resolution_notes || '') ||
+      observations !== (os.observations || '') ||
+      scheduledDate !== origDate ||
+      scheduledTime !== origTime ||
+      currentClientSig !== originalClientSig ||
+      currentTechSig !== originalTechSig ||
+      isWarranty !== (!!os.is_warranty) ||
+      currentWarrantyInfoStr !== originalWarrantyInfoStr
+    );
+  }, [os, description, anomaly, resolutionNotes, observations, scheduledDate, scheduledTime, clientSignature, technicianSignature, isWarranty, warrantyInfo]);
+
   useEffect(() => { fetchOSDetails(); }, [id]);
 
   useEffect(() => {
@@ -237,13 +270,16 @@ export const ServiceOrderDetail: React.FC = () => {
   }, [os?.timer_is_active, os?.timer_start_time]);
 
   // Sincronização periódica da OS para apanhar mudanças de timer de outros utilizadores
+  // CRÍTICO: Só sincroniza se NÃO houver alterações locais pendentes (isDirty)
   useEffect(() => {
-    if (!id) return;
+    if (!id || isDirty) return;
+    
     const syncInterval = setInterval(() => {
       fetchOSDetails(false);
-    }, 5000); // Sincroniza a cada 5 segundos
+    }, 8000); 
+    
     return () => clearInterval(syncInterval);
-  }, [id]);
+  }, [id, isDirty]);
 
   const handleStartTimer = async () => {
     if (!id || os?.timer_is_active) return;
@@ -266,6 +302,35 @@ export const ServiceOrderDetail: React.FC = () => {
   const handleStopTimer = () => {
     if (!id || !os?.timer_start_time) return;
     setShowTimerTypeModal(true);
+  };
+
+  // Função para Cancelar e Eliminar Tempo do Cronómetro
+  const handleResetTimer = async () => {
+    if (!id || !os?.timer_is_active) return;
+    
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Eliminar Tempo',
+      message: 'Deseja parar o cronómetro e descartar o tempo decorrido sem efetuar qualquer registo de mão de obra?',
+      confirmLabel: 'ELIMINAR TEMPO',
+      variant: 'danger',
+      action: async () => {
+        setActionLoading(true);
+        try {
+          await mockData.updateServiceOrder(id, { 
+            timer_is_active: false, 
+            timer_start_time: null 
+          });
+          await mockData.addOSActivity(id, { description: "CANCELOU E ELIMINOU TEMPO DO CRONÓMETRO (SEM REGISTO)" });
+          setElapsedTime(0);
+          await fetchOSDetails(false);
+        } catch (e) {
+          setErrorMessage("ERRO AO ELIMINAR TEMPO.");
+        } finally {
+          setActionLoading(false);
+        }
+      }
+    });
   };
 
   const handleConfirmTimerRegistration = async (type: 'GERAL' | 'FRIO') => {
@@ -332,34 +397,6 @@ export const ServiceOrderDetail: React.FC = () => {
     return list;
   }, [anomaly, clientSignature, technicianSignature]);
 
-  const isDirty = useMemo(() => {
-    if (!os) return false;
-    let origDate = '';
-    let origTime = '';
-    if (os.scheduled_date) {
-      const parts = os.scheduled_date.split(/[T ]/);
-      origDate = parts[0] || '';
-      origTime = (parts[1] || '').substring(0, 5);
-    }
-    const currentClientSig = clientSignature || '';
-    const originalClientSig = os.client_signature || '';
-    const currentTechSig = technicianSignature || '';
-    const originalTechSig = os.technician_signature || '';
-    
-    return (
-      description !== (os.description || '') ||
-      anomaly !== (os.anomaly_detected || '') ||
-      resolutionNotes !== (os.resolution_notes || '') ||
-      observations !== (os.observations || '') ||
-      scheduledDate !== origDate ||
-      scheduledTime !== origTime ||
-      currentClientSig !== originalClientSig ||
-      currentTechSig !== originalTechSig ||
-      isWarranty !== (!!os.is_warranty) ||
-      JSON.stringify(warrantyInfo || {}) !== JSON.stringify(os.warranty_info || {})
-    );
-  }, [os, description, anomaly, resolutionNotes, observations, scheduledDate, scheduledTime, clientSignature, technicianSignature, isWarranty, warrantyInfo]);
-
   const fetchOSDetails = async (showLoader = true) => {
     if (!id) return;
     if (showLoader) setLoading(true);
@@ -367,7 +404,7 @@ export const ServiceOrderDetail: React.FC = () => {
       const osData = await mockData.getServiceOrderById(id);
       if (osData) {
         setOs(osData);
-        // Só atualiza os campos de formulário se o utilizador não estiver a editar
+        
         if (showLoader || !isDirty) {
           setDescription(osData.description || '');
           setAnomaly(osData.anomaly_detected || '');
@@ -475,7 +512,7 @@ export const ServiceOrderDetail: React.FC = () => {
       }
 
       setShowValidationErrors(false);
-      fetchOSDetails(false);
+      fetchOSDetails(true); 
     } catch (e: any) {
       setErrorMessage("ERRO AO GUARDAR DADOS.");
     } finally {
@@ -523,7 +560,7 @@ export const ServiceOrderDetail: React.FC = () => {
       setTechnicianSignature(null);
       
       setShowReopenModal(false);
-      fetchOSDetails(false);
+      fetchOSDetails(true);
     } catch (e: any) {
       setErrorMessage("ERRO AO REABRIR OS.");
     } finally {
@@ -534,10 +571,8 @@ export const ServiceOrderDetail: React.FC = () => {
   const generateEquipmentTag = async () => {
     if (!os) return;
     
-    // 1. Gerar QR Code para a ficha do ativo com URL robusto
     let qrDataUrl = '';
     if (os.equipment_id) {
-      // Construção robusta do link para Single Page Apps com HashRouter
       const baseUrl = window.location.href.split('#')[0];
       const qrUrl = `${baseUrl}#/equipments/${os.equipment_id}`;
       
@@ -561,25 +596,20 @@ export const ServiceOrderDetail: React.FC = () => {
     const pageWidth = doc.internal.pageSize.width;
     const margin = 10;
 
-    // Moldura Principal
     doc.setLineWidth(1.2);
     doc.rect(margin, margin, pageWidth - (margin * 2), 170);
 
-    // Título Superior
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text("REAL FRIO - IDENTIFICAÇÃO TÉCNICA", pageWidth / 2, margin + 10, { align: "center" });
 
-    // CÓDIGO DA OS
     doc.setFontSize(38);
     doc.setFont("helvetica", "bold");
     doc.text(os.code, pageWidth / 2, margin + 30, { align: "center" });
 
-    // Linha Separadora Principal
     doc.setLineWidth(0.6);
     doc.line(margin + 5, margin + 38, pageWidth - margin - 5, margin + 38);
 
-    // Secção Cliente
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text("CLIENTE:", margin + 8, margin + 50);
@@ -589,12 +619,10 @@ export const ServiceOrderDetail: React.FC = () => {
     const splitClient = doc.splitTextToSize(clientName, pageWidth - (margin * 2) - 20);
     doc.text(splitClient, margin + 8, margin + 60);
 
-    // Secção Equipamento / Ativo (QR Code agora nesta secção)
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text("EQUIPAMENTO / ATIVO:", margin + 8, margin + 85);
     
-    // Inserir QR Code AO LADO dos dados do equipamento
     if (qrDataUrl) {
        doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 48, margin + 82, 40, 40);
        doc.setFontSize(6.5);
@@ -617,7 +645,6 @@ export const ServiceOrderDetail: React.FC = () => {
     doc.setFont("helvetica", "normal");
     doc.text(`S/N: ${os.equipment?.serial_number || '---'}`.toUpperCase(), margin + 8, margin + 112);
 
-    // Secção Pedido / Avaria (Ocupa agora a largura total novamente)
     doc.setLineWidth(0.3);
     doc.line(margin + 5, margin + 128, pageWidth - margin - 5, margin + 128);
     
@@ -631,7 +658,6 @@ export const ServiceOrderDetail: React.FC = () => {
     const splitDesc = doc.splitTextToSize(pedidoText, pageWidth - (margin * 2) - 16);
     doc.text(splitDesc, margin + 8, margin + 146);
 
-    // Data de Entrada (Canto inferior direito)
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 100, 100);
@@ -906,6 +932,24 @@ export const ServiceOrderDetail: React.FC = () => {
   const filteredCatalog = useMemo(() => { const term = normalizeString(partSearchTerm); return term ? catalog.filter(p => normalizeString(p.name).includes(term) || normalizeString(p.reference).includes(term)) : catalog; }, [catalog, partSearchTerm]);
   const groupedPhotos = useMemo(() => { const groups: Record<string, OSPhoto[]> = { antes: [], depois: [], peca: [], geral: [] }; photos.forEach(photo => { if (groups[photo.type]) groups[photo.type].push(photo); }); return groups; }, [photos]);
 
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'info';
+    action: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmLabel: '',
+    variant: 'info',
+    action: () => {}
+  });
+
+  const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+
   if (loading) return (
     <div className="h-full flex flex-col items-center justify-center p-20">
       <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
@@ -915,7 +959,26 @@ export const ServiceOrderDetail: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto pb-44 relative px-1 sm:px-0 space-y-4">
-      <FloatingEditBar isVisible={isDirty} isSubmitting={actionLoading} onSave={handleSaveData} onCancel={fetchOSDetails} />
+      {/* Diálogo de Confirmação Único para a página */}
+      <div className={confirmConfig.isOpen ? "block" : "hidden"}>
+        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-200">
+            <div className="p-8 text-center">
+              <div className={`w-16 h-16 ${confirmConfig.variant === 'danger' ? 'bg-red-50 text-red-500' : 'bg-orange-50 text-orange-500'} dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner`}>
+                {confirmConfig.variant === 'danger' ? <ShieldAlert size={32} /> : <AlertTriangle size={32} />}
+              </div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">{confirmConfig.title}</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">{confirmConfig.message}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={closeConfirm} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button>
+                <button onClick={() => { closeConfirm(); confirmConfig.action(); }} className={`py-4 ${confirmConfig.variant === 'danger' ? 'bg-red-600' : 'bg-orange-500'} text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all`}>{confirmConfig.confirmLabel}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <FloatingEditBar isVisible={isDirty} isSubmitting={actionLoading} onSave={handleSaveData} onCancel={() => fetchOSDetails(true)} />
 
       <div className="space-y-2 mb-4">
         <div className="bg-white dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-gray-200 dark:border-slate-800 p-3 flex items-center justify-between transition-colors overflow-hidden">
@@ -955,7 +1018,6 @@ export const ServiceOrderDetail: React.FC = () => {
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {activeTab === 'info' && (
           <div className="space-y-3">
-            {/* CRONÓMETRO GLOBAL PARTILHADO - COMPACTO */}
             <div className="bg-slate-900 dark:bg-slate-900 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-xl border border-slate-800 transition-all overflow-hidden relative group">
                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                   <Timer size={60} className="text-white" />
@@ -980,7 +1042,7 @@ export const ServiceOrderDetail: React.FC = () => {
                         </div>
                      </div>
 
-                     <div className="flex items-center gap-3 w-full sm:w-auto">
+                     <div className="flex items-center gap-2 w-full sm:w-auto">
                         {!os?.timer_is_active ? (
                           <button 
                             onClick={handleStartTimer}
@@ -990,13 +1052,23 @@ export const ServiceOrderDetail: React.FC = () => {
                              {actionLoading ? <RefreshCw className="animate-spin" size={14} /> : <Play size={14} fill="currentColor" />} INICIAR
                           </button>
                         ) : (
-                          <button 
-                            onClick={handleStopTimer}
-                            disabled={actionLoading}
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-900/40 animate-in zoom-in-95 disabled:opacity-50"
-                          >
-                             {actionLoading ? <RefreshCw className="animate-spin" size={14} /> : <StopIcon size={14} fill="currentColor" />} PARAR
-                          </button>
+                          <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                            <button 
+                              onClick={handleResetTimer}
+                              disabled={actionLoading}
+                              className="p-3 bg-slate-800 text-red-500 border border-slate-700 rounded-xl hover:bg-red-500 hover:text-white transition-all active:scale-95 group/reset"
+                              title="Cancelar e eliminar tempo"
+                            >
+                              <RotateCcw size={20} className="group-hover/reset:rotate-[-90deg] transition-transform" />
+                            </button>
+                            <button 
+                              onClick={handleStopTimer}
+                              disabled={actionLoading}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-900/40 animate-in zoom-in-95 disabled:opacity-50"
+                            >
+                               {actionLoading ? <RefreshCw className="animate-spin" size={14} /> : <StopIcon size={14} fill="currentColor" />} PARAR
+                            </button>
+                          </div>
                         )}
                      </div>
                   </div>
@@ -1151,7 +1223,6 @@ export const ServiceOrderDetail: React.FC = () => {
                )}
             </div>
 
-            {/* BOTÃO IMPRIMIR ETIQUETA COM QR CODE */}
             {os?.equipment && (
               <button 
                 onClick={generateEquipmentTag}
@@ -1349,7 +1420,6 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: PREVIEW DA ETIQUETA */}
       {showTagPreview && tagPdfUrl && (
         <div className="fixed inset-0 z-[500] bg-slate-900/90 backdrop-blur-md flex flex-col p-4 sm:p-8 animate-in fade-in duration-300">
            <div className="w-full max-w-5xl mx-auto flex-1 flex flex-col bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden border border-white/10">
@@ -1380,7 +1450,6 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: TIPO DE MÃO DE OBRA */}
       {showTimerTypeModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-white/10">
