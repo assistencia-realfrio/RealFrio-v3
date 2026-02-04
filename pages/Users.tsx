@@ -157,7 +157,7 @@ const Users: React.FC = () => {
           
         {users.filter(u => u.full_name?.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
           <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-gray-100 dark:border-slate-800 transition-colors">
-            <User Cog size={32} className="mx-auto text-gray-200 dark:text-slate-700 mb-4" />
+            <UserCog size={32} className="mx-auto text-gray-200 dark:text-slate-700 mb-4" />
             <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest">Nenhum utilizador encontrado</p>
           </div>
         )}
