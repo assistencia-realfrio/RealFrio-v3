@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench, RefreshCw, Loader2 } from 'lucide-react';
+import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench, RefreshCw, Loader2, QrCode, Scan } from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
 import { UserRole, OSActivity, ServiceOrder, Client, Equipment } from '../types';
 import { mockData } from '../services/mockData';
 import BrandLogo from './BrandLogo';
@@ -20,6 +21,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [activities, setActivities] = useState<(OSActivity & { os_code?: string; client_name?: string })[]>([]);
   const [searchResults, setSearchResults] = useState<{
     os: ServiceOrder[];
@@ -40,6 +42,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const notificationsRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const qrScannerRef = useRef<Html5Qrcode | null>(null);
 
   const activeSessionUser = mockData.getSession() || user;
 
@@ -110,8 +113,109 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     setActivities(data.slice(0, 15));
   };
 
-  useEffect(() => { if (notificationsOpen) { setSearchOpen(false); fetchGlobalActivities(); } }, [notificationsOpen]);
-  useEffect(() => { if (searchOpen) { setNotificationsOpen(false); setTimeout(() => searchInputRef.current?.focus(), 150); } }, [searchOpen]);
+  useEffect(() => { if (notificationsOpen) { setSearchOpen(false); setScannerOpen(false); fetchGlobalActivities(); } }, [notificationsOpen]);
+  useEffect(() => { if (searchOpen) { setNotificationsOpen(false); setScannerOpen(false); setTimeout(() => searchInputRef.current?.focus(), 150); } }, [searchOpen]);
+
+  // Lógica Robusta do Scanner QR Code
+  useEffect(() => {
+    let isMounted = true;
+    
+    const stopScanner = async () => {
+      if (qrScannerRef.current) {
+        try {
+          if (qrScannerRef.current.isScanning) {
+            await qrScannerRef.current.stop();
+          }
+        } catch (err) {
+          console.warn("Aviso ao parar scanner:", err);
+        } finally {
+          qrScannerRef.current = null;
+        }
+      }
+    };
+
+    if (scannerOpen) {
+      setNotificationsOpen(false);
+      setSearchOpen(false);
+      
+      const startScanner = async () => {
+        try {
+          // Criar nova instância
+          qrScannerRef.current = new Html5Qrcode("qr-reader");
+          
+          // Tentar iniciar com câmara traseira
+          await qrScannerRef.current.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (decodedText) => {
+              if (isMounted) handleQRSuccess(decodedText);
+            },
+            () => { /* Ignorar erros de frames vazios */ }
+          ).catch(async (err) => {
+             // Fallback se "environment" falhar (ex: Desktop sem câmara traseira)
+             console.warn("Falha em facingMode: environment, tentando padrão...", err);
+             if (qrScannerRef.current && isMounted) {
+                await qrScannerRef.current.start(
+                  { facingMode: "user" },
+                  { fps: 10, qrbox: { width: 250, height: 250 } },
+                  (decodedText) => { if (isMounted) handleQRSuccess(decodedText); },
+                  () => {}
+                );
+             }
+          });
+        } catch (err: any) {
+          console.error("Erro fatal ao iniciar scanner:", err);
+          if (isMounted) {
+            if (err?.name === "NotFoundError") {
+              alert("Erro: Câmara não detetada ou não disponível no dispositivo.");
+            } else {
+              alert("Não foi possível aceder à câmara. Verifique as permissões do browser.");
+            }
+            setScannerOpen(false);
+          }
+        }
+      };
+      
+      // Delay pequeno para garantir que o elemento DOM "qr-reader" está pronto
+      const timer = setTimeout(startScanner, 300);
+      return () => {
+        isMounted = false;
+        clearTimeout(timer);
+        stopScanner();
+      };
+    } else {
+      stopScanner();
+    }
+  }, [scannerOpen]);
+
+  const handleQRSuccess = (decodedText: string) => {
+    try {
+      // Se for um URL absoluto
+      if (decodedText.startsWith('http')) {
+        const url = new URL(decodedText);
+        const hash = url.hash;
+        if (hash && (hash.includes('/equipments/') || hash.includes('/os/'))) {
+          const route = hash.replace('#', '');
+          setScannerOpen(false);
+          navigate(route);
+          return;
+        }
+      }
+      
+      // Se for apenas o ID ou rota parcial
+      if (decodedText.includes('/equipments/') || decodedText.includes('/os/')) {
+         const cleanRoute = decodedText.split('#').pop() || decodedText;
+         setScannerOpen(false);
+         navigate(cleanRoute);
+         return;
+      }
+
+      alert("Código lido não reconhecido como um ativo Real Frio.");
+    } catch (e) {
+      console.error("Erro ao processar QR:", e);
+      alert("Conteúdo do QR Code inválido.");
+    }
+  };
 
   const handleLogoutClick = async () => { onLogout(); navigate('/login'); };
   const scrollToTop = () => { if (mainRef.current) mainRef.current.scrollTo({ top: 0, behavior: 'smooth' }); };
@@ -200,9 +304,9 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           <div className="flex items-center h-20 px-4 md:px-8 relative">
             <button onClick={() => setSidebarOpen(true)} className="p-3 -ml-2 text-slate-600 dark:text-slate-400 lg:hidden hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full transition-all active:scale-90" aria-label="Abrir menu"><Menu size={26} /></button>
             <div className="absolute left-1/2 -translate-x-1/2"><Link to="/" className="flex items-center hover:opacity-80 transition-opacity"><BrandLogo variant={theme === 'dark' ? 'light' : 'dark'} size="sm" className="!items-center" /></Link></div>
-            <div className="flex-1 flex justify-end items-center gap-1 sm:gap-2">
+            <div className="flex-1 flex justify-end items-center gap-1.5 sm:gap-2.5">
                <div className="relative" ref={searchRef}>
-                 <button onClick={() => setSearchOpen(!searchOpen)} className={`p-3 rounded-2xl transition-all relative active:scale-90 ${searchOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="Pesquisar Sistema"><Search size={22} /></button>
+                 <button onClick={() => setSearchOpen(!searchOpen)} className={`p-2 rounded-xl transition-all relative active:scale-90 ${searchOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="Pesquisar Sistema"><Search size={18} /></button>
                  {searchOpen && (
                    <div className="fixed sm:absolute inset-x-4 sm:inset-auto top-24 sm:top-full sm:right-0 mt-0 sm:mt-4 w-auto sm:w-[460px] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden z-[100] animate-in fade-in slide-in-from-top-4 duration-300">
                       <div className="p-4 border-b border-slate-50 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50"><div className="relative"><Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500" /><input ref={searchInputRef} type="text" placeholder="Procurar OS, Cliente, S/N..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-10 py-3.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium text-slate-900 dark:text-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none" />{searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"><X size={16} /></button>}</div></div>
@@ -215,8 +319,11 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                    </div>
                  )}
                </div>
+
+               <button onClick={() => setScannerOpen(!scannerOpen)} className={`p-2 rounded-xl transition-all relative active:scale-90 ${scannerOpen ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="Scanner QR Code"><Scan size={18} /></button>
+
                <div className="relative" ref={notificationsRef}>
-                 <button onClick={() => setNotificationsOpen(!notificationsOpen)} className={`p-3 rounded-2xl transition-all relative active:scale-90 ${notificationsOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="Feed de Alterações"><Bell size={22} /><span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-50 border-2 border-white dark:border-slate-900 rounded-full"></span></button>
+                 <button onClick={() => setNotificationsOpen(!notificationsOpen)} className={`p-2 rounded-xl transition-all relative active:scale-90 ${notificationsOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="Feed de Alterações"><Bell size={18} /><span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-50 border-2 border-white dark:border-slate-900 rounded-full"></span></button>
                  {notificationsOpen && (
                    <div className="fixed sm:absolute inset-x-4 sm:inset-auto top-24 sm:top-full sm:right-0 mt-0 sm:mt-4 w-auto sm:w-[380px] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden z-[100] animate-in fade-in slide-in-from-top-4 duration-300">
                       <div className="p-5 border-b border-slate-50 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 flex items-center justify-between"><div className="flex items-center gap-2"><History size={16} className="text-blue-500" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Feed de Atividade</h3></div><button onClick={() => setNotificationsOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button></div>
@@ -244,6 +351,30 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           </div>
         </header>
         <main ref={mainRef} className="flex-1 overflow-y-auto p-4 md:p-8 pt-6 scroll-smooth bg-slate-50/50 dark:bg-slate-950/50 transition-colors duration-300 touch-pan-y" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>{children}</main>
+        
+        {/* Modal do Scanner */}
+        {scannerOpen && (
+          <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-xl p-4 animate-in fade-in duration-300">
+             <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 flex flex-col animate-in zoom-in-95 duration-300">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                   <div className="flex items-center gap-3 text-blue-600">
+                      <Scan size={20} />
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Leitor QR Ativo</h3>
+                   </div>
+                   <button onClick={() => setScannerOpen(false)} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><X size={28}/></button>
+                </div>
+                <div className="p-6">
+                   <div id="qr-reader" className="w-full"></div>
+                </div>
+                <div className="p-8 bg-slate-50 dark:bg-slate-800/50 text-center">
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] leading-relaxed">
+                     Aponte para o código na etiqueta técnica<br/>para aceder instantaneamente aos dados.
+                   </p>
+                </div>
+             </div>
+          </div>
+        )}
+
         <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-3">
           {showScrollTop && <button onClick={scrollToTop} className="p-3.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full shadow-xl border border-slate-100 dark:border-slate-700 hover:bg-slate-50 transition-all transform hover:scale-110 active:scale-95" title="Topo"><ArrowUp size={20} /></button>}
           {showFab && <Link to={fabConfig.to} className="p-5 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-600/40 hover:bg-blue-700 hover:scale-110 transition-all transform flex items-center justify-center active:scale-95" title={fabConfig.title}><Plus size={28} /></Link>}

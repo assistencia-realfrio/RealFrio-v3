@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import QRCode from 'qrcode';
 import SignatureCanvas from '../components/SignatureCanvas';
 import OSStatusBadge from '../components/OSStatusBadge';
 import { OSStatus, ServiceOrder, PartUsed, PartCatalogItem, OSPhoto, OSNote, OSActivity } from '../types';
@@ -530,9 +531,27 @@ export const ServiceOrderDetail: React.FC = () => {
     }
   };
 
-  const generateEquipmentTag = () => {
+  const generateEquipmentTag = async () => {
     if (!os) return;
     
+    // 1. Gerar QR Code para a ficha do ativo com URL robusto
+    let qrDataUrl = '';
+    if (os.equipment_id) {
+      // Construção robusta do link para Single Page Apps com HashRouter
+      const baseUrl = window.location.href.split('#')[0];
+      const qrUrl = `${baseUrl}#/equipments/${os.equipment_id}`;
+      
+      try {
+        qrDataUrl = await QRCode.toDataURL(qrUrl, { 
+          margin: 1, 
+          width: 300,
+          color: { dark: '#000000', light: '#ffffff' }
+        });
+      } catch (err) {
+        console.error("Erro ao gerar QR Code:", err);
+      }
+    }
+
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -551,8 +570,8 @@ export const ServiceOrderDetail: React.FC = () => {
     doc.setFont("helvetica", "bold");
     doc.text("REAL FRIO - IDENTIFICAÇÃO TÉCNICA", pageWidth / 2, margin + 10, { align: "center" });
 
-    // CÓDIGO DA OS (Ajustado para não sobrepor nada)
-    doc.setFontSize(38); // Reduzido de 50 para evitar overflow
+    // CÓDIGO DA OS
+    doc.setFontSize(38);
     doc.setFont("helvetica", "bold");
     doc.text(os.code, pageWidth / 2, margin + 30, { align: "center" });
 
@@ -570,10 +589,21 @@ export const ServiceOrderDetail: React.FC = () => {
     const splitClient = doc.splitTextToSize(clientName, pageWidth - (margin * 2) - 20);
     doc.text(splitClient, margin + 8, margin + 60);
 
-    // Secção Equipamento
+    // Secção Equipamento / Ativo (QR Code agora nesta secção)
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text("EQUIPAMENTO / ATIVO:", margin + 8, margin + 85);
+    
+    // Inserir QR Code AO LADO dos dados do equipamento
+    if (qrDataUrl) {
+       doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 48, margin + 82, 40, 40);
+       doc.setFontSize(6.5);
+       doc.setFont("helvetica", "bold");
+       doc.setTextColor(150, 150, 150);
+       doc.text("SCAN PARA FICHA DO ATIVO", pageWidth - margin - 28, margin + 123.5, { align: "center" });
+    }
+
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
     const equipText = (os.equipment?.type || 'NÃO DEFINIDO').toUpperCase();
@@ -587,27 +617,26 @@ export const ServiceOrderDetail: React.FC = () => {
     doc.setFont("helvetica", "normal");
     doc.text(`S/N: ${os.equipment?.serial_number || '---'}`.toUpperCase(), margin + 8, margin + 112);
 
-    // Secção Pedido / Avaria (Destaque conforme imagem)
+    // Secção Pedido / Avaria (Ocupa agora a largura total novamente)
     doc.setLineWidth(0.3);
-    doc.line(margin + 5, margin + 120, pageWidth - margin - 5, margin + 120);
+    doc.line(margin + 5, margin + 128, pageWidth - margin - 5, margin + 128);
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text("PEDIDO DO CLIENTE / AVARIA:", margin + 8, margin + 128);
+    doc.text("PEDIDO DO CLIENTE / AVARIA:", margin + 8, margin + 136);
     
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0);
     const pedidoText = (os.description || "NÃO ESPECIFICADO").toUpperCase();
-    const splitDesc = doc.splitTextToSize(pedidoText, pageWidth - (margin * 2) - 25);
-    doc.text(splitDesc, margin + 8, margin + 138);
-    
+    const splitDesc = doc.splitTextToSize(pedidoText, pageWidth - (margin * 2) - 16);
+    doc.text(splitDesc, margin + 8, margin + 146);
+
     // Data de Entrada (Canto inferior direito)
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 100, 100);
     const dateStr = `ENTRADA: ${new Date(os.created_at).toLocaleDateString('pt-PT')}`;
-    doc.text(dateStr, pageWidth - margin - 8, margin + 164, { align: "right" });
+    doc.text(dateStr, pageWidth - margin - 8, margin + 168, { align: "right" });
 
     doc.autoPrint();
     const blobUrl = doc.output('bloburl');
@@ -1122,13 +1151,13 @@ export const ServiceOrderDetail: React.FC = () => {
                )}
             </div>
 
-            {/* BOTÃO IMPRIMIR ETIQUETA (POSIÇÃO: ENTRE PLANEAMENTO E LOG) */}
+            {/* BOTÃO IMPRIMIR ETIQUETA COM QR CODE */}
             {os?.equipment && (
               <button 
                 onClick={generateEquipmentTag}
                 className="w-full py-3 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-2xl text-[10px] font-black uppercase tracking-[0.25em] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center justify-center gap-2.5 shadow-sm active:scale-95"
               >
-                <Printer size={16} /> IMPRIMIR ETIQUETA
+                <Printer size={16} /> IMPRIMIR ETIQUETA COM QR CODE
               </button>
             )}
 
