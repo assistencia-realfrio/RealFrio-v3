@@ -12,7 +12,7 @@ import {
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
   RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
   Settings2, FileDown, Key, Mail, Share2, UploadCloud, Play, Square as StopIcon, Timer, CloudRain,
-  Wrench, Snowflake, Printer
+  Wrench, Snowflake, Printer, Check
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -897,6 +897,7 @@ export const ServiceOrderDetail: React.FC = () => {
       const part = partsUsed.find(p => p.id === partUsedId);
       await mockData.updateOSPart(partUsedId, { quantity: numericQuantity });
       await mockData.addOSActivity(id, { description: `AJUSTOU QTD MATERIAL (${part?.name}): PARA ${numericQuantity.toLocaleString('pt-PT')}` });
+      setShowEditQuantityModal(false);
       fetchOSDetails(false);
     } finally { setActionLoading(false); }
   };
@@ -1415,6 +1416,291 @@ export const ServiceOrderDetail: React.FC = () => {
                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-6 uppercase">Preencha os seguintes campos para concluir:</p>
                  <div className="space-y-2 mb-8">{missingFields.map((field, idx) => (<div key={idx} className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 p-3 rounded-xl text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest">{field}</div>))}</div>
                  <button onClick={() => setShowValidationErrorModal(false)} className="w-full py-4 bg-slate-900 dark:bg-blue-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ENTENDIDO, VOU PREENCHER</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {showTagPreview && tagPdfUrl && (
+        <div className="fixed inset-0 z-[500] bg-slate-900/90 backdrop-blur-md flex flex-col p-4 sm:p-8 animate-in fade-in duration-300">
+           <div className="w-full max-w-5xl mx-auto flex-1 flex flex-col bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden border border-white/10">
+              <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                 <div className="flex items-center gap-3">
+                   <Printer size={20} className="text-blue-600" />
+                   <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Pré-visualização da Etiqueta</h3>
+                 </div>
+                 <button onClick={() => { setShowTagPreview(false); setTagPdfUrl(null); }} className="text-gray-400 hover:text-red-500 p-2 transition-colors"><X size={28}/></button>
+              </div>
+              <div className="flex-1 relative bg-slate-100 dark:bg-slate-950 p-4 sm:p-8 flex items-center justify-center">
+                 <iframe 
+                   id="tag-preview-iframe"
+                   src={tagPdfUrl} 
+                   className="w-full h-full rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 bg-white"
+                   title="PDF Preview"
+                 />
+              </div>
+              <div className="p-8 border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+                 <button 
+                  onClick={handlePrintTag}
+                  className="w-full bg-blue-600 text-white py-5 rounded-[2rem] text-sm font-black uppercase tracking-[0.25em] shadow-2xl hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-3"
+                 >
+                   <Printer size={24} /> ENVIAR PARA A IMPRESSORA
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {showTimerTypeModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4 animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-white/10">
+              <div className="p-10 text-center">
+                 <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
+                    <Clock size={40} />
+                 </div>
+                 <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-3">Registar Tempo</h3>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-10 uppercase tracking-widest">
+                    Selecione o tipo de intervenção efetuada para contabilização:
+                 </p>
+                 
+                 <div className="grid grid-cols-1 gap-4">
+                    <button 
+                      onClick={() => handleConfirmTimerRegistration('GERAL')}
+                      className="group flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 hover:bg-blue-600 hover:text-white rounded-[2rem] transition-all active:scale-95 border border-transparent hover:shadow-xl hover:shadow-blue-600/20"
+                    >
+                       <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 text-blue-600 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white">
+                             <Wrench size={20} />
+                          </div>
+                          <span className="text-sm font-black uppercase tracking-tight">Mão de Obra Geral</span>
+                       </div>
+                       <ChevronRight size={18} className="opacity-30 group-hover:opacity-100" />
+                    </button>
+
+                    <button 
+                      onClick={() => handleConfirmTimerRegistration('FRIO')}
+                      className="group flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 hover:bg-emerald-600 hover:text-white rounded-[2rem] transition-all active:scale-95 border border-transparent hover:shadow-xl hover:shadow-emerald-600/20"
+                    >
+                       <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white">
+                             <Snowflake size={20} />
+                          </div>
+                          <span className="text-sm font-black uppercase tracking-tight">Mão de Obra Frio</span>
+                       </div>
+                       <ChevronRight size={18} className="opacity-30 group-hover:opacity-100" />
+                    </button>
+                 </div>
+
+                 <button 
+                    onClick={() => setShowTimerTypeModal(false)}
+                    className="mt-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] hover:text-red-500 transition-colors"
+                 >
+                    CANCELAR E MANTER ATIVO
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL ADICIONAR MATERIAL */}
+      {showPartModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border border-white/5">
+            <div className="p-8 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+               <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Adicionar Material</h3>
+               <button onClick={() => setShowPartModal(false)} className="text-gray-400 hover:text-red-500 p-2"><X size={24}/></button>
+            </div>
+            
+            <div className="p-8 overflow-y-auto no-scrollbar space-y-6">
+              {!isCreatingNewPart ? (
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      placeholder="Pesquisar no catálogo..." 
+                      className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all uppercase"
+                      value={partSearchTerm}
+                      onChange={(e) => setPartSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
+                    {filteredCatalog.length === 0 ? (
+                      <div className="text-center py-10 opacity-30">
+                        <p className="text-[10px] font-black uppercase">Nenhum artigo encontrado</p>
+                      </div>
+                    ) : (
+                      filteredCatalog.map(item => (
+                        <button 
+                          key={item.id} 
+                          onClick={() => setSelectedPartId(item.id)}
+                          className={`w-full text-left p-4 rounded-2xl border transition-all flex justify-between items-center ${selectedPartId === item.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs font-black uppercase truncate ${selectedPartId === item.id ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{item.name}</p>
+                            <p className={`text-[9px] font-bold uppercase tracking-widest ${selectedPartId === item.id ? 'text-blue-100' : 'text-slate-400'}`}>REF: {item.reference}</p>
+                          </div>
+                          {selectedPartId === item.id && <Check size={18} />}
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  <button 
+                    onClick={() => setIsCreatingNewPart(true)}
+                    className="w-full py-4 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest hover:underline text-center"
+                  >
+                    + Criar Artigo Fora do Catálogo
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dados do Novo Artigo</h4>
+                  <input 
+                    type="text" placeholder="Designação do Artigo *" 
+                    className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-black uppercase outline-none dark:text-white"
+                    value={newPartForm.name} onChange={(e) => setNewPartForm({...newPartForm, name: e.target.value})}
+                  />
+                  <input 
+                    type="text" placeholder="Referência (Opcional)" 
+                    className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-black uppercase outline-none dark:text-white"
+                    value={newPartForm.reference} onChange={(e) => setNewPartForm({...newPartForm, reference: e.target.value})}
+                  />
+                  <button 
+                    onClick={() => setIsCreatingNewPart(false)}
+                    className="w-full py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:underline text-center"
+                  >
+                    Voltar para Pesquisa no Catálogo
+                  </button>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-slate-50 dark:border-slate-800">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Quantidade a Aplicar</label>
+                <div className="flex items-center gap-4">
+                   <input 
+                    type="text" inputMode="decimal"
+                    className="flex-1 px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-lg font-black dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 text-center"
+                    value={partQuantityStr}
+                    onChange={(e) => setPartQuantityStr(e.target.value)}
+                   />
+                   <span className="text-xs font-black text-slate-400 uppercase">UN</span>
+                </div>
+              </div>
+
+              <button 
+                onClick={isCreatingNewPart ? handleCreateAndAddPart : handleAddPart}
+                disabled={actionLoading || (!selectedPartId && !newPartForm.name)}
+                className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {actionLoading ? <RefreshCw className="animate-spin mx-auto" /> : 'CONFIRMAR ADIÇÃO'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDITAR QUANTIDADE MATERIAL */}
+      {showEditQuantityModal && partToEditQuantity && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-white/5">
+             <div className="p-8 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Ajustar Quantidade</h3>
+                <button onClick={() => setShowEditQuantityModal(false)} className="text-gray-400 hover:text-red-500 p-2"><X size={24}/></button>
+             </div>
+             <div className="p-8 space-y-6">
+                <div className="text-center">
+                   <p className="text-xs font-black text-slate-900 dark:text-white uppercase truncate">{partToEditQuantity.name}</p>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">REF: {partToEditQuantity.reference}</p>
+                </div>
+                <div>
+                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 text-center">Nova Quantidade</label>
+                   <input 
+                    autoFocus
+                    type="text" inputMode="decimal"
+                    className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-2xl font-black text-blue-600 dark:text-blue-400 outline-none focus:ring-4 focus:ring-blue-500/10 text-center"
+                    value={tempQuantityStr}
+                    onChange={(e) => setTempQuantityStr(e.target.value)}
+                   />
+                </div>
+                <button 
+                  onClick={() => handleUpdatePartQuantity(partToEditQuantity.id, tempQuantityStr)}
+                  disabled={actionLoading}
+                  className="w-full bg-blue-600 text-white py-5 rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 transition-all"
+                >
+                  {actionLoading ? <RefreshCw className="animate-spin mx-auto" /> : 'GUARDAR ALTERAÇÃO'}
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIRMAÇÃO ELIMINAR MATERIAL */}
+      {showDeletePartModal && partToDelete && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                 <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Trash2 size={32}/></div>
+                 <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Eliminar Material</h3>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-6 uppercase">Remover "{partToDelete.name}" da lista de material aplicado?</p>
+                 <div className="grid grid-cols-2 gap-3">
+                    <button onClick={() => setShowDeletePartModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button>
+                    <button onClick={handleDeletePart} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ELIMINAR</button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIRMAÇÃO ELIMINAR FOTO */}
+      {showDeletePhotoModal && photoToDelete && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                 <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><Trash2 size={32}/></div>
+                 <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Remover Foto</h3>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-6 uppercase">Eliminar esta evidência fotográfica permanentemente?</p>
+                 <div className="grid grid-cols-2 gap-3">
+                    <button onClick={() => setShowDeletePhotoModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button>
+                    <button onClick={handleDeletePhoto} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ELIMINAR</button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIRMAÇÃO FINALIZAR OS */}
+      {showFinalizeModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                 <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><CheckCircle2 size={32}/></div>
+                 <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Concluir Intervenção</h3>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-6 uppercase">Confirmar o fecho desta Ordem de Serviço? Os dados ficarão bloqueados para edição.</p>
+                 <div className="grid grid-cols-2 gap-3">
+                    <button onClick={() => setShowFinalizeModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">VOLTAR</button>
+                    <button onClick={async () => { setShowFinalizeModal(false); await handleUpdateStatus(OSStatus.CONCLUIDA); }} className="py-4 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">CONCLUIR AGORA</button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL REABRIR OS */}
+      {showReopenModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                 <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><RotateCw size={32}/></div>
+                 <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Reabrir OS</h3>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase">Selecione o novo estado para a OS reaberta:</p>
+                 <div className="space-y-2">
+                    <button onClick={() => handleSelectReopenStatus(OSStatus.INICIADA)} className="w-full py-4 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-100 transition-all">MARCAR COMO INICIADA</button>
+                    <button onClick={() => handleSelectReopenStatus(OSStatus.AGUARDA_PECAS)} className="w-full py-4 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-orange-100 transition-all">AGUARDA PEÇAS</button>
+                    <button onClick={() => handleSelectReopenStatus(OSStatus.PARA_ORCAMENTO)} className="w-full py-4 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-yellow-100 transition-all">PARA ORÇAMENTO</button>
+                    <button onClick={() => setShowReopenModal(false)} className="w-full py-4 mt-4 text-slate-400 font-black text-[9px] uppercase tracking-widest">CANCELAR</button>
+                 </div>
               </div>
            </div>
         </div>

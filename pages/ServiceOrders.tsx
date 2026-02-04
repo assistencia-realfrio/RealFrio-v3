@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HardDrive, Filter, MapPin, ChevronDown, RefreshCw, Calendar, LayoutList, StretchHorizontal, ShieldAlert, X } from 'lucide-react';
+import { HardDrive, Filter, MapPin, ChevronDown, RefreshCw, Calendar, LayoutList, StretchHorizontal, ShieldAlert, X, Timer } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { ServiceOrder, OSStatus } from '../types';
 import { useStore } from '../contexts/StoreContext';
@@ -48,6 +49,9 @@ const ServiceOrders: React.FC = () => {
   
   useEffect(() => {
     fetchOrders();
+    // Sincronização periódica opcional para atualizar estados de cronómetros vindos de outros técnicos
+    const interval = setInterval(fetchOrdersSilently, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchOrders = async () => {
@@ -59,6 +63,15 @@ const ServiceOrders: React.FC = () => {
       console.error('Erro ao carregar OS:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchOrdersSilently = async () => {
+    try {
+      const data = await mockData.getServiceOrders();
+      setAllOrders(data || []);
+    } catch (error) {
+      console.warn('Erro na atualização silenciosa');
     }
   };
 
@@ -119,6 +132,10 @@ const ServiceOrders: React.FC = () => {
         return matchesStatus;
       })
       .sort((a, b) => {
+        // Prioridade para cronómetros ativos
+        if (a.timer_is_active && !b.timer_is_active) return -1;
+        if (!a.timer_is_active && b.timer_is_active) return 1;
+
         const weightA = STATUS_ORDER_WEIGHT[a.status] ?? 99;
         const weightB = STATUS_ORDER_WEIGHT[b.status] ?? 99;
         if (weightA !== weightB) return weightA - weightB;
@@ -219,110 +236,129 @@ const ServiceOrders: React.FC = () => {
                </p>
             </div>
           ) : (
-            sortedAndFilteredOrders.map((os) => (
-              <div 
-                key={os.id} 
-                onClick={() => navigate(`/os/${os.id}`)}
-                className={`group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 border-l-4 hover:shadow-lg transition-all duration-200 block cursor-pointer ${getStoreColorClass(os.store)} ${viewMode === 'compact' ? 'p-3' : 'p-5'}`}
-              >
-                {viewMode === 'compact' ? (
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center">
-                      <span className={`text-[10px] font-mono font-black uppercase tracking-tighter ${getStoreTextColorClass(os.store)}`}>
-                        {os.code}
-                      </span>
-                      <div className="relative" onClick={(e) => e.stopPropagation()}>
-                        {updatingId === os.id ? (
-                          <RefreshCw size={12} className="animate-spin text-blue-600" />
-                        ) : (
-                          <>
-                            <OSStatusBadge status={os.status} className="cursor-pointer hover:opacity-80 transition-opacity" />
-                            <select
-                              value={os.status}
-                              onChange={(e) => handleQuickStatusChange(e, os.id)}
-                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full bg-white dark:bg-slate-900"
-                            >
-                              {Object.values(OSStatus).map((status) => (
-                                <option key={status} value={status} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
-                                  {getStatusLabelText(status).toUpperCase()}
-                                </option>
-                              ))}
-                            </select>
-                          </>
-                        )}
+            sortedAndFilteredOrders.map((os) => {
+              const isTimerActive = !!os.timer_is_active;
+              
+              return (
+                <div 
+                  key={os.id} 
+                  onClick={() => navigate(`/os/${os.id}`)}
+                  className={`group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 border-l-4 hover:shadow-lg transition-all duration-200 block cursor-pointer relative overflow-hidden ${getStoreColorClass(os.store)} ${viewMode === 'compact' ? 'p-3' : 'p-5'} ${isTimerActive ? 'ring-2 ring-red-500 ring-offset-2 dark:ring-offset-slate-950 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.2)] z-10 scale-[1.01]' : ''}`}
+                >
+                  {isTimerActive && (
+                    <div className="absolute top-0 right-0 p-1.5 bg-red-500 text-white rounded-bl-xl z-20 shadow-md">
+                      <Timer size={12} className="animate-spin" />
+                    </div>
+                  )}
+
+                  {viewMode === 'compact' ? (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-mono font-black uppercase tracking-tighter ${isTimerActive ? 'text-red-600' : getStoreTextColorClass(os.store)}`}>
+                            {os.code}
+                          </span>
+                          {isTimerActive && <span className="text-[7px] font-black bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full uppercase tracking-widest animate-bounce">Live</span>}
+                        </div>
+                        <div className="relative" onClick={(e) => e.stopPropagation()}>
+                          {updatingId === os.id ? (
+                            <RefreshCw size={12} className="animate-spin text-blue-600" />
+                          ) : (
+                            <>
+                              <OSStatusBadge status={os.status} className="cursor-pointer hover:opacity-80 transition-opacity" />
+                              <select
+                                value={os.status}
+                                onChange={(e) => handleQuickStatusChange(e, os.id)}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full bg-white dark:bg-slate-900"
+                              >
+                                {Object.values(OSStatus).map((status) => (
+                                  <option key={status} value={status} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+                                    {getStatusLabelText(status).toUpperCase()}
+                                  </option>
+                                ))}
+                              </select>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <h3 className={`text-sm font-black uppercase truncate ${isTimerActive ? 'text-red-700 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>
+                          {os.client?.name}
+                        </h3>
+                        <div className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-tight truncate mt-0.5 flex items-center gap-1.5">
+                          <span>{os.equipment?.type}</span>
+                          <span className="opacity-20">|</span>
+                          <span>{os.equipment?.brand}</span>
+                        </div>
                       </div>
                     </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase truncate">
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-center mb-1 gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`text-[10px] font-black uppercase tracking-widest truncate ${isTimerActive ? 'text-red-600' : getStoreTextColorClass(os.store)}`}>
+                            {os.code}
+                          </span>
+                          {isTimerActive && (
+                            <div className="flex items-center gap-1 px-2 py-0.5 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-full">
+                               <Timer size={10} className="text-red-600" />
+                               <span className="text-[7px] font-black text-red-600 uppercase tracking-widest">Cronómetro Ativo</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="relative flex-shrink-0 mr-1" onClick={(e) => e.stopPropagation()}>
+                          {updatingId === os.id ? (
+                            <div className="bg-gray-100 dark:bg-slate-800 px-3 py-1 rounded-full flex items-center gap-2">
+                              <RefreshCw size={12} className="animate-spin text-blue-600" />
+                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <OSStatusBadge status={os.status} className="cursor-pointer hover:opacity-80 transition-opacity" />
+                              <select
+                                value={os.status}
+                                onChange={(e) => handleQuickStatusChange(e, os.id)}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full bg-white dark:bg-slate-900"
+                              >
+                                {Object.values(OSStatus).map((status) => (
+                                  <option key={status} value={status} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+                                    {getStatusLabelText(status).toUpperCase()}
+                                  </option>
+                                ))}
+                              </select>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <h3 className={`text-xl font-black leading-tight uppercase transition-colors truncate mb-2 ${isTimerActive ? 'text-red-700 dark:text-red-400' : 'text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400'}`}>
                         {os.client?.name}
                       </h3>
-                      <div className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-tight truncate mt-0.5 flex items-center gap-1.5">
-                        <span>{os.equipment?.type}</span>
-                        <span className="opacity-20">|</span>
-                        <span>{os.equipment?.brand}</span>
+
+                      <div className="text-base font-black text-slate-900 dark:text-slate-200 uppercase tracking-tight mb-2">
+                         {os.equipment?.type} <span className="mx-1 opacity-20">|</span> {os.equipment?.brand}
                       </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex justify-between items-center mb-1 gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`text-[10px] font-black uppercase tracking-widest truncate ${getStoreTextColorClass(os.store)}`}>
-                          {os.code}
-                        </span>
-                      </div>
-                      <div className="relative flex-shrink-0 mr-1" onClick={(e) => e.stopPropagation()}>
-                        {updatingId === os.id ? (
-                          <div className="bg-gray-100 dark:bg-slate-800 px-3 py-1 rounded-full flex items-center gap-2">
-                            <RefreshCw size={12} className="animate-spin text-blue-600" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">...</span>
+
+                      <div className="pt-3 border-t border-gray-50 dark:border-slate-800 space-y-2">
+                        <p className={`text-sm font-normal uppercase leading-relaxed ${isTimerActive ? 'text-red-900/70 dark:text-red-300/70' : 'text-slate-900 dark:text-slate-300'}`}>
+                          "{os.description}"
+                        </p>
+                        
+                        {os.scheduled_date && (
+                          <div className="flex items-center gap-2 text-slate-900 dark:text-slate-400 mt-1">
+                            <Calendar size={12} className={isTimerActive ? "text-red-500" : "text-blue-500"} />
+                            <span className="text-[10px] font-normal uppercase tracking-widest">
+                              Agendamento: {formatScheduledInfo(os.scheduled_date)}
+                            </span>
                           </div>
-                        ) : (
-                          <>
-                            <OSStatusBadge status={os.status} className="cursor-pointer hover:opacity-80 transition-opacity" />
-                            <select
-                              value={os.status}
-                              onChange={(e) => handleQuickStatusChange(e, os.id)}
-                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full bg-white dark:bg-slate-900"
-                            >
-                              {Object.values(OSStatus).map((status) => (
-                                <option key={status} value={status} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
-                                  {getStatusLabelText(status).toUpperCase()}
-                                </option>
-                              ))}
-                            </select>
-                          </>
                         )}
                       </div>
-                    </div>
-
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight uppercase group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate mb-2">
-                      {os.client?.name}
-                    </h3>
-
-                    <div className="text-base font-black text-slate-900 dark:text-slate-200 uppercase tracking-tight mb-2">
-                       {os.equipment?.type} <span className="mx-1 opacity-20">|</span> {os.equipment?.brand}
-                    </div>
-
-                    <div className="pt-3 border-t border-gray-50 dark:border-slate-800 space-y-2">
-                      <p className="text-sm font-normal text-slate-900 dark:text-slate-300 uppercase leading-relaxed">
-                        "{os.description}"
-                      </p>
-                      
-                      {os.scheduled_date && (
-                        <div className="flex items-center gap-2 text-slate-900 dark:text-slate-400 mt-1">
-                          <Calendar size={12} className="text-blue-500" />
-                          <span className="text-[10px] font-normal uppercase tracking-widest">
-                            Agendamento: {formatScheduledInfo(os.scheduled_date)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            ))
+                    </>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       )}
