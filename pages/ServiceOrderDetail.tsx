@@ -22,7 +22,7 @@ import OSStatusBadge from '../components/OSStatusBadge';
 import { OSStatus, ServiceOrder, PartUsed, PartCatalogItem, OSPhoto, OSNote, OSActivity } from '../types';
 import { generateOSReportSummary } from '../services/geminiService';
 import { mockData } from '../services/mockData';
-import { normalizeString } from '../utils';
+import { normalizeString, compressImage } from '../utils';
 import FloatingEditBar from '../components/FloatingEditBar';
 
 const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
@@ -489,15 +489,18 @@ export const ServiceOrderDetail: React.FC = () => {
     let file = fileOrEvent instanceof File ? fileOrEvent : fileOrEvent.target.files?.[0];
     if (!file || !id) return;
     setIsUploadingPhoto(true);
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      try {
-        await mockData.addOSPhoto(id, { url: reader.result as string, type });
-        await mockData.addOSActivity(id, { description: `ADICIONOU FOTO: ${type.toUpperCase()}` });
-        fetchOSDetails(false);
-      } catch (err: any) { setErrorMessage("ERRO AO CARREGAR FOTO."); } finally { setIsUploadingPhoto(false); }
-    };
-    reader.readAsDataURL(file);
+    try {
+      // Comprimir imagem antes do upload
+      const compressedBase64 = await compressImage(file);
+      await mockData.addOSPhoto(id, { url: compressedBase64, type });
+      await mockData.addOSActivity(id, { description: `ADICIONOU FOTO: ${type.toUpperCase()}` });
+      fetchOSDetails(false);
+    } catch (err: any) { 
+      console.error(err);
+      setErrorMessage("ERRO AO COMPRIMIR/CARREGAR FOTO."); 
+    } finally { 
+      setIsUploadingPhoto(false); 
+    }
   };
 
   const handleDrag = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); };
@@ -588,6 +591,22 @@ export const ServiceOrderDetail: React.FC = () => {
                     </button>
                  </div>
                  <button onClick={() => setShowSourceModal(false)} className="mt-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] hover:text-slate-600">CANCELAR</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Loader Global para Upload */}
+      {isUploadingPhoto && (
+        <div className="fixed inset-0 z-[700] bg-slate-900/60 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 border border-white/10">
+              <div className="relative">
+                 <Loader2 size={48} className="text-blue-600 animate-spin" />
+                 <Camera size={20} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-400" />
+              </div>
+              <div className="text-center">
+                 <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Otimizando Imagem</p>
+                 <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">A comprimir e carregar...</p>
               </div>
            </div>
         </div>

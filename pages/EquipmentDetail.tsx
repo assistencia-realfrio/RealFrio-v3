@@ -6,11 +6,12 @@ import {
   Paperclip, Plus, Trash2, Camera, MapPin, Building2, ExternalLink,
   ChevronRight, Download, FileText, X, Eye, Activity, Tag, UploadCloud,
   FileImage, AlertTriangle, ShieldAlert, Printer, FileImage as ImageIcon2,
-  Image as LucideImage
+  Image as LucideImage, Loader2
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { mockData } from '../services/mockData';
 import { Equipment, ServiceOrder, EquipmentAttachment, OSStatus } from '../types';
+import { compressImage } from '../utils';
 import OSStatusBadge from '../components/OSStatusBadge';
 
 // Componente de Diálogo de Confirmação
@@ -136,14 +137,15 @@ const EquipmentDetail: React.FC = () => {
     let file = fileOrEvent instanceof File ? fileOrEvent : fileOrEvent.target.files?.[0];
     if (file && equipment) {
       setIsUploading(true);
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result as string;
-        await mockData.updateEquipment(equipment.id, { nameplate_url: base64 });
-        setEquipment(prev => prev ? { ...prev, nameplate_url: base64 } : null);
+      try {
+        const compressedBase64 = await compressImage(file);
+        await mockData.updateEquipment(equipment.id, { nameplate_url: compressedBase64 });
+        setEquipment(prev => prev ? { ...prev, nameplate_url: compressedBase64 } : null);
+      } catch (err) {
+        console.error(err);
+      } finally {
         setIsUploading(false);
-      };
-      reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -151,15 +153,31 @@ const EquipmentDetail: React.FC = () => {
     let file = fileOrEvent instanceof File ? fileOrEvent : fileOrEvent.target.files?.[0];
     if (file && equipment) {
       const fileName = prompt("Nome amigável para este anexo:", file.name) || file.name;
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result as string;
-        const newAttachment: EquipmentAttachment = { id: Math.random().toString(36).substr(2, 9), name: fileName, url: base64, created_at: new Date().toISOString() };
+      setIsUploading(true);
+      try {
+        let finalData: string;
+        // Só comprime se for imagem
+        if (file.type.startsWith('image/')) {
+          finalData = await compressImage(file);
+        } else {
+          // Se for PDF ou outro ficheiro, faz upload normal via FileReader
+          finalData = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file!);
+          });
+        }
+
+        const newAttachment: EquipmentAttachment = { id: Math.random().toString(36).substr(2, 9), name: fileName, url: finalData, created_at: new Date().toISOString() };
         const updatedAttachments = [...(equipment.attachments || []), newAttachment];
         await mockData.updateEquipment(equipment.id, { attachments: updatedAttachments });
         setEquipment(prev => prev ? { ...prev, attachments: updatedAttachments } : null);
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -210,6 +228,22 @@ const EquipmentDetail: React.FC = () => {
           setShowSourceModal(false); 
         }} 
       />
+
+      {/* Loader Global para Upload */}
+      {isUploading && (
+        <div className="fixed inset-0 z-[700] bg-slate-900/60 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 border border-white/10">
+              <div className="relative">
+                 <Loader2 size={48} className="text-blue-600 animate-spin" />
+                 <UploadCloud size={20} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-400" />
+              </div>
+              <div className="text-center">
+                 <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Processando Arquivo</p>
+                 <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">A otimizar e guardar dados...</p>
+              </div>
+           </div>
+        </div>
+      )}
 
       {/* Seletor de Origem */}
       {showSourceModal && (
@@ -295,7 +329,7 @@ const EquipmentDetail: React.FC = () => {
                     onDragOver={handleDrag}
                     onDragEnter={(e) => { handleDrag(e); setIsDraggingNameplate(true); }}
                     onDragLeave={(e) => { handleDrag(e); setIsDraggingNameplate(false); }}
-                    onDrop={(e) => {
+                    onDrop={async (e) => {
                       handleDrag(e); setIsDraggingNameplate(false); const files = e.dataTransfer.files;
                       if (files && files.length > 0) { const file = files[0]; if (file.type.startsWith('image/')) handleUploadNameplate(file); }
                     }}
