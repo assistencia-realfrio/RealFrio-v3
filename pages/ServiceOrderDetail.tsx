@@ -12,7 +12,7 @@ import {
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
   RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
   Settings2, FileDown, Key, Mail, Share2, UploadCloud, Play, Square as StopIcon, Timer, CloudRain,
-  Wrench, Snowflake, Printer, Check
+  Wrench, Snowflake, Printer, Check, Image as LucideImage
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -194,6 +194,12 @@ export const ServiceOrderDetail: React.FC = () => {
   const [expandedPlanning, setExpandedPlanning] = useState(false);
   const [expandedLog, setExpandedLog] = useState(false);
 
+  // Estados para Upload Seletivo
+  const [showSourceModal, setShowSourceModal] = useState(false);
+  const [pendingUploadType, setPendingUploadType] = useState<'antes' | 'depois' | 'peca' | 'geral' | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
   // Estados do Cronómetro PARTILHADO
   const [elapsedTime, setElapsedTime] = useState(0);
   const timerIntervalRef = useRef<number | null>(null);
@@ -270,14 +276,9 @@ export const ServiceOrderDetail: React.FC = () => {
   }, [os?.timer_is_active, os?.timer_start_time]);
 
   // Sincronização periódica da OS para apanhar mudanças de timer de outros utilizadores
-  // CRÍTICO: Só sincroniza se NÃO houver alterações locais pendentes (isDirty)
   useEffect(() => {
     if (!id || isDirty) return;
-    
-    const syncInterval = setInterval(() => {
-      fetchOSDetails(false);
-    }, 8000); 
-    
+    const syncInterval = setInterval(() => { fetchOSDetails(false); }, 8000); 
     return () => clearInterval(syncInterval);
   }, [id, isDirty]);
 
@@ -286,28 +287,16 @@ export const ServiceOrderDetail: React.FC = () => {
     setActionLoading(true);
     try {
       const now = new Date().toISOString();
-      await mockData.updateServiceOrder(id, { 
-        timer_is_active: true, 
-        timer_start_time: now 
-      });
+      await mockData.updateServiceOrder(id, { timer_is_active: true, timer_start_time: now });
       await mockData.addOSActivity(id, { description: "INICIOU CRONÓMETRO GLOBAL" });
       await fetchOSDetails(false);
-    } catch (e) {
-      setErrorMessage("ERRO AO INICIAR CRONÓMETRO.");
-    } finally {
-      setActionLoading(false);
-    }
+    } catch (e) { setErrorMessage("ERRO AO INICIAR CRONÓMETRO."); } finally { setActionLoading(false); }
   };
 
-  const handleStopTimer = () => {
-    if (!id || !os?.timer_start_time) return;
-    setShowTimerTypeModal(true);
-  };
+  const handleStopTimer = () => { if (!id || !os?.timer_start_time) return; setShowTimerTypeModal(true); };
 
-  // Função para Cancelar e Eliminar Tempo do Cronómetro
   const handleResetTimer = async () => {
     if (!id || !os?.timer_is_active) return;
-    
     setConfirmConfig({
       isOpen: true,
       title: 'Eliminar Tempo',
@@ -317,18 +306,11 @@ export const ServiceOrderDetail: React.FC = () => {
       action: async () => {
         setActionLoading(true);
         try {
-          await mockData.updateServiceOrder(id, { 
-            timer_is_active: false, 
-            timer_start_time: null 
-          });
+          await mockData.updateServiceOrder(id, { timer_is_active: false, timer_start_time: null });
           await mockData.addOSActivity(id, { description: "CANCELOU E ELIMINOU TEMPO DO CRONÓMETRO (SEM REGISTO)" });
           setElapsedTime(0);
           await fetchOSDetails(false);
-        } catch (e) {
-          setErrorMessage("ERRO AO ELIMINAR TEMPO.");
-        } finally {
-          setActionLoading(false);
-        }
+        } catch (e) { setErrorMessage("ERRO AO ELIMINAR TEMPO."); } finally { setActionLoading(false); }
       }
     });
   };
@@ -337,48 +319,20 @@ export const ServiceOrderDetail: React.FC = () => {
     if (!id || !os?.timer_start_time) return;
     setActionLoading(true);
     setShowTimerTypeModal(false);
-    
     try {
       const startTime = new Date(os.timer_start_time).getTime();
       const finalElapsed = Date.now() - startTime;
       const minutes = Math.max(1, Math.round(finalElapsed / 60000));
       const hours = Number((minutes / 60).toFixed(2));
-      
       const designation = type === 'FRIO' ? "MÃO DE OBRA FRIO" : "MÃO DE OBRA GERAL";
       const reference = type === 'FRIO' ? "MO-FRIO" : "MO-GERAL";
-
-      // 1. Limpar estado na OS
-      await mockData.updateServiceOrder(id, { 
-        timer_is_active: false, 
-        timer_start_time: null 
-      });
-
-      // 2. Adicionar à lista de materiais
-      await mockData.addOSPart(id, {
-        name: designation,
-        reference: reference,
-        quantity: hours
-      });
-
-      // 3. Adicionar entrada de tempo oficial
-      await mockData.createTimeEntry({
-        os_id: id,
-        start_time: os.timer_start_time,
-        duration_minutes: minutes,
-        description: `Registo cronómetro: ${designation}`
-      });
-
-      await mockData.addOSActivity(id, { 
-        description: `PAROU CRONÓMETRO: REGISTADO ${minutes} MINUTOS COMO ${designation}` 
-      });
-
+      await mockData.updateServiceOrder(id, { timer_is_active: false, timer_start_time: null });
+      await mockData.addOSPart(id, { name: designation, reference: reference, quantity: hours });
+      await mockData.createTimeEntry({ os_id: id, start_time: os.timer_start_time, duration_minutes: minutes, description: `Registo cronómetro: ${designation}` });
+      await mockData.addOSActivity(id, { description: `PAROU CRONÓMETRO: REGISTADO ${minutes} MINUTOS COMO ${designation}` });
       setElapsedTime(0);
       fetchOSDetails(false);
-    } catch (e) {
-      setErrorMessage("ERRO AO FINALIZAR REGISTO DE TEMPO.");
-    } finally {
-      setActionLoading(false);
-    }
+    } catch (e) { setErrorMessage("ERRO AO FINALIZAR REGISTO DE TEMPO."); } finally { setActionLoading(false); }
   };
 
   const formatElapsedTime = (ms: number) => {
@@ -404,7 +358,6 @@ export const ServiceOrderDetail: React.FC = () => {
       const osData = await mockData.getServiceOrderById(id);
       if (osData) {
         setOs(osData);
-        
         if (showLoader || !isDirty) {
           setDescription(osData.description || '');
           setAnomaly(osData.anomaly_detected || '');
@@ -414,59 +367,29 @@ export const ServiceOrderDetail: React.FC = () => {
           setTechnicianSignature(osData.technician_signature && osData.technician_signature.trim() !== '' ? osData.technician_signature : null);
           setIsWarranty(!!osData.is_warranty);
           setWarrantyInfo(osData.warranty_info || {});
-          
           if (osData.scheduled_date) {
             const parts = osData.scheduled_date.split(/[T ]/);
             setScheduledDate(parts[0] || '');
             setScheduledTime((parts[1] || '').substring(0, 5));
-          } else {
-            setScheduledDate('');
-            setScheduledTime('');
-          }
+          } else { setScheduledDate(''); setScheduledTime(''); }
         }
-
-        const [p, ph, n, act] = await Promise.all([
-          mockData.getOSParts(id),
-          mockData.getOSPhotos(id),
-          mockData.getOSNotes(id),
-          mockData.getOSActivity(id)
-        ]);
-        setPartsUsed(p);
-        setPhotos(ph);
-        setNotesList(n);
-        setActivities(act);
+        const [p, ph, n, act] = await Promise.all([ mockData.getOSParts(id), mockData.getOSPhotos(id), mockData.getOSNotes(id), mockData.getOSActivity(id) ]);
+        setPartsUsed(p); setPhotos(ph); setNotesList(n); setActivities(act);
       }
-    } catch (error: any) {
-      console.error("ERRO AO CARREGAR OS:", error.message || error);
-    } finally {
-      if (showLoader) setLoading(false);
-    }
+    } catch (error: any) { console.error("ERRO AO CARREGAR OS:", error.message || error); } finally { if (showLoader) setLoading(false); }
   };
 
   const handleUpdateStatus = async (newStatus: OSStatus) => {
     if (!id || !os) return;
-    if (newStatus === OSStatus.CONCLUIDA && missingFields.length > 0) {
-      setShowValidationErrorModal(true);
-      setShowValidationErrors(true);
-      setActiveTab('finalizar');
-      return;
-    }
+    if (newStatus === OSStatus.CONCLUIDA && missingFields.length > 0) { setShowValidationErrorModal(true); setShowValidationErrors(true); setActiveTab('finalizar'); return; }
     setActionLoading(true);
     try {
       const oldStatusLabel = getStatusLabelText(os.status).toUpperCase();
       const newStatusLabel = getStatusLabelText(newStatus).toUpperCase();
-      
       await mockData.updateServiceOrder(id, { status: newStatus });
-      await mockData.addOSActivity(id, {
-        description: `ALTEROU ESTADO: DE ${oldStatusLabel} PARA ${newStatusLabel}`
-      });
-      
+      await mockData.addOSActivity(id, { description: `ALTEROU ESTADO: DE ${oldStatusLabel} PARA ${newStatusLabel}` });
       fetchOSDetails(false);
-    } catch (e: any) {
-      setErrorMessage("ERRO AO ATUALIZAR ESTADO.");
-    } finally {
-      setActionLoading(false);
-    }
+    } catch (e: any) { setErrorMessage("ERRO AO ATUALIZAR ESTADO."); } finally { setActionLoading(false); }
   };
 
   const handleSaveData = async () => {
@@ -478,46 +401,18 @@ export const ServiceOrderDetail: React.FC = () => {
       if (anomaly !== (os.anomaly_detected || '')) changes.push("ANOMALIA DETETADA");
       if (resolutionNotes !== (os.resolution_notes || '')) changes.push("RESUMO DA RESOLUÇÃO");
       if (observations !== (os.observations || '')) changes.push("OBSERVAÇÕES");
-      
       const originalDate = os.scheduled_date?.split(/[T ]/)[0] || '';
       const originalTime = os.scheduled_date?.split(/[T ]/)[1]?.substring(0, 5) || '';
-      if (scheduledDate !== originalDate || scheduledTime !== originalTime) {
-        changes.push(`AGENDAMENTO (${scheduledDate} ${scheduledTime})`);
-      }
-      
+      if (scheduledDate !== originalDate || scheduledTime !== originalTime) { changes.push(`AGENDAMENTO (${scheduledDate} ${scheduledTime})`); }
       if (clientSignature !== (os.client_signature || null)) changes.push("ASSINATURA CLIENTE");
       if (technicianSignature !== (os.technician_signature || null)) changes.push("ASSINATURA TÉCNICO");
       if (isWarranty !== !!os.is_warranty) changes.push(isWarranty ? "ATIVOU GARANTIA" : "DESATIVOU GARANTIA");
-
-      const finalScheduled = scheduledDate 
-        ? `${scheduledDate}T${scheduledTime || '00:00'}:00` 
-        : null;
-
-      await mockData.updateServiceOrder(id, {
-        description,
-        anomaly_detected: anomaly,
-        resolution_notes: resolutionNotes,
-        observations,
-        client_signature: clientSignature,
-        technician_signature: technicianSignature,
-        scheduled_date: finalScheduled as any,
-        is_warranty: isWarranty,
-        warranty_info: warrantyInfo
-      });
-
-      if (changes.length > 0) {
-        await mockData.addOSActivity(id, {
-          description: `ATUALIZOU: ${changes.join(', ')}`
-        });
-      }
-
+      const finalScheduled = scheduledDate ? `${scheduledDate}T${scheduledTime || '00:00'}:00` : null;
+      await mockData.updateServiceOrder(id, { description, anomaly_detected: anomaly, resolution_notes: resolutionNotes, observations, client_signature: clientSignature, technician_signature: technicianSignature, scheduled_date: finalScheduled as any, is_warranty: isWarranty, warranty_info: warrantyInfo });
+      if (changes.length > 0) { await mockData.addOSActivity(id, { description: `ATUALIZOU: ${changes.join(', ')}` }); }
       setShowValidationErrors(false);
       fetchOSDetails(true); 
-    } catch (e: any) {
-      setErrorMessage("ERRO AO GUARDAR DADOS.");
-    } finally {
-      setActionLoading(false);
-    }
+    } catch (e: any) { setErrorMessage("ERRO AO GUARDAR DADOS."); } finally { setActionLoading(false); }
   };
 
   const toggleWarranty = () => {
@@ -525,15 +420,8 @@ export const ServiceOrderDetail: React.FC = () => {
     setIsWarranty(newValue);
     if (newValue) {
       const autoCheckedInfo: ServiceOrder['warranty_info'] = { ...warrantyInfo };
-      if (os?.equipment) {
-        autoCheckedInfo.has_brand = !!os.equipment.brand;
-        autoCheckedInfo.has_model = !!os.equipment.model;
-        autoCheckedInfo.has_serial = !!os.equipment.serial_number;
-        autoCheckedInfo.has_photo_nameplate = !!os.equipment.nameplate_url;
-      }
-      if (anomaly && anomaly.trim().length > 0) {
-        autoCheckedInfo.has_failure_reason = true;
-      }
+      if (os?.equipment) { autoCheckedInfo.has_brand = !!os.equipment.brand; autoCheckedInfo.has_model = !!os.equipment.model; autoCheckedInfo.has_serial = !!os.equipment.serial_number; autoCheckedInfo.has_photo_nameplate = !!os.equipment.nameplate_url; }
+      if (anomaly && anomaly.trim().length > 0) { autoCheckedInfo.has_failure_reason = true; }
       setWarrantyInfo(autoCheckedInfo);
     }
   };
@@ -542,139 +430,42 @@ export const ServiceOrderDetail: React.FC = () => {
     if (!id || !os) return;
     setActionLoading(true);
     try {
-      await mockData.updateServiceOrder(id, { 
-        status: targetStatus,
-        anomaly_detected: '',
-        resolution_notes: '',
-        client_signature: null,
-        technician_signature: null
-      });
-      
-      await mockData.addOSActivity(id, {
-        description: `REABERTA: ESTADO ${getStatusLabelText(targetStatus).toUpperCase()} (RESETOU DADOS DE FECHO)`
-      });
-
-      setAnomaly('');
-      setResolutionNotes('');
-      setClientSignature(null);
-      setTechnicianSignature(null);
-      
-      setShowReopenModal(false);
-      fetchOSDetails(true);
-    } catch (e: any) {
-      setErrorMessage("ERRO AO REABRIR OS.");
-    } finally {
-      setActionLoading(false);
-    }
+      await mockData.updateServiceOrder(id, { status: targetStatus, anomaly_detected: '', resolution_notes: '', client_signature: null, technician_signature: null });
+      await mockData.addOSActivity(id, { description: `REABERTA: ESTADO ${getStatusLabelText(targetStatus).toUpperCase()} (RESETOU DADOS DE FECHO)` });
+      setAnomaly(''); setResolutionNotes(''); setClientSignature(null); setTechnicianSignature(null); setShowReopenModal(false); fetchOSDetails(true);
+    } catch (e: any) { setErrorMessage("ERRO AO REABRIR OS."); } finally { setActionLoading(false); }
   };
 
   const generateEquipmentTag = async () => {
     if (!os) return;
-    
     let qrDataUrl = '';
     if (os.equipment_id) {
       const baseUrl = window.location.href.split('#')[0];
       const qrUrl = `${baseUrl}#/equipments/${os.equipment_id}`;
-      
-      try {
-        qrDataUrl = await QRCode.toDataURL(qrUrl, { 
-          margin: 1, 
-          width: 300,
-          color: { dark: '#000000', light: '#ffffff' }
-        });
-      } catch (err) {
-        console.error("Erro ao gerar QR Code:", err);
-      }
+      try { qrDataUrl = await QRCode.toDataURL(qrUrl, { margin: 1, width: 300, color: { dark: '#000000', light: '#ffffff' } }); } catch (err) { console.error("Erro ao gerar QR Code:", err); }
     }
-
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
-
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageWidth = doc.internal.pageSize.width;
     const margin = 10;
-
-    doc.setLineWidth(1.2);
-    doc.rect(margin, margin, pageWidth - (margin * 2), 170);
-
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("REAL FRIO - IDENTIFICAÇÃO TÉCNICA", pageWidth / 2, margin + 10, { align: "center" });
-
-    doc.setFontSize(38);
-    doc.setFont("helvetica", "bold");
-    doc.text(os.code, pageWidth / 2, margin + 30, { align: "center" });
-
-    doc.setLineWidth(0.6);
-    doc.line(margin + 5, margin + 38, pageWidth - margin - 5, margin + 38);
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("CLIENTE:", margin + 8, margin + 50);
-    doc.setFontSize(20);
-    doc.setFont("helvetica", "bold");
-    const clientName = (os.client?.name || "---").toUpperCase();
-    const splitClient = doc.splitTextToSize(clientName, pageWidth - (margin * 2) - 20);
-    doc.text(splitClient, margin + 8, margin + 60);
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("EQUIPAMENTO / ATIVO:", margin + 8, margin + 85);
-    
-    if (qrDataUrl) {
-       doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 48, margin + 82, 40, 40);
-       doc.setFontSize(6.5);
-       doc.setFont("helvetica", "bold");
-       doc.setTextColor(150, 150, 150);
-       doc.text("SCAN PARA FICHA DO ATIVO", pageWidth - margin - 28, margin + 123.5, { align: "center" });
-    }
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    const equipText = (os.equipment?.type || 'NÃO DEFINIDO').toUpperCase();
-    doc.text(equipText, margin + 8, margin + 95);
-    
-    doc.setFontSize(14);
-    const brandModel = `${os.equipment?.brand || ''} ${os.equipment?.model ? '- ' + os.equipment.model : ''}`.toUpperCase();
-    doc.text(brandModel, margin + 8, margin + 105);
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`S/N: ${os.equipment?.serial_number || '---'}`.toUpperCase(), margin + 8, margin + 112);
-
-    doc.setLineWidth(0.3);
-    doc.line(margin + 5, margin + 128, pageWidth - margin - 5, margin + 128);
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("PEDIDO DO CLIENTE / AVARIA:", margin + 8, margin + 136);
-    
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    const pedidoText = (os.description || "NÃO ESPECIFICADO").toUpperCase();
-    const splitDesc = doc.splitTextToSize(pedidoText, pageWidth - (margin * 2) - 16);
-    doc.text(splitDesc, margin + 8, margin + 146);
-
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 100, 100);
-    const dateStr = `ENTRADA: ${new Date(os.created_at).toLocaleDateString('pt-PT')}`;
-    doc.text(dateStr, pageWidth - margin - 8, margin + 168, { align: "right" });
-
-    doc.autoPrint();
-    const blobUrl = doc.output('bloburl');
-    setTagPdfUrl(String(blobUrl));
-    setShowTagPreview(true);
+    doc.setLineWidth(1.2); doc.rect(margin, margin, pageWidth - (margin * 2), 170);
+    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.text("REAL FRIO - IDENTIFICAÇÃO TÉCNICA", pageWidth / 2, margin + 10, { align: "center" });
+    doc.setFontSize(38); doc.setFont("helvetica", "bold"); doc.text(os.code, pageWidth / 2, margin + 30, { align: "center" });
+    doc.setLineWidth(0.6); doc.line(margin + 5, margin + 38, pageWidth - margin - 5, margin + 38);
+    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text("CLIENTE:", margin + 8, margin + 50);
+    doc.setFontSize(20); doc.setFont("helvetica", "bold"); const clientName = (os.client?.name || "---").toUpperCase(); const splitClient = doc.splitTextToSize(clientName, pageWidth - (margin * 2) - 20); doc.text(splitClient, margin + 8, margin + 60);
+    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text("EQUIPAMENTO / ATIVO:", margin + 8, margin + 85);
+    if (qrDataUrl) { doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 48, margin + 82, 40, 40); doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(150, 150, 150); doc.text("SCAN PARA FICHA DO ATIVO", pageWidth - margin - 28, margin + 123.5, { align: "center" }); }
+    doc.setTextColor(0, 0, 0); doc.setFontSize(18); doc.setFont("helvetica", "bold"); const equipText = (os.equipment?.type || 'NÃO DEFINIDO').toUpperCase(); doc.text(equipText, margin + 8, margin + 95);
+    doc.setFontSize(14); const brandModel = `${os.equipment?.brand || ''} ${os.equipment?.model ? '- ' + os.equipment.model : ''}`.toUpperCase(); doc.text(brandModel, margin + 8, margin + 105);
+    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`S/N: ${os.equipment?.serial_number || '---'}`.toUpperCase(), margin + 8, margin + 112);
+    doc.setLineWidth(0.3); doc.line(margin + 5, margin + 128, pageWidth - margin - 5, margin + 128);
+    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text("PEDIDO DO CLIENTE / AVARIA:", margin + 8, margin + 136);
+    doc.setFontSize(18); doc.setFont("helvetica", "bold"); const pedidoText = (os.description || "NÃO ESPECIFICADO").toUpperCase(); const splitDesc = doc.splitTextToSize(pedidoText, pageWidth - (margin * 2) - 16); doc.text(splitDesc, margin + 8, margin + 146);
+    doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 100, 100); const dateStr = `ENTRADA: ${new Date(os.created_at).toLocaleDateString('pt-PT')}`; doc.text(dateStr, pageWidth - margin - 8, margin + 168, { align: "right" });
+    doc.autoPrint(); const blobUrl = doc.output('bloburl'); setTagPdfUrl(String(blobUrl)); setShowTagPreview(true);
   };
 
-  const handlePrintTag = () => {
-    if (tagPdfUrl) {
-      window.open(tagPdfUrl, '_blank');
-    }
-  };
+  const handlePrintTag = () => { if (tagPdfUrl) { window.open(tagPdfUrl, '_blank'); } };
 
   const createPDFDocument = async () => {
     if (!os) return null;
@@ -682,142 +473,17 @@ export const ServiceOrderDetail: React.FC = () => {
     const pageWidth = doc.internal.pageSize.width;
     const margin = 10;
     const contentWidth = pageWidth - (margin * 2);
-    
-    doc.setFillColor(15, 23, 42); 
-    doc.rect(0, 0, pageWidth, 28, 'F'); 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("REAL FRIO", margin, 12);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 18);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(os.code, pageWidth - margin, 12, { align: 'right' });
-    doc.setFontSize(6);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(180, 180, 180);
-    doc.text(`EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 18, { align: 'right' });
-
-    let currentY = 32;
-    doc.setDrawColor(241, 245, 249);
-    doc.setFillColor(252, 252, 253);
-    doc.roundedRect(margin, currentY, contentWidth, 22, 1, 1, 'FD'); 
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("DADOS DO CLIENTE", margin + 3, currentY + 5);
-    doc.text("EQUIPAMENTO", margin + (contentWidth / 2) + 3, currentY + 5);
-    doc.setDrawColor(226, 232, 240);
-    doc.line(margin + 3, currentY + 7, margin + (contentWidth / 2) - 3, currentY + 7);
-    doc.line(margin + (contentWidth / 2) + 3, currentY + 7, margin + contentWidth - 3, currentY + 7);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.5);
-    doc.setTextColor(71, 85, 105);
-    doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 3, currentY + 11);
-    doc.text(`FIRMA: ${os.client?.billing_name || '---'}`, margin + 3, currentY + 14.5, { maxWidth: (contentWidth / 2) - 8 });
-    doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 3, currentY + 18);
-    doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 3, currentY + 11);
-    doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 3, currentY + 14.5);
-    doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 3, currentY + 18);
-
-    currentY += 26;
-    const narrativeFields = [
-      { label: "DESCRIÇÃO DO PEDIDO / AVARIA:", value: os.description || 'N/A' },
-      { label: "ANOMALIA DETETADA NO LOCAL:", value: os.anomaly_detected || 'N/A' },
-      { label: "TRABALHO EFETUADO E RESOLUÇÃO:", value: os.resolution_notes || 'N/A' }
-    ];
-    narrativeFields.forEach(field => {
-      doc.setFontSize(7);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text(field.label, margin, currentY);
-      currentY += 3;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.5); 
-      doc.setTextColor(51, 65, 85);
-      const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth);
-      doc.text(splitText, margin, currentY);
-      currentY += (splitText.length * 4) + 3;
-      if (currentY > 275) { doc.addPage(); currentY = 15; }
-    });
-
-    if (partsUsed.length > 0) {
-      doc.setFontSize(7);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text("MATERIAL APLICADO:", margin, currentY);
-      currentY += 2;
-      autoTable(doc, {
-        startY: currentY,
-        margin: { left: margin, right: margin },
-        theme: 'plain',
-        head: [['ARTIGO / DESIGNAÇÃO', 'REFERÊNCIA', 'QTD']],
-        body: partsUsed.map(p => [p.name.toUpperCase(), p.reference.toUpperCase(), `${p.quantity.toLocaleString('pt-PT')} UN`]),
-        headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontSize: 6, fontStyle: 'bold', halign: 'left' },
-        styles: { fontSize: 7, cellPadding: 1, textColor: [51, 65, 85], lineWidth: 0.05, lineColor: [241, 245, 249] },
-        columnStyles: { 2: { halign: 'right' } }
-      });
-      currentY = (doc as any).lastAutoTable.finalY + 8;
-    }
-    if (currentY > 250) { doc.addPage(); currentY = 15; }
-    doc.setDrawColor(226, 232, 240);
-    doc.line(margin, currentY, pageWidth - margin, currentY);
-    currentY += 5;
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("VALIDAÇÃO E CONFORMIDADE", margin, currentY);
-    currentY += 3;
-    const sigBoxWidth = (contentWidth / 2) - 5;
-    if (clientSignature) { try { doc.addImage(clientSignature, 'JPEG', margin, currentY, 40, 15, undefined, 'FAST'); } catch (e) {} }
-    doc.setDrawColor(203, 213, 225);
-    doc.line(margin, currentY + 16, margin + sigBoxWidth, currentY + 16);
-    doc.setFontSize(5.5);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(148, 163, 184);
-    doc.text("ASSINATURA CLIENTE", margin + (sigBoxWidth / 2), currentY + 20, { align: 'center' });
-    if (technicianSignature) { try { doc.addImage(technicianSignature, 'JPEG', margin + (contentWidth / 2) + 5, currentY, 40, 15, undefined, 'FAST'); } catch (e) {} }
-    doc.line(margin + (contentWidth / 2) + 5, currentY + 16, margin + contentWidth, currentY + 16);
-    doc.text("ASSINATURA TÉCNICO", margin + (contentWidth / 2) + 5 + (sigBoxWidth / 2), currentY + 20, { align: 'center' });
-    doc.setFontSize(5);
-    doc.setTextColor(148, 163, 184);
-    doc.text("Documento oficial Real Frio. Emitido via Plataforma Cloud Técnica.", pageWidth / 2, 290, { align: 'center' });
-    return doc;
+    doc.setFillColor(15, 23, 42); doc.rect(0, 0, pageWidth, 28, 'F'); doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text("REAL FRIO", margin, 12); doc.setFontSize(7); doc.setFont("helvetica", "normal"); doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 18); doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(os.code, pageWidth - margin, 12, { align: 'right' }); doc.setFontSize(6); doc.setFont("helvetica", "normal"); doc.setTextColor(180, 180, 180); doc.text(`EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 18, { align: 'right' });
+    let currentY = 32; doc.setDrawColor(241, 245, 249); doc.setFillColor(252, 252, 253); doc.roundedRect(margin, currentY, contentWidth, 22, 1, 1, 'FD'); doc.setTextColor(15, 23, 42); doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.text("DADOS DO CLIENTE", margin + 3, currentY + 5); doc.text("EQUIPAMENTO", margin + (contentWidth / 2) + 3, currentY + 5); doc.setDrawColor(226, 232, 240); doc.line(margin + 3, currentY + 7, margin + (contentWidth / 2) - 3, currentY + 7); doc.line(margin + (contentWidth / 2) + 3, currentY + 7, margin + contentWidth - 3, currentY + 7); doc.setFont("helvetica", "normal"); doc.setFontSize(6.5); doc.setTextColor(71, 85, 105); doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 3, currentY + 11); doc.text(`FIRMA: ${os.client?.billing_name || '---'}`, margin + 3, currentY + 14.5, { maxWidth: (contentWidth / 2) - 8 }); doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 3, currentY + 18); doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 3, currentY + 11); doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 3, currentY + 14.5); doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 3, currentY + 18);
+    currentY += 26; const narrativeFields = [ { label: "DESCRIÇÃO DO PEDIDO / AVARIA:", value: os.description || 'N/A' }, { label: "ANOMALIA DETETADA NO LOCAL:", value: os.anomaly_detected || 'N/A' }, { label: "TRABALHO EFETUADO E RESOLUÇÃO:", value: os.resolution_notes || 'N/A' } ];
+    narrativeFields.forEach(field => { doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(15, 23, 42); doc.text(field.label, margin, currentY); currentY += 3; doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(51, 65, 85); const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth); doc.text(splitText, margin, currentY); currentY += (splitText.length * 4) + 3; if (currentY > 275) { doc.addPage(); currentY = 15; } });
+    if (partsUsed.length > 0) { doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(15, 23, 42); doc.text("MATERIAL APLICADO:", margin, currentY); currentY += 2; autoTable(doc, { startY: currentY, margin: { left: margin, right: margin }, theme: 'plain', head: [['ARTIGO / DESIGNAÇÃO', 'REFERÊNCIA', 'QTD']], body: partsUsed.map(p => [p.name.toUpperCase(), p.reference.toUpperCase(), `${p.quantity.toLocaleString('pt-PT')} UN`]), headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontSize: 6, fontStyle: 'bold', halign: 'left' }, styles: { fontSize: 7, cellPadding: 1, textColor: [51, 65, 85], lineWidth: 0.05, lineColor: [241, 245, 249] }, columnStyles: { 2: { halign: 'right' } } }); currentY = (doc as any).lastAutoTable.finalY + 8; }
+    if (currentY > 250) { doc.addPage(); currentY = 15; } doc.setDrawColor(226, 232, 240); doc.line(margin, currentY, pageWidth - margin, currentY); currentY += 5; doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.text("VALIDAÇÃO E CONFORMIDADE", margin, currentY); currentY += 3; const sigBoxWidth = (contentWidth / 2) - 5; if (clientSignature) { try { doc.addImage(clientSignature, 'JPEG', margin, currentY, 40, 15, undefined, 'FAST'); } catch (e) {} } doc.setDrawColor(203, 213, 225); doc.line(margin, currentY + 16, margin + sigBoxWidth, currentY + 16); doc.setFontSize(5.5); doc.setFont("helvetica", "normal"); doc.setTextColor(148, 163, 184); doc.text("ASSINATURA CLIENTE", margin + (sigBoxWidth / 2), currentY + 20, { align: 'center' }); if (technicianSignature) { try { doc.addImage(technicianSignature, 'JPEG', margin + (contentWidth / 2) + 5, currentY, 40, 15, undefined, 'FAST'); } catch (e) {} } doc.line(margin + (contentWidth / 2) + 5, currentY + 16, margin + contentWidth, currentY + 16); doc.text("ASSINATURA TÉCNICO", margin + (contentWidth / 2) + 5 + (sigBoxWidth / 2), currentY + 20, { align: 'center' }); doc.setFontSize(5); doc.setTextColor(148, 163, 184); doc.text("Documento oficial Real Frio. Emitido via Plataforma Cloud Técnica.", pageWidth / 2, 290, { align: 'center' }); return doc;
   };
 
-  const generatePDFReport = async () => {
-    setIsExportingPDF(true);
-    try {
-      const doc = await createPDFDocument();
-      if (doc) doc.save(`RELATORIO_${os?.code}.pdf`);
-    } catch (err) {
-      setErrorMessage("ERRO AO GERAR PDF.");
-    } finally {
-      setIsExportingPDF(false);
-    }
-  };
+  const generatePDFReport = async () => { setIsExportingPDF(true); try { const doc = await createPDFDocument(); if (doc) doc.save(`RELATORIO_${os?.code}.pdf`); } catch (err) { setErrorMessage("ERRO AO GERAR PDF."); } finally { setIsExportingPDF(false); } };
 
-  const handleSendEmailShortcut = async () => {
-    if (!os) return;
-    const clientEmail = os.client?.email?.trim();
-    if (!clientEmail) alert("CLIENTE SEM EMAIL REGISTADO.");
-    setIsExportingPDF(true);
-    try {
-      const doc = await createPDFDocument();
-      if (!doc) throw new Error("Falha");
-      doc.save(`RELATORIO_REALFRIO_${os.code}.pdf`);
-      const interventionDate = new Date(os.created_at).toLocaleDateString('pt-PT');
-      const subject = `RELATÓRIO TÉCNICO - ${os.code} - ${os.client?.name}`;
-      const body = `Exmos. Srs.\n\nJunto enviamos o relatório técnico relativo à intervenção efetuada em ${interventionDate}.\n\nCódigo OS: ${os.code}\n\nCom os melhores cumprimentos,\nReal Frio, Lda`;
-      window.location.href = `mailto:${clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      await mockData.addOSActivity(os.id, { description: `EMAIL ABERTO PARA: ${clientEmail || '(MANUAL)'}` });
-    } catch (err) {
-      setErrorMessage("ERRO AO PREPARAR ENVIO.");
-    } finally {
-      setIsExportingPDF(false);
-    }
-  };
+  const handleSendEmailShortcut = async () => { if (!os) return; const clientEmail = os.client?.email?.trim(); if (!clientEmail) alert("CLIENTE SEM EMAIL REGISTADO."); setIsExportingPDF(true); try { const doc = await createPDFDocument(); if (!doc) throw new Error("Falha"); doc.save(`RELATORIO_REALFRIO_${os.code}.pdf`); const interventionDate = new Date(os.created_at).toLocaleDateString('pt-PT'); const subject = `RELATÓRIO TÉCNICO - ${os.code} - ${os.client?.name}`; const body = `Exmos. Srs.\n\nJunto enviamos o relatório técnico relativo à intervenção efetuada em ${interventionDate}.\n\nCódigo OS: ${os.code}\n\nCom os melhores cumprimentos,\nReal Frio, Lda`; window.location.href = `mailto:${clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`; await mockData.addOSActivity(os.id, { description: `EMAIL ABERTO PARA: ${clientEmail || '(MANUAL)'}` }); } catch (err) { setErrorMessage("ERRO AO PREPARAR ENVIO."); } finally { setIsExportingPDF(false); } };
 
   const handleUploadPhoto = async (fileOrEvent: React.ChangeEvent<HTMLInputElement> | File, type: 'antes' | 'depois' | 'peca' | 'geral') => {
     let file = fileOrEvent instanceof File ? fileOrEvent : fileOrEvent.target.files?.[0];
@@ -829,11 +495,7 @@ export const ServiceOrderDetail: React.FC = () => {
         await mockData.addOSPhoto(id, { url: reader.result as string, type });
         await mockData.addOSActivity(id, { description: `ADICIONOU FOTO: ${type.toUpperCase()}` });
         fetchOSDetails(false);
-      } catch (err: any) {
-        setErrorMessage("ERRO AO CARREGAR FOTO.");
-      } finally {
-        setIsUploadingPhoto(false);
-      }
+      } catch (err: any) { setErrorMessage("ERRO AO CARREGAR FOTO."); } finally { setIsUploadingPhoto(false); }
     };
     reader.readAsDataURL(file);
   };
@@ -843,90 +505,17 @@ export const ServiceOrderDetail: React.FC = () => {
   const handleDragOut = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setDragActiveType(null); };
   const handleDrop = (e: React.DragEvent, type: 'antes' | 'depois' | 'peca' | 'geral') => { e.preventDefault(); e.stopPropagation(); setDragActiveType(null); if (os?.status === OSStatus.CONCLUIDA) return; const files = e.dataTransfer.files; if (files?.[0]?.type.startsWith('image/')) handleUploadPhoto(files[0], type); };
 
-  const handleDeletePhoto = async () => {
-    if (!photoToDelete) return;
-    setActionLoading(true);
-    try {
-      await mockData.deleteOSPhoto(photoToDelete.id);
-      await mockData.addOSActivity(id!, { description: `REMOVEU FOTO: ${photoToDelete.type.toUpperCase()}` });
-      setShowDeletePhotoModal(false);
-      setPhotoToDelete(null);
-      fetchOSDetails(false);
-    } finally { setActionLoading(false); }
-  };
+  const handleDeletePhoto = async () => { if (!photoToDelete) return; setActionLoading(true); try { await mockData.deleteOSPhoto(photoToDelete.id); await mockData.addOSActivity(id!, { description: `REMOVEU FOTO: ${photoToDelete.type.toUpperCase()}` }); setShowDeletePhotoModal(false); setPhotoToDelete(null); fetchOSDetails(false); } finally { setActionLoading(false); } };
 
-  const handleAddPart = async () => {
-    if (!id || !selectedPartId) return;
-    const part = catalog.find(p => p.id === selectedPartId);
-    if (!part) return;
-    setActionLoading(true);
-    try {
-      const numericQuantity = parseFloat(partQuantityStr.replace(',', '.'));
-      await mockData.addOSPart(id, { part_id: part.id, name: part.name, reference: part.reference, quantity: numericQuantity });
-      await mockData.addOSActivity(id, { description: `APLICOU MATERIAL: ${numericQuantity.toLocaleString('pt-PT')}x ${part.name}` });
-      setShowPartModal(false);
-      setSelectedPartId('');
-      setPartQuantityStr("1");
-      setPartSearchTerm('');
-      fetchOSDetails(false);
-    } finally { setActionLoading(false); }
-  };
+  const handleAddPart = async () => { if (!id || !selectedPartId) return; const part = catalog.find(p => p.id === selectedPartId); if (!part) return; setActionLoading(true); try { const numericQuantity = parseFloat(partQuantityStr.replace(',', '.')); await mockData.addOSPart(id, { part_id: part.id, name: part.name, reference: part.reference, quantity: numericQuantity }); await mockData.addOSActivity(id, { description: `APLICOU MATERIAL: ${numericQuantity.toLocaleString('pt-PT')}x ${part.name}` }); setShowPartModal(false); setSelectedPartId(''); setPartQuantityStr("1"); setPartSearchTerm(''); fetchOSDetails(false); } finally { setActionLoading(false); } };
 
-  const handleCreateAndAddPart = async () => {
-    if (!id || !newPartForm.name) return;
-    setActionLoading(true);
-    try {
-      const ref = newPartForm.reference.trim() || Math.floor(1000000 + Math.random() * 9000000).toString();
-      const qty = parseFloat(partQuantityStr.replace(',', '.'));
-      const created = await mockData.addCatalogItem({ name: newPartForm.name.toUpperCase(), reference: ref, stock: 0 });
-      await mockData.addOSPart(id, { part_id: created.id, name: created.name, reference: created.reference, quantity: qty });
-      await mockData.addOSActivity(id, { description: `CRIOU E APLICOU: ${qty.toLocaleString('pt-PT')}x ${created.name}` });
-      setShowPartModal(false);
-      setIsCreatingNewPart(false);
-      setNewPartForm({ name: '', reference: '' });
-      fetchOSDetails(false);
-      mockData.getCatalog().then(setCatalog);
-    } finally { setActionLoading(false); }
-  };
+  const handleCreateAndAddPart = async () => { if (!id || !newPartForm.name) return; setActionLoading(true); try { const ref = newPartForm.reference.trim() || Math.floor(1000000 + Math.random() * 9000000).toString(); const qty = parseFloat(partQuantityStr.replace(',', '.')); const created = await mockData.addCatalogItem({ name: newPartForm.name.toUpperCase(), reference: ref, stock: 0 }); await mockData.addOSPart(id, { part_id: created.id, name: created.name, reference: created.reference, quantity: qty }); await mockData.addOSActivity(id, { description: `CRIOU E APLICOU: ${qty.toLocaleString('pt-PT')}x ${created.name}` }); setShowPartModal(false); setIsCreatingNewPart(false); setNewPartForm({ name: '', reference: '' }); fetchOSDetails(false); mockData.getCatalog().then(setCatalog); } finally { setActionLoading(false); } };
 
-  const handleUpdatePartQuantity = async (partUsedId: string, newQuantityStr: string) => {
-    const numericQuantity = parseFloat(newQuantityStr.replace(',', '.'));
-    if (isNaN(numericQuantity) || numericQuantity < 0 || !id) return;
-    setActionLoading(true);
-    try {
-      const part = partsUsed.find(p => p.id === partUsedId);
-      await mockData.updateOSPart(partUsedId, { quantity: numericQuantity });
-      await mockData.addOSActivity(id, { description: `AJUSTOU QTD MATERIAL (${part?.name}): PARA ${numericQuantity.toLocaleString('pt-PT')}` });
-      setShowEditQuantityModal(false);
-      fetchOSDetails(false);
-    } finally { setActionLoading(false); }
-  };
+  const handleUpdatePartQuantity = async (partUsedId: string, newQuantityStr: string) => { const numericQuantity = parseFloat(newQuantityStr.replace(',', '.')); if (isNaN(numericQuantity) || numericQuantity < 0 || !id) return; setActionLoading(true); try { const part = partsUsed.find(p => p.id === partUsedId); await mockData.updateOSPart(partUsedId, { quantity: numericQuantity }); await mockData.addOSActivity(id, { description: `AJUSTOU QTD MATERIAL (${part?.name}): PARA ${numericQuantity.toLocaleString('pt-PT')}` }); setShowEditQuantityModal(false); fetchOSDetails(false); } finally { setActionLoading(false); } };
 
-  const handleDeletePart = async () => {
-    if (!partToDelete) return;
-    setActionLoading(true);
-    try {
-      await mockData.removeOSPart(partToDelete.id);
-      await mockData.addOSActivity(id!, { description: `REMOVEU MATERIAL: ${partToDelete.name}` });
-      setShowDeletePartModal(false);
-      setPartToDelete(null);
-      fetchOSDetails(false);
-    } finally { setActionLoading(false); }
-  };
+  const handleDeletePart = async () => { if (!partToDelete) return; setActionLoading(true); try { await mockData.removeOSPart(partToDelete.id); await mockData.addOSActivity(id!, { description: `REMOVEU MATERIAL: ${partToDelete.name}` }); setShowDeletePartModal(false); setPartToDelete(null); fetchOSDetails(false); } finally { setActionLoading(false); } };
 
-  const handleGenerateAISummary = async () => {
-    if (!anomaly?.trim()) { setErrorMessage("DESCREVA A ANOMALIA PRIMEIRO."); return; }
-    setIsGenerating(true);
-    try {
-      const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity.toLocaleString('pt-PT')}x ${p.name}`), os?.type || "INTERVENÇÃO");
-      if (summary) {
-        setResolutionNotes(summary.toUpperCase());
-        await mockData.addOSActivity(id!, { description: "GEROU RESUMO VIA IA" });
-      }
-    } catch (e: any) {
-      setErrorMessage("ERRO IA.");
-    } finally { setIsGenerating(false); }
-  };
+  const handleGenerateAISummary = async () => { if (!anomaly?.trim()) { setErrorMessage("DESCREVA A ANOMALIA PRIMEIRO."); return; } setIsGenerating(true); try { const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity.toLocaleString('pt-PT')}x ${p.name}`), os?.type || "INTERVENÇÃO"); if (summary) { setResolutionNotes(summary.toUpperCase()); await mockData.addOSActivity(id!, { description: "GEROU RESUMO VIA IA" }); } } catch (e: any) { setErrorMessage("ERRO IA."); } finally { setIsGenerating(false); } };
 
   const handleResetAnomaly = () => setAnomaly('');
   const handleResetResolution = () => setResolutionNotes('');
@@ -941,15 +530,16 @@ export const ServiceOrderDetail: React.FC = () => {
     variant: 'danger' | 'warning' | 'info';
     action: () => void;
   }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    confirmLabel: '',
-    variant: 'info',
-    action: () => {}
+    isOpen: false, title: '', message: '', confirmLabel: '', variant: 'info', action: () => {}
   });
 
   const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+
+  const openSourceSelector = (type: 'antes' | 'depois' | 'peca' | 'geral') => {
+    if (os?.status === OSStatus.CONCLUIDA) return;
+    setPendingUploadType(type);
+    setShowSourceModal(true);
+  };
 
   if (loading) return (
     <div className="h-full flex flex-col items-center justify-center p-20">
@@ -960,6 +550,49 @@ export const ServiceOrderDetail: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto pb-44 relative px-1 sm:px-0 space-y-4">
+      {/* Inputs de ficheiro escondidos para captura seletiva */}
+      <input 
+        type="file" accept="image/*" capture="environment" 
+        className="hidden" ref={cameraInputRef} 
+        onChange={(e) => { if(pendingUploadType) handleUploadPhoto(e, pendingUploadType); setShowSourceModal(false); }} 
+      />
+      <input 
+        type="file" accept="image/*" 
+        className="hidden" ref={galleryInputRef} 
+        onChange={(e) => { if(pendingUploadType) handleUploadPhoto(e, pendingUploadType); setShowSourceModal(false); }} 
+      />
+
+      {/* Diálogo de Origem de Upload */}
+      {showSourceModal && (
+        <div className="fixed inset-0 z-[600] flex items-end sm:items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
+              <div className="p-8 text-center">
+                 <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Escolher Origem</h3>
+                    <button onClick={() => setShowSourceModal(false)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><X size={24} /></button>
+                 </div>
+                 <div className="grid grid-cols-1 gap-4">
+                    <button 
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="flex items-center gap-4 p-6 bg-blue-600 text-white rounded-3xl shadow-xl hover:bg-blue-700 transition-all active:scale-95"
+                    >
+                       <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center"><Camera size={28} /></div>
+                       <div className="text-left"><p className="font-black text-sm uppercase tracking-tight">Usar Câmara</p><p className="text-[10px] opacity-70 uppercase font-bold">Captura direta do local</p></div>
+                    </button>
+                    <button 
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="flex items-center gap-4 p-6 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-3xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
+                    >
+                       <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-2xl flex items-center justify-center"><LucideImage size={28} /></div>
+                       <div className="text-left"><p className="font-black text-sm uppercase tracking-tight">Abrir Galeria</p><p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">Escolher foto existente</p></div>
+                    </button>
+                 </div>
+                 <button onClick={() => setShowSourceModal(false)} className="mt-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] hover:text-slate-600">CANCELAR</button>
+              </div>
+           </div>
+        </div>
+      )}
+
       {/* Diálogo de Confirmação Único para a página */}
       <div className={confirmConfig.isOpen ? "block" : "hidden"}>
         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -1019,7 +652,6 @@ export const ServiceOrderDetail: React.FC = () => {
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {activeTab === 'info' && (
           <div className="space-y-3">
-            {/* BOTÃO DE IMPRESSÃO - POSIÇÃO ATUALIZADA */}
             {os?.equipment && (
               <button 
                 onClick={generateEquipmentTag}
@@ -1289,7 +921,6 @@ export const ServiceOrderDetail: React.FC = () => {
                           <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase leading-tight truncate">{part.name}</p>
                           <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mt-0.5">REF: {part.reference} • <span className="text-blue-600 dark:text-blue-400 font-black">{part.quantity.toLocaleString('pt-PT', { maximumFractionDigits: 3 })} UN</span></p>
                        </div>
-                       
                        <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-200/60 dark:border-slate-700 shadow-sm flex-shrink-0">
                           <button onClick={() => { setPartToEditQuantity(part); setTempQuantityStr(part.quantity.toString().replace('.', ',')); setShowEditQuantityModal(true); }} disabled={os?.status === OSStatus.CONCLUIDA} className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"><Edit2 size={14} /></button>
                           <div className="w-px h-3 bg-slate-100 dark:bg-slate-700"></div>
@@ -1308,8 +939,9 @@ export const ServiceOrderDetail: React.FC = () => {
                 <div className="flex items-center justify-between mb-6"><div className="flex items-center gap-3"><ImageIcon size={18} className="text-slate-400" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Evidências Fotográficas</h3></div></div>
                 <div className="grid grid-cols-2 gap-3 mb-8">
                    {['antes', 'depois', 'peca', 'geral'].map((type) => (
-                     <label 
+                     <div 
                         key={type} 
+                        onClick={() => openSourceSelector(type as any)}
                         onDragOver={handleDrag}
                         onDragEnter={(e) => handleDragIn(e, type)}
                         onDragLeave={handleDragOut}
@@ -1326,8 +958,7 @@ export const ServiceOrderDetail: React.FC = () => {
                         )}
                         <Camera size={24} className={`mb-2 transition-colors ${dragActiveType === type ? 'text-blue-600' : 'text-slate-300 group-hover:text-blue-500'}`} />
                         <span className={`text-[10px] font-black uppercase tracking-widest ${dragActiveType === type ? 'text-blue-600' : 'text-slate-400'}`}>{type.toUpperCase()}</span>
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadPhoto(e, type as any)} disabled={os?.status === OSStatus.CONCLUIDA} />
-                     </label>
+                     </div>
                    ))}
                 </div>
                 <div className="space-y-10">
@@ -1364,7 +995,6 @@ export const ServiceOrderDetail: React.FC = () => {
                 </div>
                 <input type="text" placeholder="..." className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-xs font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" value={anomaly} onChange={e => setAnomaly(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} />
              </div>
-
              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 transition-colors">
                 <div className="flex items-center justify-between mb-6">
                    <div className="flex items-center gap-3 text-blue-500"><Sparkles size={18} /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Resumo da Intervenção (IA)</h3></div>
@@ -1375,7 +1005,6 @@ export const ServiceOrderDetail: React.FC = () => {
                 </div>
                 <textarea className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-[2rem] px-6 py-5 text-sm text-slate-800 dark:text-slate-200 leading-relaxed outline-none focus:ring-4 focus:ring-blue-500/10 transition-all min-h-[160px] resize-none" value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} placeholder="..." />
              </div>
-
              <div className="space-y-4">
                <div className="flex items-center justify-between px-2"><h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Validação de Trabalho</h3></div>
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1383,27 +1012,15 @@ export const ServiceOrderDetail: React.FC = () => {
                  <SignatureCanvas label="Assinatura Técnico" onSave={setTechnicianSignature} onClear={() => setTechnicianSignature(null)} initialValue={technicianSignature} readOnly={os?.status === OSStatus.CONCLUIDA} error={showValidationErrors && !technicianSignature} />
                </div>
              </div>
-
              <div className="pt-6"><button onClick={async () => { if (missingFields.length > 0) { setShowValidationErrors(true); setShowValidationErrorModal(true); return; } setShowFinalizeModal(true); }} disabled={os?.status === OSStatus.CONCLUIDA || actionLoading} className="w-full py-5 bg-blue-600 text-white rounded-[2rem] text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 disabled:opacity-50">CONCLUIR ORDEM DE SERVIÇO</button></div>
           </div>
         )}
       </div>
 
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-[#9d1c24] dark:border-[#9d1c24]/60 shadow-[0_12px_40px_rgba(157,28,36,0.25)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
-        {[
-          { id: 'info', icon: Info, label: 'INFO' },
-          { id: 'notas', icon: MessageSquare, label: 'NOTAS' },
-          { id: 'tecnico', icon: Package, label: 'MATERIAL' },
-          { id: 'fotos', icon: ImageIcon, label: 'FOTOS' },
-          { id: 'finalizar', icon: CheckCircle, label: 'FECHO' }
-        ].map((tab) => (
-          <button 
-            key={tab.id} 
-            onClick={() => setActiveTab(tab.id as TabType)} 
-            className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-full transition-all gap-1 ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-          >
-            <tab.icon size={18} />
-            <span className="text-[7px] font-black uppercase tracking-widest">{tab.label}</span>
+        {[ { id: 'info', icon: Info, label: 'INFO' }, { id: 'notas', icon: MessageSquare, label: 'NOTAS' }, { id: 'tecnico', icon: Package, label: 'MATERIAL' }, { id: 'fotos', icon: ImageIcon, label: 'FOTOS' }, { id: 'finalizar', icon: CheckCircle, label: 'FECHO' } ].map((tab) => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)} className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-full transition-all gap-1 ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>
+            <tab.icon size={18} /><span className="text-[7px] font-black uppercase tracking-widest">{tab.label}</span>
           </button>
         ))}
       </div>
@@ -1433,20 +1050,10 @@ export const ServiceOrderDetail: React.FC = () => {
                  <button onClick={() => { setShowTagPreview(false); setTagPdfUrl(null); }} className="text-gray-400 hover:text-red-500 p-2 transition-colors"><X size={28}/></button>
               </div>
               <div className="flex-1 relative bg-slate-100 dark:bg-slate-950 p-4 sm:p-8 flex items-center justify-center">
-                 <iframe 
-                   id="tag-preview-iframe"
-                   src={tagPdfUrl} 
-                   className="w-full h-full rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 bg-white"
-                   title="PDF Preview"
-                 />
+                 <iframe id="tag-preview-iframe" src={tagPdfUrl} className="w-full h-full rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 bg-white" title="PDF Preview" />
               </div>
               <div className="p-8 border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900">
-                 <button 
-                  onClick={handlePrintTag}
-                  className="w-full bg-blue-600 text-white py-5 rounded-[2rem] text-sm font-black uppercase tracking-[0.25em] shadow-2xl hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-3"
-                 >
-                   <Printer size={24} /> ENVIAR PARA A IMPRESSORA
-                 </button>
+                 <button onClick={handlePrintTag} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] text-sm font-black uppercase tracking-[0.25em] shadow-2xl hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-3"><Printer size={24} /> ENVIAR PARA A IMPRESSORA</button>
               </div>
            </div>
         </div>
@@ -1456,48 +1063,26 @@ export const ServiceOrderDetail: React.FC = () => {
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-white/10">
               <div className="p-10 text-center">
-                 <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
-                    <Clock size={40} />
-                 </div>
+                 <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner"><Clock size={40} /></div>
                  <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-3">Registar Tempo</h3>
-                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-10 uppercase tracking-widest">
-                    Selecione o tipo de intervenção efetuada para contabilização:
-                 </p>
-                 
+                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-10 uppercase tracking-widest">Selecione o tipo de intervenção efetuada para contabilização:</p>
                  <div className="grid grid-cols-1 gap-4">
-                    <button 
-                      onClick={() => handleConfirmTimerRegistration('GERAL')}
-                      className="group flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 hover:bg-blue-600 hover:text-white rounded-[2rem] transition-all active:scale-95 border border-transparent hover:shadow-xl hover:shadow-blue-600/20"
-                    >
+                    <button onClick={() => handleConfirmTimerRegistration('GERAL')} className="group flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 hover:bg-blue-600 hover:text-white rounded-[2rem] transition-all active:scale-95 border border-transparent hover:shadow-xl hover:shadow-blue-600/20">
                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 text-blue-600 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white">
-                             <Wrench size={20} />
-                          </div>
+                          <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 text-blue-600 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white"><Wrench size={20} /></div>
                           <span className="text-sm font-black uppercase tracking-tight">Mão de Obra Geral</span>
                        </div>
                        <ChevronRight size={18} className="opacity-30 group-hover:opacity-100" />
                     </button>
-
-                    <button 
-                      onClick={() => handleConfirmTimerRegistration('FRIO')}
-                      className="group flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 hover:bg-emerald-600 hover:text-white rounded-[2rem] transition-all active:scale-95 border border-transparent hover:shadow-xl hover:shadow-emerald-600/20"
-                    >
+                    <button onClick={() => handleConfirmTimerRegistration('FRIO')} className="group flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 hover:bg-emerald-600 hover:text-white rounded-[2rem] transition-all active:scale-95 border border-transparent hover:shadow-xl hover:shadow-emerald-600/20">
                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white">
-                             <Snowflake size={20} />
-                          </div>
+                          <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 text-emerald-600 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white"><Snowflake size={20} /></div>
                           <span className="text-sm font-black uppercase tracking-tight">Mão de Obra Frio</span>
                        </div>
                        <ChevronRight size={18} className="opacity-30 group-hover:opacity-100" />
                     </button>
                  </div>
-
-                 <button 
-                    onClick={() => setShowTimerTypeModal(false)}
-                    className="mt-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] hover:text-red-500 transition-colors"
-                 >
-                    CANCELAR E MANTER ATIVO
-                 </button>
+                 <button onClick={() => setShowTimerTypeModal(false)} className="mt-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] hover:text-red-500 transition-colors">CANCELAR E MANTER ATIVO</button>
               </div>
            </div>
         </div>
@@ -1511,92 +1096,34 @@ export const ServiceOrderDetail: React.FC = () => {
                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Adicionar Material</h3>
                <button onClick={() => setShowPartModal(false)} className="text-gray-400 hover:text-red-500 p-2"><X size={24}/></button>
             </div>
-            
             <div className="p-8 overflow-y-auto no-scrollbar space-y-6">
               {!isCreatingNewPart ? (
                 <div className="space-y-4">
                   <div className="relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input 
-                      type="text" 
-                      placeholder="Pesquisar no catálogo..." 
-                      className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase"
-                      value={partSearchTerm}
-                      onChange={(e) => setPartSearchTerm(e.target.value)}
-                    />
+                    <input type="text" placeholder="Pesquisar no catálogo..." className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase" value={partSearchTerm} onChange={(e) => setPartSearchTerm(e.target.value)} />
                   </div>
-                  
                   <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
-                    {filteredCatalog.length === 0 ? (
-                      <div className="text-center py-10 opacity-30">
-                        <p className="text-[10px] font-black uppercase">Nenhum artigo encontrado</p>
-                      </div>
-                    ) : (
-                      filteredCatalog.map(item => (
-                        <button 
-                          key={item.id} 
-                          onClick={() => setSelectedPartId(item.id)}
-                          className={`w-full text-left p-4 rounded-2xl border transition-all flex justify-between items-center ${selectedPartId === item.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className={`text-xs font-black uppercase truncate ${selectedPartId === item.id ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{item.name}</p>
-                            <p className={`text-[9px] font-bold uppercase tracking-widest ${selectedPartId === item.id ? 'text-blue-100' : 'text-slate-400'}`}>REF: {item.reference}</p>
-                          </div>
-                          {selectedPartId === item.id && <Check size={18} />}
-                        </button>
-                      ))
-                    )}
+                    {filteredCatalog.length === 0 ? ( <div className="text-center py-10 opacity-30"> <p className="text-[10px] font-black uppercase">Nenhum artigo encontrado</p> </div> ) : ( filteredCatalog.map(item => ( <button key={item.id} onClick={() => setSelectedPartId(item.id)} className={`w-full text-left p-4 rounded-2xl border transition-all flex justify-between items-center ${selectedPartId === item.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'}`}> <div className="min-w-0 flex-1"> <p className={`text-xs font-black uppercase truncate ${selectedPartId === item.id ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{item.name}</p> <p className={`text-[9px] font-bold uppercase tracking-widest ${selectedPartId === item.id ? 'text-blue-100' : 'text-slate-400'}`}>REF: {item.reference}</p> </div> {selectedPartId === item.id && <Check size={18} />} </button> )) )}
                   </div>
-
-                  <button 
-                    onClick={() => setIsCreatingNewPart(true)}
-                    className="w-full py-4 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest hover:underline text-center"
-                  >
-                    + Criar Artigo Fora do Catálogo
-                  </button>
+                  <button onClick={() => setIsCreatingNewPart(true)} className="w-full py-4 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest hover:underline text-center"> + Criar Artigo Fora do Catálogo </button>
                 </div>
               ) : (
                 <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dados do Novo Artigo</h4>
-                  <input 
-                    type="text" placeholder="Designação do Artigo *" 
-                    className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-black uppercase outline-none dark:text-white"
-                    value={newPartForm.name} onChange={(e) => setNewPartForm({...newPartForm, name: e.target.value})}
-                  />
-                  <input 
-                    type="text" placeholder="Referência (Opcional)" 
-                    className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-black uppercase outline-none dark:text-white"
-                    value={newPartForm.reference} onChange={(e) => setNewPartForm({...newPartForm, reference: e.target.value})}
-                  />
-                  <button 
-                    onClick={() => setIsCreatingNewPart(false)}
-                    className="w-full py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:underline text-center"
-                  >
-                    Voltar para Pesquisa no Catálogo
-                  </button>
+                  <input type="text" placeholder="Designação do Artigo *" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-black uppercase outline-none dark:text-white" value={newPartForm.name} onChange={(e) => setNewPartForm({...newPartForm, name: e.target.value})} />
+                  <input type="text" placeholder="Referência (Opcional)" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-black uppercase outline-none dark:text-white" value={newPartForm.reference} onChange={(e) => setNewPartForm({...newPartForm, reference: e.target.value})} />
+                  <button onClick={() => setIsCreatingNewPart(false)} className="w-full py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:underline text-center"> Voltar para Pesquisa no Catálogo </button>
                 </div>
               )}
-
               <div className="pt-4 border-t border-slate-50 dark:border-slate-800">
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Quantidade a Aplicar</label>
                 <div className="flex items-center gap-4">
-                   <input 
-                    type="text" inputMode="decimal"
-                    className="flex-1 px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-lg font-black dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 text-center"
-                    value={partQuantityStr}
-                    onChange={(e) => setPartQuantityStr(e.target.value)}
-                   />
+                   <input type="text" inputMode="decimal" className="flex-1 px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-lg font-black dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 text-center" value={partQuantityStr} onChange={(e) => setPartQuantityStr(e.target.value)} />
                    <span className="text-xs font-black text-slate-400 uppercase">UN</span>
                 </div>
               </div>
-
-              <button 
-                onClick={isCreatingNewPart ? handleCreateAndAddPart : handleAddPart}
-                disabled={actionLoading || (!selectedPartId && !newPartForm.name)}
-                className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50"
-              >
-                {actionLoading ? <RefreshCw className="animate-spin mx-auto" /> : 'CONFIRMAR ADIÇÃO'}
-              </button>
+              <button onClick={isCreatingNewPart ? handleCreateAndAddPart : handleAddPart} disabled={actionLoading || (!selectedPartId && !newPartForm.name)} className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50">{actionLoading ? <RefreshCw className="animate-spin mx-auto" /> : 'CONFIRMAR ADIÇÃO'}</button>
             </div>
           </div>
         </div>
@@ -1617,21 +1144,9 @@ export const ServiceOrderDetail: React.FC = () => {
                 </div>
                 <div>
                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 text-center">Nova Quantidade</label>
-                   <input 
-                    autoFocus
-                    type="text" inputMode="decimal"
-                    className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-2xl font-black text-blue-600 dark:text-blue-400 outline-none focus:ring-4 focus:ring-blue-500/10 text-center"
-                    value={tempQuantityStr}
-                    onChange={(e) => setTempQuantityStr(e.target.value)}
-                   />
+                   <input autoFocus type="text" inputMode="decimal" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-2xl font-black text-blue-600 dark:text-blue-400 outline-none focus:ring-4 focus:ring-blue-500/10 text-center" value={tempQuantityStr} onChange={(e) => setTempQuantityStr(e.target.value)} />
                 </div>
-                <button 
-                  onClick={() => handleUpdatePartQuantity(partToEditQuantity.id, tempQuantityStr)}
-                  disabled={actionLoading}
-                  className="w-full bg-blue-600 text-white py-5 rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 transition-all"
-                >
-                  {actionLoading ? <RefreshCw className="animate-spin mx-auto" /> : 'GUARDAR ALTERAÇÃO'}
-                </button>
+                <button onClick={() => handleUpdatePartQuantity(partToEditQuantity.id, tempQuantityStr)} disabled={actionLoading} className="w-full bg-blue-600 text-white py-5 rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 transition-all">{actionLoading ? <RefreshCw className="animate-spin mx-auto" /> : 'GUARDAR ALTERAÇÃO'}</button>
              </div>
           </div>
         </div>
