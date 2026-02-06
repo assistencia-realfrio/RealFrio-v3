@@ -23,8 +23,13 @@ import {
   Users,
   FileSpreadsheet,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  User,
+  ArrowRight,
+  Edit2,
+  Save
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { mockData } from '../services/mockData';
 import { Client } from '../types';
 
@@ -77,6 +82,17 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ isOpen, title, message, c
   );
 };
 
+interface AuditClient {
+  id: string;
+  name: string;
+  billing_name: string;
+  phone: string;
+  email: string;
+  address: string;
+  google_drive_link: string;
+  missingFields: string[];
+}
+
 const Maintenance: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -93,13 +109,18 @@ const Maintenance: React.FC = () => {
   // Auditoria de Clientes
   const [auditResults, setAuditResults] = useState<{
     total: number;
-    incomplete: number;
+    incompleteCount: number;
     missingBilling: number;
     missingPhone: number;
     missingEmail: number;
     missingMaps: number;
     missingDrive: number;
+    clients: AuditClient[];
   } | null>(null);
+
+  // Edição rápida de auditoria
+  const [quickEditId, setQuickEditId] = useState<string | null>(null);
+  const [quickEditForm, setQuickEditForm] = useState<Partial<Client>>({});
 
   // Estados para Controle de Modais de Confirmação
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -207,23 +228,36 @@ const Maintenance: React.FC = () => {
       
       const stats = {
         total: clients.length,
-        incomplete: 0,
+        incompleteCount: 0,
         missingBilling: 0,
         missingPhone: 0,
         missingEmail: 0,
         missingMaps: 0,
-        missingDrive: 0
+        missingDrive: 0,
+        clients: [] as AuditClient[]
       };
 
       clients.forEach(c => {
-        let isInc = false;
-        if (!c.billing_name || c.billing_name === '---' || c.billing_name.trim() === '') { stats.missingBilling++; isInc = true; }
-        if (!c.phone || c.phone === '---' || c.phone.trim() === '') { stats.missingPhone++; isInc = true; }
-        if (!c.email || c.email === '---' || c.email.trim() === '') { stats.missingEmail++; isInc = true; }
-        if (!c.address || c.address === '---' || c.address.trim() === '') { stats.missingMaps++; isInc = true; }
-        if (!c.google_drive_link || c.google_drive_link.trim() === '') { stats.missingDrive++; isInc = true; }
+        const missingFields: string[] = [];
+        if (!c.billing_name || c.billing_name === '---' || c.billing_name.trim() === '') { stats.missingBilling++; missingFields.push("Firma"); }
+        if (!c.phone || c.phone === '---' || c.phone.trim() === '') { stats.missingPhone++; missingFields.push("Telefone"); }
+        if (!c.email || c.email === '---' || c.email.trim() === '') { stats.missingEmail++; missingFields.push("Email"); }
+        if (!c.address || c.address === '---' || c.address.trim() === '') { stats.missingMaps++; missingFields.push("Morada"); }
+        if (!c.google_drive_link || c.google_drive_link.trim() === '') { stats.missingDrive++; missingFields.push("Drive"); }
         
-        if (isInc) stats.incomplete++;
+        if (missingFields.length > 0) {
+          stats.incompleteCount++;
+          stats.clients.push({
+            id: c.id,
+            name: c.name,
+            billing_name: c.billing_name || '',
+            phone: c.phone || '',
+            email: c.email || '',
+            address: c.address || '',
+            google_drive_link: c.google_drive_link || '',
+            missingFields
+          });
+        }
       });
 
       setAuditResults(stats);
@@ -232,6 +266,32 @@ const Maintenance: React.FC = () => {
     } catch (err: any) {
       setError("Erro na auditoria.");
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartQuickEdit = (client: AuditClient) => {
+    setQuickEditId(client.id);
+    setQuickEditForm({
+      billing_name: client.billing_name,
+      phone: client.phone,
+      email: client.email,
+      address: client.address,
+      google_drive_link: client.google_drive_link
+    });
+  };
+
+  const handleSaveQuickEdit = async (clientId: string) => {
+    setLoading(true);
+    setStatus("A atualizar dados do cliente...");
+    try {
+      await mockData.updateClient(clientId, quickEditForm);
+      setQuickEditId(null);
+      setQuickEditForm({});
+      // Re-executar auditoria para atualizar lista
+      await handleAuditClients();
+    } catch (err: any) {
+      setError("Erro ao guardar dados.");
       setLoading(false);
     }
   };
@@ -365,7 +425,7 @@ const Maintenance: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         {/* AUDITORIA DE CLIENTES */}
-        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-xl border border-blue-100 dark:border-blue-900/30 overflow-hidden flex flex-col transition-all">
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-xl border border-blue-100 dark:border-blue-900/30 overflow-hidden flex flex-col transition-all md:col-span-2">
           <button 
             onClick={() => setExpandedAudit(!expandedAudit)}
             className="w-full p-8 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
@@ -389,28 +449,150 @@ const Maintenance: React.FC = () => {
               </p>
               
               {auditResults && (
-                <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-4 text-left space-y-2 border border-slate-100 dark:border-slate-800">
-                   <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-slate-400">Total Clientes:</span><span className="text-slate-900 dark:text-white">{auditResults.total}</span></div>
-                   <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-red-500">Fichas Incompletas:</span><span className="text-red-600">{auditResults.incomplete}</span></div>
-                   <div className="h-px bg-slate-100 dark:bg-slate-800 my-1"></div>
-                   <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                      <div className="text-[8px] font-bold text-slate-400 uppercase">Firma: {auditResults.missingBilling}</div>
-                      <div className="text-[8px] font-bold text-slate-400 uppercase">Tel.: {auditResults.missingPhone}</div>
-                      <div className="text-[8px] font-bold text-slate-400 uppercase">Email: {auditResults.missingEmail}</div>
-                      <div className="text-[8px] font-bold text-slate-400 uppercase">Morada: {auditResults.missingMaps}</div>
-                      <div className="text-[8px] font-bold text-slate-400 uppercase">Drive: {auditResults.missingDrive}</div>
-                   </div>
+                <div className="space-y-4">
+                  <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-4 text-left space-y-2 border border-slate-100 dark:border-slate-800">
+                    <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-slate-400">Total Clientes:</span><span className="text-slate-900 dark:text-white">{auditResults.total}</span></div>
+                    <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-red-500">Fichas Incompletas:</span><span className="text-red-600">{auditResults.incompleteCount}</span></div>
+                    <div className="h-px bg-slate-100 dark:bg-slate-800 my-1"></div>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-1">
+                        <div className="text-[8px] font-bold text-slate-400 uppercase">Firma: {auditResults.missingBilling}</div>
+                        <div className="text-[8px] font-bold text-slate-400 uppercase">Tel.: {auditResults.missingPhone}</div>
+                        <div className="text-[8px] font-bold text-slate-400 uppercase">Email: {auditResults.missingEmail}</div>
+                        <div className="text-[8px] font-bold text-slate-400 uppercase">Morada: {auditResults.missingMaps}</div>
+                        <div className="text-[8px] font-bold text-slate-400 uppercase">Drive: {auditResults.missingDrive}</div>
+                    </div>
+                  </div>
+
+                  {auditResults.clients.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2 mb-3">Detalhamento por Cliente</h4>
+                      <div className="max-h-96 overflow-y-auto no-scrollbar space-y-2 pr-1">
+                        {auditResults.clients.map(c => (
+                          <div key={c.id} className={`p-4 bg-white dark:bg-slate-800 border rounded-2xl flex flex-col transition-all ${quickEditId === c.id ? 'border-blue-500 shadow-lg ring-1 ring-blue-500/20' : 'border-slate-100 dark:border-slate-700'}`}>
+                            <div className="flex items-center justify-between group">
+                              <div className="flex items-center gap-3 min-w-0">
+                                 <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-400 flex items-center justify-center flex-shrink-0 group-hover:text-blue-500 transition-colors">
+                                    <User size={16} />
+                                 </div>
+                                 <div className="min-w-0">
+                                    <p className="text-xs font-black text-slate-900 dark:text-white uppercase truncate">{c.name}</p>
+                                    {quickEditId !== c.id && (
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {c.missingFields.map(f => (
+                                          <span key={f} className="text-[7px] font-black text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                                            Falta: {f}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                 </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {quickEditId !== c.id ? (
+                                  <>
+                                    <button 
+                                      onClick={() => handleStartQuickEdit(c)}
+                                      className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all"
+                                      title="Preencher Dados"
+                                    >
+                                      <Edit2 size={16} />
+                                    </button>
+                                    <Link to={`/clients/${c.id}`} className="p-2 text-slate-300 hover:text-blue-600 transition-colors">
+                                      <ArrowRight size={18} />
+                                    </Link>
+                                  </>
+                                ) : (
+                                  <button onClick={() => setQuickEditId(null)} className="p-2 text-slate-400 hover:text-red-500"><X size={18} /></button>
+                                )}
+                              </div>
+                            </div>
+
+                            {quickEditId === c.id && (
+                              <div className="mt-4 pt-4 border-t border-slate-50 dark:border-slate-700 space-y-3 animate-in slide-in-from-top-2 duration-300">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  {c.missingFields.includes("Firma") && (
+                                    <div>
+                                      <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Nome Faturação / Firma</label>
+                                      <input 
+                                        type="text" 
+                                        className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold uppercase outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={quickEditForm.billing_name}
+                                        onChange={e => setQuickEditForm({...quickEditForm, billing_name: e.target.value})}
+                                      />
+                                    </div>
+                                  )}
+                                  {c.missingFields.includes("Telefone") && (
+                                    <div>
+                                      <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Telefone Sede</label>
+                                      <input 
+                                        type="tel" 
+                                        className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={quickEditForm.phone}
+                                        onChange={e => setQuickEditForm({...quickEditForm, phone: e.target.value})}
+                                      />
+                                    </div>
+                                  )}
+                                  {c.missingFields.includes("Email") && (
+                                    <div className="lowercase-container">
+                                      <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Email Faturação</label>
+                                      <input 
+                                        type="email" 
+                                        className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={quickEditForm.email}
+                                        onChange={e => setQuickEditForm({...quickEditForm, email: e.target.value})}
+                                      />
+                                    </div>
+                                  )}
+                                  {c.missingFields.includes("Drive") && (
+                                    <div>
+                                      <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Google Drive Cliente</label>
+                                      <input 
+                                        type="url" 
+                                        placeholder="https://drive.google.com/..."
+                                        className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={quickEditForm.google_drive_link}
+                                        onChange={e => setQuickEditForm({...quickEditForm, google_drive_link: e.target.value})}
+                                      />
+                                    </div>
+                                  )}
+                                  {c.missingFields.includes("Morada") && (
+                                    <div className="sm:col-span-2">
+                                      <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Morada Sede / Link Maps</label>
+                                      <input 
+                                        type="text" 
+                                        className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold uppercase outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={quickEditForm.address}
+                                        onChange={e => setQuickEditForm({...quickEditForm, address: e.target.value})}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                                <button 
+                                  onClick={() => handleSaveQuickEdit(c.id)}
+                                  disabled={loading}
+                                  className="w-full py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all mt-2"
+                                >
+                                  {loading ? <RefreshCw className="animate-spin" size={14} /> : <Save size={14} />}
+                                  GUARDAR ATUALIZAÇÃO
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button 
                   onClick={handleAuditClients}
                   disabled={loading}
                   className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-3 active:scale-95"
                 >
                   <FileSearch size={18} />
-                  VERIFICAR DADOS EM FALTA
+                  EXECUTAR AUDITORIA
                 </button>
                 
                 <label className={`w-full py-4 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-blue-50 transition-all flex items-center justify-center gap-3 cursor-pointer active:scale-95`}>
@@ -494,7 +676,7 @@ const Maintenance: React.FC = () => {
         </div>
 
         {/* RESTAURAR BACKUP */}
-        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-xl border border-red-100 dark:border-red-900/30 overflow-hidden flex flex-col transition-all">
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-xl border border-red-100 dark:border-red-900/30 overflow-hidden flex flex-col transition-all md:col-span-2">
           <button 
             onClick={() => setExpandedRestore(!expandedRestore)}
             className="w-full p-8 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"

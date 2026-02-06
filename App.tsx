@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { mockData } from './services/mockData';
@@ -50,6 +49,8 @@ function App() {
     setUser(null);
   };
 
+  const isAdmin = user?.role?.toLowerCase() === UserRole.ADMIN;
+
   if (loading) {
     return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 text-gray-500 uppercase font-black text-[10px] tracking-widest">A iniciar aplicação...</div>;
   }
@@ -78,8 +79,17 @@ function App() {
             <Route path="/equipments/:id/edit" element={user ? <Layout user={user} onLogout={handleLogout}><EditEquipment /></Layout> : <Navigate to="/login" />} />
             
             <Route path="/inventory" element={user ? <Layout user={user} onLogout={handleLogout}><Inventory /></Layout> : <Navigate to="/login" />} />
-            <Route path="/users" element={user ? <Layout user={user} onLogout={handleLogout}><Users /></Layout> : <Navigate to="/login" />} />
-            <Route path="/maintenance" element={user ? <Layout user={user} onLogout={handleLogout}><Maintenance /></Layout> : <Navigate to="/login" />} />
+            
+            {/* Rotas restritas a Administradores */}
+            <Route 
+              path="/users" 
+              element={user && isAdmin ? <Layout user={user} onLogout={handleLogout}><Users /></Layout> : (user ? <Navigate to="/" /> : <Navigate to="/login" />)} 
+            />
+            <Route 
+              path="/maintenance" 
+              element={user && isAdmin ? <Layout user={user} onLogout={handleLogout}><Maintenance /></Layout> : (user ? <Navigate to="/" /> : <Navigate to="/login" />)} 
+            />
+            
             <Route path="/profile" element={user ? <Layout user={user} onLogout={handleLogout}><Profile /></Layout> : <Navigate to="/login" />} />
             
             <Route path="*" element={<Navigate to="/" />} />
