@@ -1,4 +1,3 @@
-
 import { supabase } from '../supabaseClient';
 import { 
   Client, Establishment, Equipment, ServiceOrder, OSStatus, OSType, 
@@ -376,6 +375,10 @@ export const mockData = {
 
   updateVacation: async (id: string, updates: Partial<Vacation>) => {
     return supabase.from('vacations').update(updates).eq('id', id);
+  },
+
+  deleteVacation: async (id: string) => {
+    return supabase.from('vacations').delete().eq('id', id);
   },
 
   importVacations: async (data: any[]) => {
