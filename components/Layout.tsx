@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench, RefreshCw, Loader2, QrCode, Scan } from 'lucide-react';
@@ -190,27 +189,24 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   const handleQRSuccess = (decodedText: string) => {
     try {
-      // Se for um URL absoluto
-      if (decodedText.startsWith('http')) {
-        const url = new URL(decodedText);
-        const hash = url.hash;
-        if (hash && (hash.includes('/equipments/') || hash.includes('/os/'))) {
-          const route = hash.replace('#', '');
-          setScannerOpen(false);
-          navigate(route);
-          return;
+      // Se for um URL absoluto (completo com o domínio da app)
+      if (decodedText.includes('/#/equipments/') || decodedText.includes('/#/os/')) {
+        const hashPart = decodedText.includes('#') ? decodedText.split('#')[1] : '';
+        if (hashPart) {
+           setScannerOpen(false);
+           navigate(hashPart);
+           return;
         }
       }
       
-      // Se for apenas o ID ou rota parcial
-      if (decodedText.includes('/equipments/') || decodedText.includes('/os/')) {
-         const cleanRoute = decodedText.split('#').pop() || decodedText;
+      // Suporte para rotas amigáveis sem o domínio (ex: /equipments/123)
+      if (decodedText.startsWith('/equipments/') || decodedText.startsWith('/os/')) {
          setScannerOpen(false);
-         navigate(cleanRoute);
+         navigate(decodedText);
          return;
       }
 
-      alert("Código lido não reconhecido como um ativo Real Frio.");
+      alert("Código lido não reconhecido como um ativo ou OS Real Frio.");
     } catch (e) {
       console.error("Erro ao processar QR:", e);
       alert("Conteúdo do QR Code inválido.");
@@ -262,6 +258,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
       {sidebarOpen && <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
+      {/* Fix: Corrected broken ternary operator string literal interpolation in className on line 262 */}
       <aside className={`fixed inset-y-0 left-0 z-[80] w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none lg:relative lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between h-20 px-6 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">

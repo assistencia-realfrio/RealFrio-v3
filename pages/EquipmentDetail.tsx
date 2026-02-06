@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
@@ -6,7 +5,7 @@ import {
   Paperclip, Plus, Trash2, Camera, MapPin, Building2, ExternalLink,
   ChevronRight, Download, FileText, X, Eye, Activity, Tag, UploadCloud,
   FileImage, AlertTriangle, ShieldAlert, Printer, FileImage as ImageIcon2,
-  Image as LucideImage, Loader2
+  Image as LucideImage, Loader2, ChevronDown
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { mockData } from '../services/mockData';
@@ -116,18 +115,46 @@ const EquipmentDetail: React.FC = () => {
     if (!equipment) return;
     const widthMM = 127.0; const heightMM = 59.2; const dpi = 300; const mmToPx = dpi / 25.4; const widthPX = Math.round(widthMM * mmToPx); const heightPX = Math.round(heightMM * mmToPx);
     const canvas = document.createElement('canvas'); canvas.width = widthPX; canvas.height = heightPX; const ctx = canvas.getContext('2d'); if (!ctx) return;
+    
     const qrSize = Math.round(heightPX * 0.75 * 1.25); const marginMM = 4; const marginPX = Math.round(marginMM * mmToPx);
     const baseUrl = window.location.href.split('#')[0]; const qrUrl = `${baseUrl}#/equipments/${equipment.id}`;
     const qrDataUrl = await QRCode.toDataURL(qrUrl, { margin: 1, width: qrSize, color: { dark: '#000000', light: '#00000000' } });
     const qrImage = new Image(); qrImage.src = qrDataUrl;
     await new Promise((resolve) => { qrImage.onload = () => { const qrX = widthPX - qrSize - marginPX; const qrY = (heightPX - qrSize) / 2; ctx.drawImage(qrImage, qrX, qrY); resolve(true); }; });
+    
     const textMarginX = Math.round(5 * mmToPx); const textMaxWidth = widthPX - qrSize - (marginPX * 3);
-    const fontSize = Math.round(14 * mmToPx); const lineSpacing = Math.round(4 * mmToPx);
-    const totalBlockHeight = (fontSize * 3) + (lineSpacing * 2); let currentY = (heightPX - totalBlockHeight) / 2 + (fontSize * 0.85);
-    ctx.fillStyle = '#000000'; const fontStyle = `bold ${fontSize}px Inter, "Segoe UI", Helvetica, Arial, sans-serif`; ctx.font = fontStyle;
-    ctx.fillText("REAL FRIO", textMarginX, currentY, textMaxWidth); currentY += fontSize + lineSpacing;
-    const equipType = equipment.type.toUpperCase(); ctx.fillText(equipType, textMarginX, currentY, textMaxWidth); currentY += fontSize + lineSpacing;
-    const brandModel = `${equipment.brand || ''} ${equipment.model ? '- ' + equipment.model : ''}`.toUpperCase(); ctx.fillText(brandModel, textMarginX, currentY, textMaxWidth);
+    
+    // Configurações de Fonte
+    const fontSizeMain = Math.round(8 * mmToPx); 
+    const fontSizeOther = Math.round(6 * mmToPx); 
+    const lineSpacing = Math.round(4 * mmToPx);
+    
+    const otherLines = [
+      equipment.type.toUpperCase(),
+      (equipment.brand || '---').toUpperCase(),
+      (equipment.model || '---').toUpperCase(),
+      (equipment.serial_number || '---').toUpperCase() // Prefixo removido conforme solicitado
+    ];
+    
+    // Altura total: 1 linha de 8 + 4 linhas de 6 + 4 espaços
+    const totalBlockHeight = fontSizeMain + (fontSizeOther * otherLines.length) + (lineSpacing * otherLines.length); 
+    let currentY = (heightPX - totalBlockHeight) / 2 + (fontSizeMain * 0.85);
+    
+    ctx.fillStyle = '#000000'; 
+    const fontCalibri = 'Calibri, "Segoe UI", Candara, Segoe, Optima, Arial, sans-serif';
+    
+    // Desenhar "REAL FRIO" (Tamanho 8, Negrito)
+    ctx.font = `bold ${fontSizeMain}px ${fontCalibri}`;
+    ctx.fillText("REAL FRIO", textMarginX, currentY, textMaxWidth);
+    currentY += fontSizeMain + lineSpacing;
+
+    // Desenhar restantes campos (Tamanho 6, Negrito)
+    ctx.font = `bold ${fontSizeOther}px ${fontCalibri}`;
+    otherLines.forEach(line => {
+      ctx.fillText(line, textMarginX, currentY, textMaxWidth);
+      currentY += fontSizeOther + lineSpacing;
+    });
+    
     const safeClient = clientName.replace(/\s+/g, '_').toUpperCase(); const safeType = equipment.type.replace(/\s+/g, '_').toUpperCase(); const safeBrand = (equipment.brand || '').replace(/\s+/g, '_').toUpperCase(); const safeModel = (equipment.model || '').replace(/\s+/g, '_').toUpperCase(); const safeSerial = (equipment.serial_number || 'S-N').replace(/\s+/g, '_').toUpperCase();
     const finalFileName = `ETIQUETA_MAXQR_${safeClient}_${safeType}_${safeBrand}_${safeModel}_${safeSerial}.png`;
     const pngUrl = canvas.toDataURL('image/png', 1.0); const link = document.createElement('a'); link.href = pngUrl; link.download = finalFileName; link.click();
@@ -245,10 +272,10 @@ const EquipmentDetail: React.FC = () => {
         </div>
       )}
 
-      {/* Seletor de Origem */}
+      {/* Seletor de Origem Centrado */}
       {showSourceModal && (
-        <div className="fixed inset-0 z-[600] flex items-end sm:items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-300">
               <div className="p-8 text-center">
                  <div className="flex justify-between items-center mb-6">
                     <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Origem do Arquivo</h3>
@@ -270,7 +297,7 @@ const EquipmentDetail: React.FC = () => {
                        <div className="text-left"><p className="font-black text-sm uppercase tracking-tight">Galeria / Arquivos</p><p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">Documentos e Fotos</p></div>
                     </button>
                  </div>
-                 <button onClick={() => setShowSourceModal(false)} className="mt-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">VOLTAR</button>
+                 <button onClick={() => setShowSourceModal(false)} className="mt-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] hover:text-slate-600">VOLTAR</button>
               </div>
            </div>
         </div>
@@ -279,43 +306,46 @@ const EquipmentDetail: React.FC = () => {
       <ConfirmDialog {...confirmConfig} onCancel={closeConfirm} onConfirm={() => { closeConfirm(); confirmConfig.action(); }} />
 
       <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2 px-1">
-          <button onClick={() => navigate(-1)} className="p-3 text-slate-500 dark:text-slate-400 hover:text-blue-600 rounded-2xl transition-all bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm active:scale-95">
-            <ArrowLeft size={22} />
+        {/* Header Section: Back Button and Identity Card aligned horizontal */}
+        <div className="flex items-stretch gap-3 px-1">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="flex-shrink-0 flex items-center justify-center w-14 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:text-blue-600 rounded-[1.5rem] transition-all border border-gray-200 dark:border-slate-800 shadow-sm active:scale-95 active:bg-slate-50"
+          >
+            <ArrowLeft size={24} />
           </button>
-        </div>
 
-        <div className="bg-white dark:bg-slate-900 shadow-xl rounded-[2rem] p-6 border border-gray-100 dark:border-slate-800 text-center animate-in fade-in duration-300 relative transition-colors">
-          <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight">
-            {equipment.type}
-          </h1>
-          <p className="text-[8px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.4em] mt-1.5">Ficha de Identificação do Ativo</p>
+          <div className="flex-1 bg-white dark:bg-slate-900 shadow-xl rounded-[2.5rem] p-6 border border-gray-100 dark:border-slate-800 text-center animate-in fade-in slide-in-from-right-4 duration-500 relative transition-colors flex items-center justify-center">
+            <h1 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-tight">
+              {equipment.type}
+            </h1>
+          </div>
         </div>
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           {activeTab === 'info' && (
             <div className="space-y-4">
               <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden divide-y divide-slate-50 dark:divide-slate-800 transition-colors">
-                <div className="p-6 flex items-center gap-4">
-                   <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-500 flex items-center justify-center flex-shrink-0"> <Building2 size={22} /> </div>
-                   <div className="min-w-0 pr-4"> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Proprietário / Cliente</p> <button onClick={() => navigate(`/clients/${equipment.client_id}`)} className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase truncate hover:text-blue-600 text-left transition-colors"> {clientName} </button> </div>
+                <div className="p-4 flex items-center gap-4">
+                   <div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-500 flex items-center justify-center flex-shrink-0"> <Building2 size={20} /> </div>
+                   <div className="min-w-0 pr-4"> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Proprietário / Cliente</p> <button onClick={() => navigate(`/clients/${equipment.client_id}`)} className="text-[13px] font-black text-slate-900 dark:text-slate-100 uppercase truncate hover:text-blue-600 text-left transition-colors"> {clientName} </button> </div>
                 </div>
-                <div className="p-6 flex items-center gap-4">
-                   <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 flex items-center justify-center flex-shrink-0"> <MapPin size={22} /> </div>
-                   <div className="min-w-0 pr-4"> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Localização de Instalação</p> <p className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase truncate">{establishmentName}</p> </div>
+                <div className="p-4 flex items-center gap-4">
+                   <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 flex items-center justify-center flex-shrink-0"> <MapPin size={20} /> </div>
+                   <div className="min-w-0 pr-4"> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Localização de Instalação</p> <p className="text-[13px] font-black text-slate-900 dark:text-slate-100 uppercase truncate">{establishmentName}</p> </div>
                 </div>
-                <div className="p-6 flex items-center gap-4">
-                   <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center flex-shrink-0"> <Tag size={22} /> </div>
-                   <div className="min-w-0 pr-4"> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Marca / Modelo</p> <p className="text-sm font-black text-blue-600 dark:text-blue-400 uppercase truncate">{equipment.brand} <span className="text-slate-300 dark:text-slate-700 mx-1">|</span> {equipment.model || '---'}</p> </div>
+                <div className="p-4 flex items-center gap-4">
+                   <div className="w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center flex-shrink-0"> <Tag size={20} /> </div>
+                   <div className="min-w-0 pr-4"> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Marca / Modelo</p> <p className="text-[13px] font-black text-slate-900 dark:text-slate-100 uppercase truncate">{equipment.brand} <span className="text-slate-300 dark:text-slate-700 mx-1 font-normal">|</span> {equipment.model || '---'}</p> </div>
                 </div>
-                <div className="p-6 flex items-center gap-4">
-                   <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0"> <FileText size={22} /> </div>
-                   <div className="min-w-0 pr-4"> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Número de Série (S/N)</p> <p className="text-sm font-black text-slate-900 dark:text-slate-100 font-mono uppercase">{equipment.serial_number || '---'}</p> </div>
+                <div className="p-4 flex items-center gap-4">
+                   <div className="w-11 h-11 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0"> <FileText size={20} /> </div>
+                   <div className="min-w-0 pr-4"> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Número de Série (S/N)</p> <p className="text-[13px] font-black text-slate-900 dark:text-slate-100 uppercase">{equipment.serial_number || '---'}</p> </div>
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6">
-                <button onClick={generateAssetPNG} className="w-full bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 py-5 rounded-3xl font-black text-[10px] uppercase tracking-[0.2em] shadow-sm hover:bg-blue-50 transition-all flex items-center justify-center gap-3 active:scale-95" > <ImageIcon2 size={16} /> EXPORTAR ETIQUETA (127x59) </button>
-                <Link to={`/equipments/${equipment.id}/edit`} className="w-full bg-slate-900 dark:bg-blue-600 text-white py-5 rounded-3xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95" > <Edit2 size={16} /> EDITAR FICHA DO ATIVO </Link>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                <button onClick={generateAssetPNG} className="w-full bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-sm hover:bg-blue-50 transition-all flex items-center justify-center gap-3 active:scale-95" > <ImageIcon2 size={16} /> EXPORTAR ETIQUETA (127x59) </button>
+                <Link to={`/equipments/${equipment.id}/edit`} className="w-full bg-slate-900 dark:bg-blue-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95" > <Edit2 size={16} /> EDITAR FICHA DO ATIVO </Link>
               </div>
             </div>
           )}
@@ -390,7 +420,7 @@ const EquipmentDetail: React.FC = () => {
       </div>
 
       {selectedAttachmentForView && ( <div className="fixed inset-0 z-[300] bg-slate-950 flex flex-col animate-in fade-in duration-300"> <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 z-[310] bg-gradient-to-b from-black/80 to-transparent"> <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] truncate pr-10"> {selectedAttachmentForView.name} </span> <button onClick={() => setSelectedAttachmentForView(null)} className="p-4 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all active:scale-90 backdrop-blur-lg"> <X size={24} /> </button> </div> <div className="flex-1 w-full h-full"> <ZoomableImage src={selectedAttachmentForView.url} alt={selectedAttachmentForView.name} /> </div> </div> )}
-      {showNameplateFullscreen && equipment.nameplate_url && ( <div className="fixed inset-0 z-[300] bg-slate-950 flex flex-col animate-in fade-in duration-300"> <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 z-[310] bg-gradient-to-b from-black/80 to-transparent"> <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] truncate pr-10"> CHAPA DE CARACTERÍSTICAS: {equipment.type} </span> <button onClick={() => setShowNameplateFullscreen(false)} className="p-4 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all active:scale-90 backdrop-blur-lg"> <X size={24} /> </button> </div> <div className="flex-1 w-full h-full"> <ZoomableImage src={equipment.nameplate_url} alt="Chapa de Características" /> </div> </div> )}
+      {showNameplateFullscreen && equipment.nameplate_url && ( <div className="fixed inset-0 z-[300] bg-slate-950 flex flex-col animate-in fade-in duration-300"> <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 z-[310] bg-gradient-to-b from-black/80 to-transparent"> <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] truncate pr-10"> CHAPA DE CARACTERÍSTICAS: {equipment.type} </span> <button onClick={() => setShowNameplateFullscreen(false)} className="p-4 bg-white/10 text-white rounded-full hover:bg-white/10 transition-all active:scale-90 backdrop-blur-lg"> <X size={24} /> </button> </div> <div className="flex-1 w-full h-full"> <ZoomableImage src={equipment.nameplate_url} alt="Chapa de Características" /> </div> </div> )}
 
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-[#9d1c24] dark:border-[#9d1c24]/60 shadow-[0_12px_40px_rgba(157,28,36,0.15)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
         {[ { id: 'info', icon: HardDrive, label: 'GERAL' }, { id: 'chapa', icon: ImageIcon, label: 'CHAPA' }, { id: 'history', icon: History, label: 'HIST.' }, { id: 'attachments', icon: Paperclip, label: 'ANEXOS' } ].map((tab) => (

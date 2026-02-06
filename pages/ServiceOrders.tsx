@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HardDrive, Filter, MapPin, ChevronDown, RefreshCw, Calendar, LayoutList, StretchHorizontal, ShieldAlert, X, Timer } from 'lucide-react';
@@ -86,7 +85,7 @@ const ServiceOrders: React.FC = () => {
       const hasClientSig = osToUpdate?.client_signature && osToUpdate.client_signature.trim().length > 0;
       const hasTechSig = osToUpdate?.technician_signature && osToUpdate.technician_signature.trim().length > 0;
 
-      if (!hasAnomaly) fields.push("ANOMALIA DETETADA");
+      if (!hasAnomaly) fields.push("CAUSA DA AVARIA");
       if (!hasClientSig) fields.push("ASSINATURA DO CLIENTE");
       if (!hasTechSig) fields.push("ASSINATURA DO TÉCNICO");
 

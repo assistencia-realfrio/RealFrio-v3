@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
@@ -12,7 +11,7 @@ import {
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
   RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
   Settings2, FileDown, Key, Mail, Share2, UploadCloud, Play, Square as StopIcon, Timer, CloudRain,
-  Wrench, Snowflake, Printer, Check, Image as LucideImage
+  Wrench, Snowflake, Printer, Check, Image as LucideImage, QrCode, ExternalLink
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -345,7 +344,7 @@ export const ServiceOrderDetail: React.FC = () => {
 
   const missingFields = useMemo(() => {
     const list = [];
-    if (!anomaly || !anomaly.trim()) list.push("ANOMALIA DETETADA");
+    if (!anomaly || !anomaly.trim()) list.push("CAUSA DA AVARIA");
     if (!clientSignature) list.push("ASSINATURA DO CLIENTE");
     if (!technicianSignature) list.push("ASSINATURA DO TÉCNICO");
     return list;
@@ -398,7 +397,7 @@ export const ServiceOrderDetail: React.FC = () => {
     try {
       const changes = [];
       if (description !== (os.description || '')) changes.push("PEDIDO/AVARIA");
-      if (anomaly !== (os.anomaly_detected || '')) changes.push("ANOMALIA DETETADA");
+      if (anomaly !== (os.anomaly_detected || '')) changes.push("CAUSA DA AVARIA");
       if (resolutionNotes !== (os.resolution_notes || '')) changes.push("RESUMO DA RESOLUÇÃO");
       if (observations !== (os.observations || '')) changes.push("OBSERVAÇÕES");
       const originalDate = os.scheduled_date?.split(/[T ]/)[0] || '';
@@ -436,33 +435,107 @@ export const ServiceOrderDetail: React.FC = () => {
     } catch (e: any) { setErrorMessage("ERRO AO REABRIR OS."); } finally { setActionLoading(false); }
   };
 
-  const generateEquipmentTag = async () => {
+  const generateTechnicalTag = async () => {
     if (!os) return;
-    let qrDataUrl = '';
-    if (os.equipment_id) {
+    setIsExportingPDF(true);
+    try {
+      let qrAssetDataUrl = '';
+      let qrOSDataUrl = '';
       const baseUrl = window.location.href.split('#')[0];
-      const qrUrl = `${baseUrl}#/equipments/${os.equipment_id}`;
-      try { qrDataUrl = await QRCode.toDataURL(qrUrl, { margin: 1, width: 300, color: { dark: '#000000', light: '#ffffff' } }); } catch (err) { console.error("Erro ao gerar QR Code:", err); }
+
+      // QR Code 1: Ativo / Equipamento (Histórico)
+      if (os.equipment_id) {
+        const qrAssetUrl = `${baseUrl}#/equipments/${os.equipment_id}`;
+        qrAssetDataUrl = await QRCode.toDataURL(qrAssetUrl, { margin: 1, width: 300 });
+      }
+
+      // QR Code 2: Ordem de Serviço Direta
+      const qrOSUrl = `${baseUrl}#/os/${os.id}`;
+      qrOSDataUrl = await QRCode.toDataURL(qrOSUrl, { margin: 1, width: 300 });
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.width;
+      const margin = 10;
+      
+      // Borda da etiqueta
+      doc.setLineWidth(1.2); 
+      doc.rect(margin, margin, pageWidth - (margin * 2), 175);
+      
+      doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(80, 80, 80);
+      doc.text("REAL FRIO - IDENTIFICAÇÃO TÉCNICA", pageWidth / 2, margin + 10, { align: "center" });
+
+      // --- SECÇÃO OS (TOPO) ---
+      const rightColX = pageWidth - margin - 42; // Coluna direita para QR codes
+
+      // QR 2: ORDEM DE SERVIÇO (Topo Direito)
+      if (qrOSDataUrl) {
+        doc.addImage(qrOSDataUrl, 'PNG', rightColX, margin + 15, 34, 34);
+        doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(0, 100, 200);
+        doc.text("SCAN PARA ESTA OS", rightColX + 17, margin + 53, { align: "center" });
+      }
+
+      // ID da OS (Esquerda)
+      doc.setFontSize(26); doc.setFont("helvetica", "bold"); doc.setTextColor(0, 0, 0);
+      doc.text(os.code, margin + 8, margin + 30);
+      
+      doc.setLineWidth(0.5); doc.setDrawColor(220, 220, 220);
+      doc.line(margin + 5, margin + 60, pageWidth - margin - 5, margin + 60);
+      
+      // --- CLIENTE ---
+      doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 100, 100);
+      doc.text("CLIENTE:", margin + 8, margin + 70);
+      doc.setFontSize(18); doc.setFont("helvetica", "bold"); doc.setTextColor(0, 0, 0);
+      const clientName = (os.client?.name || "---").toUpperCase(); 
+      const splitClient = doc.splitTextToSize(clientName, pageWidth - (margin * 2) - 50); 
+      doc.text(splitClient, margin + 8, margin + 78);
+      
+      // --- EQUIPAMENTO / ATIVO ---
+      const equipY = margin + 105;
+      doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 100, 100);
+      doc.text("EQUIPAMENTO / ATIVO:", margin + 8, equipY);
+      
+      doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.setTextColor(0, 0, 0);
+      const equipText = (os.equipment?.type || 'NÃO DEFINIDO').toUpperCase(); 
+      doc.text(equipText, margin + 8, equipY + 10);
+      
+      doc.setFontSize(12); doc.setTextColor(60, 60, 60);
+      const brandModel = `${os.equipment?.brand || ''} ${os.equipment?.model ? '- ' + os.equipment.model : ''}`.toUpperCase(); 
+      doc.text(brandModel, margin + 8, equipY + 18);
+      
+      doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(120, 120, 120);
+      doc.text(`S/N: ${os.equipment?.serial_number || '---'}`.toUpperCase(), margin + 8, equipY + 24);
+
+      // QR 1: ATIVO (Próximo à info do Ativo)
+      if (qrAssetDataUrl) {
+        doc.addImage(qrAssetDataUrl, 'PNG', rightColX, equipY - 5, 34, 34);
+        doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(120, 120, 120);
+        doc.text("SCAN PARA FICHA DO ATIVO", rightColX + 17, equipY + 33, { align: "center" });
+      }
+      
+      doc.setLineWidth(0.3); doc.setDrawColor(220, 220, 220);
+      doc.line(margin + 5, margin + 140, pageWidth - margin - 5, margin + 140);
+      
+      // --- PEDIDO ORIGINAL (RODAPÉ) ---
+      doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 100, 100);
+      doc.text("PEDIDO ORIGINAL:", margin + 8, margin + 148);
+      doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(0, 0, 0);
+      const pedidoText = (os.description || "NÃO ESPECIFICADO").toUpperCase(); 
+      const splitDesc = doc.splitTextToSize(pedidoText, pageWidth - (margin * 2) - 20); 
+      doc.text(splitDesc, margin + 8, margin + 156);
+      
+      doc.setFontSize(7.5); doc.setFont("helvetica", "normal"); doc.setTextColor(180, 180, 180); 
+      const dateStr = `EMISSÃO ETIQUETA: ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`; 
+      doc.text(dateStr, pageWidth - margin - 8, margin + 172, { align: "right" });
+      
+      const blobUrl = doc.output('bloburl'); 
+      setTagPdfUrl(String(blobUrl)); 
+      setShowTagPreview(true);
+    } catch (err) {
+      console.error("Erro ao gerar etiqueta:", err);
+      setErrorMessage("ERRO AO GERAR ETIQUETA TÉCNICA.");
+    } finally {
+      setIsExportingPDF(false);
     }
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageWidth = doc.internal.pageSize.width;
-    const margin = 10;
-    doc.setLineWidth(1.2); doc.rect(margin, margin, pageWidth - (margin * 2), 170);
-    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.text("REAL FRIO - IDENTIFICAÇÃO TÉCNICA", pageWidth / 2, margin + 10, { align: "center" });
-    doc.setFontSize(38); doc.setFont("helvetica", "bold"); doc.text(os.code, pageWidth / 2, margin + 30, { align: "center" });
-    doc.setLineWidth(0.6); doc.line(margin + 5, margin + 38, pageWidth - margin - 5, margin + 38);
-    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text("CLIENTE:", margin + 8, margin + 50);
-    doc.setFontSize(20); doc.setFont("helvetica", "bold"); const clientName = (os.client?.name || "---").toUpperCase(); const splitClient = doc.splitTextToSize(clientName, pageWidth - (margin * 2) - 20); doc.text(splitClient, margin + 8, margin + 60);
-    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text("EQUIPAMENTO / ATIVO:", margin + 8, margin + 85);
-    if (qrDataUrl) { doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 48, margin + 82, 40, 40); doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(150, 150, 150); doc.text("SCAN PARA FICHA DO ATIVO", pageWidth - margin - 28, margin + 123.5, { align: "center" }); }
-    doc.setTextColor(0, 0, 0); doc.setFontSize(18); doc.setFont("helvetica", "bold"); const equipText = (os.equipment?.type || 'NÃO DEFINIDO').toUpperCase(); doc.text(equipText, margin + 8, margin + 95);
-    doc.setFontSize(14); const brandModel = `${os.equipment?.brand || ''} ${os.equipment?.model ? '- ' + os.equipment.model : ''}`.toUpperCase(); doc.text(brandModel, margin + 8, margin + 105);
-    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`S/N: ${os.equipment?.serial_number || '---'}`.toUpperCase(), margin + 8, margin + 112);
-    doc.setLineWidth(0.3); doc.line(margin + 5, margin + 128, pageWidth - margin - 5, margin + 128);
-    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text("PEDIDO DO CLIENTE / AVARIA:", margin + 8, margin + 136);
-    doc.setFontSize(18); doc.setFont("helvetica", "bold"); const pedidoText = (os.description || "NÃO ESPECIFICADO").toUpperCase(); const splitDesc = doc.splitTextToSize(pedidoText, pageWidth - (margin * 2) - 16); doc.text(splitDesc, margin + 8, margin + 146);
-    doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 100, 100); const dateStr = `ENTRADA: ${new Date(os.created_at).toLocaleDateString('pt-PT')}`; doc.text(dateStr, pageWidth - margin - 8, margin + 168, { align: "right" });
-    doc.autoPrint(); const blobUrl = doc.output('bloburl'); setTagPdfUrl(String(blobUrl)); setShowTagPreview(true);
   };
 
   const handlePrintTag = () => { if (tagPdfUrl) { window.open(tagPdfUrl, '_blank'); } };
@@ -475,7 +548,7 @@ export const ServiceOrderDetail: React.FC = () => {
     const contentWidth = pageWidth - (margin * 2);
     doc.setFillColor(15, 23, 42); doc.rect(0, 0, pageWidth, 28, 'F'); doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text("REAL FRIO", margin, 12); doc.setFontSize(7); doc.setFont("helvetica", "normal"); doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 18); doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(os.code, pageWidth - margin, 12, { align: 'right' }); doc.setFontSize(6); doc.setFont("helvetica", "normal"); doc.setTextColor(180, 180, 180); doc.text(`EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 18, { align: 'right' });
     let currentY = 32; doc.setDrawColor(241, 245, 249); doc.setFillColor(252, 252, 253); doc.roundedRect(margin, currentY, contentWidth, 22, 1, 1, 'FD'); doc.setTextColor(15, 23, 42); doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.text("DADOS DO CLIENTE", margin + 3, currentY + 5); doc.text("EQUIPAMENTO", margin + (contentWidth / 2) + 3, currentY + 5); doc.setDrawColor(226, 232, 240); doc.line(margin + 3, currentY + 7, margin + (contentWidth / 2) - 3, currentY + 7); doc.line(margin + (contentWidth / 2) + 3, currentY + 7, margin + contentWidth - 3, currentY + 7); doc.setFont("helvetica", "normal"); doc.setFontSize(6.5); doc.setTextColor(71, 85, 105); doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 3, currentY + 11); doc.text(`FIRMA: ${os.client?.billing_name || '---'}`, margin + 3, currentY + 14.5, { maxWidth: (contentWidth / 2) - 8 }); doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 3, currentY + 18); doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 3, currentY + 11); doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 3, currentY + 14.5); doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 3, currentY + 18);
-    currentY += 26; const narrativeFields = [ { label: "DESCRIÇÃO DO PEDIDO / AVARIA:", value: os.description || 'N/A' }, { label: "ANOMALIA DETETADA NO LOCAL:", value: os.anomaly_detected || 'N/A' }, { label: "TRABALHO EFETUADO E RESOLUÇÃO:", value: os.resolution_notes || 'N/A' } ];
+    currentY += 26; const narrativeFields = [ { label: "DESCRIÇÃO DO PEDIDO / AVARIA:", value: os.description || 'N/A' }, { label: "CAUSA DA AVARIA:", value: os.anomaly_detected || 'N/A' }, { label: "TRABALHO EFETUADO E RESOLUÇÃO:", value: os.resolution_notes || 'N/A' } ];
     narrativeFields.forEach(field => { doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(15, 23, 42); doc.text(field.label, margin, currentY); currentY += 3; doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(51, 65, 85); const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth); doc.text(splitText, margin, currentY); currentY += (splitText.length * 4) + 3; if (currentY > 275) { doc.addPage(); currentY = 15; } });
     if (partsUsed.length > 0) { doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(15, 23, 42); doc.text("MATERIAL APLICADO:", margin, currentY); currentY += 2; autoTable(doc, { startY: currentY, margin: { left: margin, right: margin }, theme: 'plain', head: [['ARTIGO / DESIGNAÇÃO', 'REFERÊNCIA', 'QTD']], body: partsUsed.map(p => [p.name.toUpperCase(), p.reference.toUpperCase(), `${p.quantity.toLocaleString('pt-PT')} UN`]), headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontSize: 6, fontStyle: 'bold', halign: 'left' }, styles: { fontSize: 7, cellPadding: 1, textColor: [51, 65, 85], lineWidth: 0.05, lineColor: [241, 245, 249] }, columnStyles: { 2: { halign: 'right' } } }); currentY = (doc as any).lastAutoTable.finalY + 8; }
     if (currentY > 250) { doc.addPage(); currentY = 15; } doc.setDrawColor(226, 232, 240); doc.line(margin, currentY, pageWidth - margin, currentY); currentY += 5; doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.text("VALIDAÇÃO E CONFORMIDADE", margin, currentY); currentY += 3; const sigBoxWidth = (contentWidth / 2) - 5; if (clientSignature) { try { doc.addImage(clientSignature, 'JPEG', margin, currentY, 40, 15, undefined, 'FAST'); } catch (e) {} } doc.setDrawColor(203, 213, 225); doc.line(margin, currentY + 16, margin + sigBoxWidth, currentY + 16); doc.setFontSize(5.5); doc.setFont("helvetica", "normal"); doc.setTextColor(148, 163, 184); doc.text("ASSINATURA CLIENTE", margin + (sigBoxWidth / 2), currentY + 20, { align: 'center' }); if (technicianSignature) { try { doc.addImage(technicianSignature, 'JPEG', margin + (contentWidth / 2) + 5, currentY, 40, 15, undefined, 'FAST'); } catch (e) {} } doc.line(margin + (contentWidth / 2) + 5, currentY + 16, margin + contentWidth, currentY + 16); doc.text("ASSINATURA TÉCNICO", margin + (contentWidth / 2) + 5 + (sigBoxWidth / 2), currentY + 20, { align: 'center' }); doc.setFontSize(5); doc.setTextColor(148, 163, 184); doc.text("Documento oficial Real Frio. Emitido via Plataforma Cloud Técnica.", pageWidth / 2, 290, { align: 'center' }); return doc;
@@ -518,7 +591,7 @@ export const ServiceOrderDetail: React.FC = () => {
 
   const handleDeletePart = async () => { if (!partToDelete) return; setActionLoading(true); try { await mockData.removeOSPart(partToDelete.id); await mockData.addOSActivity(id!, { description: `REMOVEU MATERIAL: ${partToDelete.name}` }); setShowDeletePartModal(false); setPartToDelete(null); fetchOSDetails(false); } finally { setActionLoading(false); } };
 
-  const handleGenerateAISummary = async () => { if (!anomaly?.trim()) { setErrorMessage("DESCREVA A ANOMALIA PRIMEIRO."); return; } setIsGenerating(true); try { const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity.toLocaleString('pt-PT')}x ${p.name}`), os?.type || "INTERVENÇÃO"); if (summary) { setResolutionNotes(summary.toUpperCase()); await mockData.addOSActivity(id!, { description: "GEROU RESUMO VIA IA" }); } } catch (e: any) { setErrorMessage("ERRO IA."); } finally { setIsGenerating(false); } };
+  const handleGenerateAISummary = async () => { if (!anomaly?.trim()) { setErrorMessage("DESCREVA A CAUSA PRIMEIRO."); return; } setIsGenerating(true); try { const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity.toLocaleString('pt-PT')}x ${p.name}`), os?.type || "INTERVENÇÃO"); if (summary) { setResolutionNotes(summary.toUpperCase()); await mockData.addOSActivity(id!, { description: "GEROU RESUMO VIA IA" }); } } catch (e: any) { setErrorMessage("ERRO IA."); } finally { setIsGenerating(false); } };
 
   const handleResetAnomaly = () => setAnomaly('');
   const handleResetResolution = () => setResolutionNotes('');
@@ -565,10 +638,10 @@ export const ServiceOrderDetail: React.FC = () => {
         onChange={(e) => { if(pendingUploadType) handleUploadPhoto(e, pendingUploadType); setShowSourceModal(false); }} 
       />
 
-      {/* Diálogo de Origem de Upload */}
+      {/* Diálogo de Origem de Upload Centrado */}
       {showSourceModal && (
-        <div className="fixed inset-0 z-[600] flex items-end sm:items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-300">
               <div className="p-8 text-center">
                  <div className="flex justify-between items-center mb-6">
                     <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Escolher Origem</h3>
@@ -673,10 +746,12 @@ export const ServiceOrderDetail: React.FC = () => {
           <div className="space-y-3">
             {os?.equipment && (
               <button 
-                onClick={generateEquipmentTag}
-                className="w-full py-4 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-[1.8rem] text-[10px] font-black uppercase tracking-[0.25em] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center justify-center gap-3 shadow-sm active:scale-95 animate-in slide-in-from-top-2 duration-500"
+                onClick={generateTechnicalTag}
+                disabled={isExportingPDF}
+                className="w-full py-4 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-[1.8rem] text-[10px] font-black uppercase tracking-[0.25em] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center justify-center gap-3 shadow-sm active:scale-95 animate-in slide-in-from-top-2 duration-500 disabled:opacity-50"
               >
-                <Printer size={18} /> IMPRIMIR ETIQUETA COM QR CODE
+                {isExportingPDF ? <Loader2 className="animate-spin" size={18} /> : <QrCode size={18} />} 
+                {isExportingPDF ? 'A PREPARAR ETIQUETA...' : 'IMPRIMIR ETIQUETA TÉCNICA (DUAL QR)'}
               </button>
             )}
 
@@ -782,15 +857,32 @@ export const ServiceOrderDetail: React.FC = () => {
                  {expandedEquip ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
                </button>
                {expandedEquip && (
-                 <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-200">
+                 <div className="px-6 pb-6 space-y-3 animate-in slide-in-from-top-2 duration-200">
                     {os?.equipment ? (
-                      <div className="space-y-4">
-                        <button onClick={() => navigate(`/equipments/${os.equipment_id}`)} className="w-full text-left p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-900 transition-all group">
-                          <p className="text-sm font-black text-slate-900 dark:text-white uppercase group-hover:text-blue-600 transition-colors">{os.equipment.type} - {os.equipment.brand}</p>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mt-1">S/N: {os.equipment.serial_number}</p>
-                          <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest mt-2">Ver Ficha Técnica Integral ➜</p>
+                      <>
+                        <button 
+                          onClick={() => navigate(`/equipments/${os.equipment_id}`)}
+                          className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 px-4 py-2.5 rounded-full transition-all hover:bg-blue-100 dark:hover:bg-blue-900/40 w-full"
+                        >
+                          <HardDrive size={14} />
+                          <span className="text-xs font-black uppercase tracking-tight truncate">{os.equipment.type}</span>
                         </button>
-                      </div>
+                        
+                        <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 space-y-2.5">
+                          <div className="flex items-baseline gap-2">
+                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest w-12">Marca</span>
+                             <span className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase">{os.equipment.brand || '---'}</span>
+                          </div>
+                          <div className="flex items-baseline gap-2">
+                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest w-12">Modelo</span>
+                             <span className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase">{os.equipment.model || '---'}</span>
+                          </div>
+                          <div className="flex items-baseline gap-2">
+                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest w-12">S/N</span>
+                             <span className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase font-mono">{os.equipment.serial_number || '---'}</span>
+                          </div>
+                        </div>
+                      </>
                     ) : (
                       <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest">Sem equipamento registado</div>
                     )}
@@ -963,7 +1055,7 @@ export const ServiceOrderDetail: React.FC = () => {
                         onClick={() => openSourceSelector(type as any)}
                         onDragOver={handleDrag}
                         onDragEnter={(e) => handleDragIn(e, type)}
-                        onDragLeave={handleDragOut}
+                        onDragLeave={(e) => handleDragOut}
                         onDrop={(e) => handleDrop(e, type as any)}
                         className={`flex flex-col items-center justify-center py-6 bg-slate-50 dark:bg-slate-950 border-2 border-dashed rounded-3xl cursor-pointer transition-all group relative overflow-hidden ${dragActiveType === type ? 'border-blue-500 bg-blue-50/50 scale-[1.02] ring-4 ring-blue-500/10' : 'border-slate-200 dark:border-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:border-blue-200'}`}
                      >
@@ -1008,7 +1100,7 @@ export const ServiceOrderDetail: React.FC = () => {
                 <div className="flex items-center justify-between mb-6">
                    <div className="flex items-center gap-3">
                       <AlertTriangle size={18} className={showValidationErrors && !anomaly.trim() ? "text-red-600" : "text-orange-500"} />
-                      <h3 className={`text-[10px] font-black uppercase tracking-widest ${showValidationErrors && !anomaly.trim() ? 'text-red-600' : 'text-slate-900 dark:text-white'}`}>Anomalia Detetada *</h3>
+                      <h3 className={`text-[10px] font-black uppercase tracking-widest ${showValidationErrors && !anomaly.trim() ? 'text-red-600' : 'text-slate-900 dark:text-white'}`}>Causa da Avaria *</h3>
                    </div>
                    <button type="button" onClick={handleResetAnomaly} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors p-2" title="Limpar"><RotateCcw size={12} /> <span className="text-[9px] font-black uppercase">LIMPAR</span></button>
                 </div>
@@ -1059,12 +1151,12 @@ export const ServiceOrderDetail: React.FC = () => {
       )}
 
       {showTagPreview && tagPdfUrl && (
-        <div className="fixed inset-0 z-[500] bg-slate-900/90 backdrop-blur-md flex flex-col p-4 sm:p-8 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[500] bg-slate-950/95 backdrop-blur-md flex flex-col p-4 sm:p-8 animate-in fade-in duration-300">
            <div className="w-full max-w-5xl mx-auto flex-1 flex flex-col bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden border border-white/10">
-              <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
                  <div className="flex items-center gap-3">
                    <Printer size={20} className="text-blue-600" />
-                   <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Pré-visualização da Etiqueta</h3>
+                   <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Etiqueta Técnica Gerada</h3>
                  </div>
                  <button onClick={() => { setShowTagPreview(false); setTagPdfUrl(null); }} className="text-gray-400 hover:text-red-500 p-2 transition-colors"><X size={28}/></button>
               </div>
@@ -1072,7 +1164,7 @@ export const ServiceOrderDetail: React.FC = () => {
                  <iframe id="tag-preview-iframe" src={tagPdfUrl} className="w-full h-full rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 bg-white" title="PDF Preview" />
               </div>
               <div className="p-8 border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900">
-                 <button onClick={handlePrintTag} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] text-sm font-black uppercase tracking-[0.25em] shadow-2xl hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-3"><Printer size={24} /> ENVIAR PARA A IMPRESSORA</button>
+                 <button onClick={handlePrintTag} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] text-sm font-black uppercase tracking-[0.25em] shadow-2xl hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-3"><Printer size={24} /> ABRIR PARA IMPRESSÃO</button>
               </div>
            </div>
         </div>
@@ -1113,7 +1205,7 @@ export const ServiceOrderDetail: React.FC = () => {
           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border border-white/5">
             <div className="p-8 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Adicionar Material</h3>
-               <button onClick={() => setShowPartModal(false)} className="text-gray-400 hover:text-red-500 p-2"><X size={24}/></button>
+               <button onClick={() => setShowPartModal(false)} className="text-gray-400 hover:text-gray-600 p-2"><X size={24}/></button>
             </div>
             <div className="p-8 overflow-y-auto no-scrollbar space-y-6">
               {!isCreatingNewPart ? (

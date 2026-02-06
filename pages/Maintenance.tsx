@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   DatabaseZap, 
@@ -19,9 +18,15 @@ import {
   Check,
   Info,
   Beaker,
-  Sparkles
+  Sparkles,
+  FileSearch,
+  Users,
+  FileSpreadsheet,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
+import { Client } from '../types';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -78,6 +83,23 @@ const Maintenance: React.FC = () => {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isRepaired, setIsRepaired] = useState(false);
+  
+  // Estados de Colapso (Todos iniciam fechados)
+  const [expandedAudit, setExpandedAudit] = useState(false);
+  const [expandedBackup, setExpandedBackup] = useState(false);
+  const [expandedRepair, setExpandedRepair] = useState(false);
+  const [expandedRestore, setExpandedRestore] = useState(false);
+
+  // Auditoria de Clientes
+  const [auditResults, setAuditResults] = useState<{
+    total: number;
+    incomplete: number;
+    missingBilling: number;
+    missingPhone: number;
+    missingEmail: number;
+    missingMaps: number;
+    missingDrive: number;
+  } | null>(null);
 
   // Estados para Controle de Modais de Confirmação
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -172,7 +194,120 @@ const Maintenance: React.FC = () => {
       action: () => executeRestore(file)
     });
     
-    // Limpar input para permitir selecionar o mesmo ficheiro se necessário
+    e.target.value = '';
+  };
+
+  const handleAuditClients = async () => {
+    setLoading(true);
+    setStatus("A analisar base de dados de clientes...");
+    setProgress(10);
+    try {
+      const clients = await mockData.getClients();
+      setProgress(50);
+      
+      const stats = {
+        total: clients.length,
+        incomplete: 0,
+        missingBilling: 0,
+        missingPhone: 0,
+        missingEmail: 0,
+        missingMaps: 0,
+        missingDrive: 0
+      };
+
+      clients.forEach(c => {
+        let isInc = false;
+        if (!c.billing_name || c.billing_name === '---' || c.billing_name.trim() === '') { stats.missingBilling++; isInc = true; }
+        if (!c.phone || c.phone === '---' || c.phone.trim() === '') { stats.missingPhone++; isInc = true; }
+        if (!c.email || c.email === '---' || c.email.trim() === '') { stats.missingEmail++; isInc = true; }
+        if (!c.address || c.address === '---' || c.address.trim() === '') { stats.missingMaps++; isInc = true; }
+        if (!c.google_drive_link || c.google_drive_link.trim() === '') { stats.missingDrive++; isInc = true; }
+        
+        if (isInc) stats.incomplete++;
+      });
+
+      setAuditResults(stats);
+      setProgress(100);
+      setStatus("Auditoria de clientes concluída.");
+    } catch (err: any) {
+      setError("Erro na auditoria.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImportClientData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Cruzamento de Dados',
+      message: 'O ficheiro CSV será processado e os clientes serão atualizados com base no ID. Deseja prosseguir?',
+      confirmLabel: 'IMPORTAR E CRUZAR',
+      variant: 'info',
+      action: () => {
+        setLoading(true);
+        setStatus("A processar ficheiro CSV...");
+        setProgress(10);
+        
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          try {
+            const csv = event.target?.result as string;
+            const lines = csv.split('\n').filter(l => l.trim() !== '');
+            if (lines.length < 2) throw new Error("CSV vazio ou sem cabeçalho.");
+            
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const idIdx = headers.indexOf('id');
+            if (idIdx === -1) throw new Error("Coluna 'id' obrigatória no CSV.");
+
+            let updatedCount = 0;
+            for (let i = 1; i < lines.length; i++) {
+              const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+              const clientId = values[idIdx];
+              
+              if (!clientId) continue;
+
+              const updates: any = {};
+              headers.forEach((h, idx) => {
+                if (h === 'id') return;
+                const fieldMap: Record<string, string> = {
+                  'billing_name': 'billing_name',
+                  'firma': 'billing_name',
+                  'phone': 'phone',
+                  'telefone': 'phone',
+                  'email': 'email',
+                  'address': 'address',
+                  'morada': 'address',
+                  'google_drive_link': 'google_drive_link',
+                  'drive': 'google_drive_link'
+                };
+                if (fieldMap[h]) updates[fieldMap[h]] = values[idx];
+              });
+
+              if (Object.keys(updates).length > 0) {
+                await mockData.updateClient(clientId, updates);
+                updatedCount++;
+              }
+              
+              const currentProgress = Math.round((i / lines.length) * 90);
+              setProgress(currentProgress);
+              setStatus(`A atualizar cliente ${i} de ${lines.length - 1}...`);
+            }
+
+            setProgress(100);
+            setStatus(`Sucesso! Foram atualizados ${updatedCount} clientes.`);
+            setAuditResults(null); 
+          } catch (err: any) {
+            setError(err.message);
+          } finally {
+            setLoading(false);
+          }
+        };
+        reader.readAsText(file);
+      }
+    });
     e.target.value = '';
   };
 
@@ -214,35 +349,6 @@ const Maintenance: React.FC = () => {
     });
   };
 
-  const executeSeeding = async () => {
-    setLoading(true);
-    setError(null);
-    setProgress(5);
-    try {
-      await mockData.seedTestData((msg) => {
-        setStatus(msg);
-        setProgress(prev => Math.min(prev + 3, 98));
-      });
-      setProgress(100);
-      setStatus("Seeding concluído com sucesso!");
-    } catch (err: any) {
-      setError(err.message || "Falha ao gerar dados de teste.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSeedTestData = () => {
-    setConfirmConfig({
-      isOpen: true,
-      title: 'Dados de Demonstração',
-      message: 'Deseja gerar 30 Ordens de Serviço fictícias (15 por loja) para fins de teste?',
-      confirmLabel: 'GERAR DADOS',
-      variant: 'info',
-      action: executeSeeding
-    });
-  };
-
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
       <ConfirmDialog 
@@ -257,83 +363,166 @@ const Maintenance: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* CRIAR BACKUP */}
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-slate-800 flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
-            <DatabaseZap size={32} />
-          </div>
-          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Criar Ponto de Restauro</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight leading-relaxed mb-8 px-4">
-            Gera uma fotografia total do sistema para salvaguarda externa. Recomendado antes de grandes alterações.
-          </p>
+        
+        {/* AUDITORIA DE CLIENTES */}
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-xl border border-blue-100 dark:border-blue-900/30 overflow-hidden flex flex-col transition-all">
           <button 
-            onClick={handleCreateRestorePoint}
-            disabled={loading}
-            className="w-full py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95"
+            onClick={() => setExpandedAudit(!expandedAudit)}
+            className="w-full p-8 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
           >
-            <HardDriveDownload size={18} />
-            GERAR BACKUP TOTAL
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center shadow-inner">
+                <FileSearch size={24} />
+              </div>
+              <div className="text-left">
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Auditoria de Clientes</h3>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Identificar lacunas de dados</p>
+              </div>
+            </div>
+            {expandedAudit ? <ChevronUp size={20} className="text-slate-300" /> : <ChevronDown size={20} className="text-slate-300" />}
           </button>
+          
+          {expandedAudit && (
+            <div className="px-8 pb-8 space-y-6 animate-in slide-in-from-top-2 duration-200">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight leading-relaxed px-2">
+                Analisa a base de dados para detetar fichas com dados de faturação ou links Drive em falta.
+              </p>
+              
+              {auditResults && (
+                <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-4 text-left space-y-2 border border-slate-100 dark:border-slate-800">
+                   <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-slate-400">Total Clientes:</span><span className="text-slate-900 dark:text-white">{auditResults.total}</span></div>
+                   <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-red-500">Fichas Incompletas:</span><span className="text-red-600">{auditResults.incomplete}</span></div>
+                   <div className="h-px bg-slate-100 dark:bg-slate-800 my-1"></div>
+                   <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                      <div className="text-[8px] font-bold text-slate-400 uppercase">Firma: {auditResults.missingBilling}</div>
+                      <div className="text-[8px] font-bold text-slate-400 uppercase">Tel.: {auditResults.missingPhone}</div>
+                      <div className="text-[8px] font-bold text-slate-400 uppercase">Email: {auditResults.missingEmail}</div>
+                      <div className="text-[8px] font-bold text-slate-400 uppercase">Morada: {auditResults.missingMaps}</div>
+                      <div className="text-[8px] font-bold text-slate-400 uppercase">Drive: {auditResults.missingDrive}</div>
+                   </div>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={handleAuditClients}
+                  disabled={loading}
+                  className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-3 active:scale-95"
+                >
+                  <FileSearch size={18} />
+                  VERIFICAR DADOS EM FALTA
+                </button>
+                
+                <label className={`w-full py-4 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-blue-50 transition-all flex items-center justify-center gap-3 cursor-pointer active:scale-95`}>
+                  <FileSpreadsheet size={18} />
+                  CRUZAR DADOS (CSV)
+                  <input type="file" accept=".csv" className="hidden" onChange={handleImportClientData} disabled={loading} />
+                </label>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* REPARAR INTEGRIDADE */}
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-indigo-100 dark:border-indigo-900/30 flex flex-col items-center text-center transition-colors">
-          <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
-            <Stethoscope size={32} />
-          </div>
-          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Reparar Locais em Falta</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight leading-relaxed mb-8 px-4">
-            Cria automaticamente sedes para clientes importados que ficaram sem local de intervenção.
-          </p>
+        {/* PONTO DE RESTAURO (BACKUP) */}
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-slate-800 overflow-hidden flex flex-col transition-all">
           <button 
-            onClick={handleRepairMissingSedes}
-            disabled={loading}
-            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95"
+            onClick={() => setExpandedBackup(!expandedBackup)}
+            className="w-full p-8 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
           >
-            {loading ? <RefreshCw className="animate-spin" size={18} /> : <Wrench size={18} />}
-            {loading ? 'A PROCESSAR...' : 'EXECUTAR DIAGNÓSTICO'}
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl flex items-center justify-center shadow-inner">
+                <DatabaseZap size={24} />
+              </div>
+              <div className="text-left">
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Salvaguarda Total</h3>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Criar Ponto de Restauro</p>
+              </div>
+            </div>
+            {expandedBackup ? <ChevronUp size={20} className="text-slate-300" /> : <ChevronDown size={20} className="text-slate-300" />}
           </button>
+
+          {expandedBackup && (
+            <div className="px-8 pb-8 space-y-6 animate-in slide-in-from-top-2 duration-200">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight leading-relaxed px-2">
+                Gera uma fotografia total do sistema para salvaguarda externa. Recomendado antes de grandes alterações.
+              </p>
+              <button 
+                onClick={handleCreateRestorePoint}
+                disabled={loading}
+                className="w-full py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95"
+              >
+                <HardDriveDownload size={18} />
+                GERAR BACKUP TOTAL
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* DADOS DE TESTE (NOVO) */}
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-emerald-100 dark:border-emerald-900/30 flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
-            <Beaker size={32} />
-          </div>
-          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Seeding de Dados</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight leading-relaxed mb-8 px-4">
-            Adiciona instantaneamente 30 Ordens de Serviço (15 CR / 15 PM) para testes de interface e relatórios.
-          </p>
+        {/* REPARAR LOCAIS */}
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-xl border border-indigo-100 dark:border-indigo-900/30 overflow-hidden flex flex-col transition-all">
           <button 
-            onClick={handleSeedTestData}
-            disabled={loading}
-            className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95"
+            onClick={() => setExpandedRepair(!expandedRepair)}
+            className="w-full p-8 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
           >
-            <Sparkles size={18} />
-            GERAR 30 OS DE TESTE
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center shadow-inner">
+                <Stethoscope size={24} />
+              </div>
+              <div className="text-left">
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Reparar Integridade</h3>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Normalizar moradas e locais</p>
+              </div>
+            </div>
+            {expandedRepair ? <ChevronUp size={20} className="text-slate-300" /> : <ChevronDown size={20} className="text-slate-300" />}
           </button>
+
+          {expandedRepair && (
+            <div className="px-8 pb-8 space-y-6 animate-in slide-in-from-top-2 duration-200">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight leading-relaxed px-2">
+                Cria automaticamente sedes para clientes importados que ficaram sem local de intervenção.
+              </p>
+              <button 
+                onClick={handleRepairMissingSedes}
+                disabled={loading}
+                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95"
+              >
+                {loading ? <RefreshCw className="animate-spin" size={18} /> : <Wrench size={18} />}
+                {loading ? 'A PROCESSAR...' : 'EXECUTAR DIAGNÓSTICO'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* RESTAURAR BACKUP */}
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-red-100 dark:border-red-900/30 flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
-            <ShieldAlert size={32} />
-          </div>
-          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Substituir Sistema</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight leading-relaxed mb-8 px-4">
-            Importa um backup e SUBSTITUI todos os dados atuais. CUIDADO: Os dados existentes serão apagados.
-          </p>
-          <label className={`w-full py-4 bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 border-2 border-dashed border-red-200 dark:border-red-900/50 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-red-50 transition-all flex items-center justify-center gap-3 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}>
-            <Upload size={18} />
-            FICHA DE RESTAURO
-            <input 
-              type="file" 
-              accept=".rf-backup,.json" 
-              className="hidden" 
-              onChange={handleRestoreSystem}
-              disabled={loading}
-            />
-          </label>
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-xl border border-red-100 dark:border-red-900/30 overflow-hidden flex flex-col transition-all">
+          <button 
+            onClick={() => setExpandedRestore(!expandedRestore)}
+            className="w-full p-8 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center shadow-inner">
+                <ShieldAlert size={24} />
+              </div>
+              <div className="text-left">
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Restauro de Sistema</h3>
+                <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Ação Crítica / Perda de Dados</p>
+              </div>
+            </div>
+            {expandedRestore ? <ChevronUp size={20} className="text-slate-300" /> : <ChevronDown size={20} className="text-slate-300" />}
+          </button>
+
+          {expandedRestore && (
+            <div className="px-8 pb-8 space-y-6 animate-in slide-in-from-top-2 duration-200">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight leading-relaxed px-2">
+                Importa um backup e SUBSTITUI todos os dados atuais. CUIDADO: Os dados existentes serão apagados.
+              </p>
+              <label className={`w-full py-4 bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 border-2 border-dashed border-red-200 dark:border-red-900/50 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-red-50 transition-all flex items-center justify-center gap-3 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}>
+                <Upload size={18} />
+                FICHA DE RESTAURO
+                <input type="file" accept=".rf-backup,.json" className="hidden" onChange={handleRestoreSystem} disabled={loading} />
+              </label>
+            </div>
+          )}
         </div>
       </div>
 
@@ -342,15 +531,7 @@ const Maintenance: React.FC = () => {
         <div className={`p-8 rounded-[2.5rem] border shadow-2xl animate-in slide-in-from-bottom-4 duration-300 ${error ? 'bg-red-50 border-red-100 dark:bg-red-950/20 dark:border-red-900/50' : 'bg-slate-900 text-white border-slate-800'}`}>
            <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                 {error ? (
-                   <AlertTriangle className="text-red-500" size={24} />
-                 ) : loading ? (
-                   <Loader2 className="text-blue-500 animate-spin" size={24} />
-                 ) : isRepaired ? (
-                   <CheckCircle2 className="text-emerald-500" size={24} />
-                 ) : (
-                   <ShieldCheck className="text-emerald-500" size={24} />
-                 )}
+                 {error ? <AlertTriangle className="text-red-500" size={24} /> : loading ? <Loader2 className="text-blue-500 animate-spin" size={24} /> : isRepaired ? <CheckCircle2 className="text-emerald-500" size={24} /> : <ShieldCheck className="text-emerald-500" size={24} />}
                  <div>
                     <h4 className={`text-[10px] font-black uppercase tracking-widest ${error ? 'text-red-900 dark:text-red-400' : 'text-slate-400'}`}>Estado da Operação</h4>
                     <p className={`text-sm font-black uppercase tracking-tight ${error ? 'text-red-600 dark:text-red-500' : 'text-white'}`}>
@@ -358,20 +539,13 @@ const Maintenance: React.FC = () => {
                     </p>
                  </div>
               </div>
-              {error && (
-                <button onClick={() => setError(null)} className="p-2 text-red-300 hover:text-red-600">
-                   <X size={20} />
-                </button>
-              )}
+              {error && <button onClick={() => setError(null)} className="p-2 text-red-300 hover:text-red-600"><X size={20} /></button>}
            </div>
 
            {loading && !error && (
              <div className="space-y-3">
                 <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden">
-                   <div 
-                    className="bg-blue-600 h-full transition-all duration-500 ease-out shadow-[0_0_15px_rgba(37,99,235,0.5)]" 
-                    style={{ width: `${progress}%` }}
-                   />
+                   <div className="bg-blue-600 h-full transition-all duration-500 ease-out shadow-[0_0_15px_rgba(37,99,235,0.5)]" style={{ width: `${progress}%` }} />
                 </div>
                 <p className="text-[8px] font-black text-slate-500 text-right uppercase tracking-[0.3em]">{progress}% Processado</p>
              </div>
@@ -379,12 +553,8 @@ const Maintenance: React.FC = () => {
 
            {error && (
              <div className="mt-4 p-4 bg-white/10 dark:bg-black/20 rounded-xl border border-red-200/20">
-               <div className="flex items-center gap-2 text-[9px] font-black text-red-400 uppercase tracking-widest mb-2">
-                 <Terminal size={12} /> Log de Erro Técnico
-               </div>
-               <p className="text-[10px] font-mono text-red-500 leading-relaxed break-words">
-                 {error}
-               </p>
+               <div className="flex items-center gap-2 text-[9px] font-black text-red-400 uppercase tracking-widest mb-2"><Terminal size={12} /> Log de Erro Técnico</div>
+               <p className="text-[10px] font-mono text-red-500 leading-relaxed break-words">{error}</p>
              </div>
            )}
         </div>
@@ -394,24 +564,22 @@ const Maintenance: React.FC = () => {
       <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 transition-colors">
          <div className="flex items-center gap-3 mb-4 text-slate-400">
             <History size={16} />
-            <h4 className="text-[10px] font-black uppercase tracking-widest">Recomendações de Segurança</h4>
+            <h4 className="text-[10px] font-black uppercase tracking-widest">Dicas de Importação</h4>
          </div>
          <ul className="space-y-3">
-            {[
-              "A reparação utiliza a morada do cliente para criar o local de intervenção.",
-              "Operações de manutenção exigem estabilidade de rede.",
-              "A limpeza e o restauro ocorrem em tempo real na base de dados."
-            ].map((text, i) => (
-              <li key={i} className="flex items-start gap-3">
-                 <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 mt-1.5 flex-shrink-0"></div>
-                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight">{text}</p>
-              </li>
-            ))}
+            <li className="flex items-start gap-3">
+               <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 mt-1.5 flex-shrink-0"></div>
+               <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight">O CSV para Clientes deve conter a coluna "id" (chave primária) e opcionalmente "billing_name", "phone", "email", "address" ou "google_drive_link".</p>
+            </li>
+            <li className="flex items-start gap-3">
+               <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 mt-1.5 flex-shrink-0"></div>
+               <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight">A importação de dados em lote substitui apenas os campos fornecidos, mantendo os restantes intactos.</p>
+            </li>
          </ul>
       </div>
 
       <div className="flex justify-center pt-4">
-         <p className="text-[8px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.5em]">Real Frio Maintenance Agent v3.3</p>
+         <p className="text-[8px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.5em]">Real Frio Maintenance Agent v3.5</p>
       </div>
     </div>
   );
