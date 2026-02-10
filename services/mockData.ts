@@ -101,7 +101,9 @@ export const mockData = {
         ...payload, 
         code, 
         status: QuoteStatus.PENDENTE,
-        total_amount: quoteData.total_amount || 0
+        total_amount: quoteData.total_amount || 0,
+        // Garantir que a descrição é pelo menos uma string vazia se vier null após o cleanPayload
+        description: payload.description || ''
       }])
       .select()
       .single();
@@ -136,7 +138,10 @@ export const mockData = {
     const payload = cleanPayload(quoteData);
     const { error: qError } = await supabase
       .from('quotes')
-      .update(payload)
+      .update({
+        ...payload,
+        description: payload.description || ''
+      })
       .eq('id', id);
     
     if (qError) throw qError;

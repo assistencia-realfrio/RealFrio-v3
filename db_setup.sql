@@ -6,12 +6,15 @@ CREATE TABLE IF NOT EXISTS public.quotes (
     client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
     establishment_id UUID REFERENCES public.establishments(id) ON DELETE SET NULL,
     equipment_id UUID REFERENCES public.equipments(id) ON DELETE SET NULL,
-    description TEXT NOT NULL,
+    description TEXT, -- Removido NOT NULL
     status TEXT NOT NULL DEFAULT 'pendente',
     total_amount NUMERIC(12,2) DEFAULT 0,
     store TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Garantir que a coluna description permite nulos caso a tabela já exista
+ALTER TABLE public.quotes ALTER COLUMN description DROP NOT NULL;
 
 -- 2. Criar a tabela de Itens do Orçamento
 CREATE TABLE IF NOT EXISTS public.quote_items (
@@ -42,7 +45,6 @@ BEGIN
     END IF;
 
     -- CRÍTICO: Políticas de LEITURA PÚBLICA para tabelas relacionadas (para mostrar nome do cliente/equipamento na proposta pública)
-    -- Se estas não existirem, o cliente vê "Proposta não encontrada" ou dados incompletos porque o join falha.
     
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'clients' AND policyname = 'Allow public read access') THEN
         CREATE POLICY "Allow public read access" ON public.clients FOR SELECT USING (true);
