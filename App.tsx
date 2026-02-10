@@ -74,7 +74,7 @@ function App() {
             <Route path="/clients/new" element={user ? <Layout user={user} onLogout={handleLogout}><NewClient /></Layout> : <Navigate to="/login" />} />
             <Route path="/clients/:id" element={user ? <Layout user={user} onLogout={handleLogout}><ClientDetail /></Layout> : <Navigate to="/login" />} />
             
-            <Route path="/equipments" element={user ? <Layout user={user} onLogout={handleLogout}><Equipments /></Route> : <Navigate to="/login" />} />
+            <Route path="/equipments" element={user ? <Layout user={user} onLogout={handleLogout}><Equipments /></Layout> : <Navigate to="/login" />} />
             <Route path="/equipments/:id" element={user ? <Layout user={user} onLogout={handleLogout}><EquipmentDetail /></Layout> : <Navigate to="/login" />} />
             <Route path="/clients/:clientId/equipments/new" element={user ? <Layout user={user} onLogout={handleLogout}><NewEquipment /></Layout> : <Navigate to="/login" />} />
             <Route path="/equipments/:id/edit" element={user ? <Layout user={user} onLogout={handleLogout}><EditEquipment /></Layout> : <Navigate to="/login" />} />

@@ -29,15 +29,31 @@ CREATE TABLE IF NOT EXISTS public.quote_items (
 ALTER TABLE public.quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_items ENABLE ROW LEVEL SECURITY;
 
--- 4. Criar políticas de acesso simplificadas (ajuste conforme a sua segurança)
+-- 4. Criar políticas de acesso
 DO $$ 
 BEGIN
+    -- Políticas para Orçamentos (Público pode ler/escrever para aprovação)
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'quotes' AND policyname = 'Allow all operations for everyone') THEN
         CREATE POLICY "Allow all operations for everyone" ON public.quotes FOR ALL USING (true) WITH CHECK (true);
     END IF;
     
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'quote_items' AND policyname = 'Allow all operations for items') THEN
         CREATE POLICY "Allow all operations for items" ON public.quote_items FOR ALL USING (true) WITH CHECK (true);
+    END IF;
+
+    -- CRÍTICO: Políticas de LEITURA PÚBLICA para tabelas relacionadas (para mostrar nome do cliente/equipamento na proposta pública)
+    -- Se estas não existirem, o cliente vê "Proposta não encontrada" ou dados incompletos porque o join falha.
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'clients' AND policyname = 'Allow public read access') THEN
+        CREATE POLICY "Allow public read access" ON public.clients FOR SELECT USING (true);
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'establishments' AND policyname = 'Allow public read access') THEN
+        CREATE POLICY "Allow public read access" ON public.establishments FOR SELECT USING (true);
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'equipments' AND policyname = 'Allow public read access') THEN
+        CREATE POLICY "Allow public read access" ON public.equipments FOR SELECT USING (true);
     END IF;
 END $$;
 
