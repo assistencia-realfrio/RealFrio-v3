@@ -11,10 +11,12 @@ const STATUS_ORDER_WEIGHT: Record<string, number> = {
   [OSStatus.INICIADA]: 1,
   [OSStatus.PARA_ORCAMENTO]: 2,
   [OSStatus.ORCAMENTO_ENVIADO]: 3,
+  [OSStatus.ORCAMENTO_ACEITE]: 3.5,
+  [OSStatus.ORCAMENTO_REJEITADO]: 7,
   [OSStatus.AGUARDA_PECAS]: 4,
   [OSStatus.PECAS_RECEBIDAS]: 5,
   [OSStatus.CONCLUIDA]: 6,
-  [OSStatus.CANCELADA]: 7,
+  [OSStatus.CANCELADA]: 8,
 };
 
 const getStatusLabelText = (status: string) => {
@@ -23,6 +25,8 @@ const getStatusLabelText = (status: string) => {
     case OSStatus.INICIADA: return 'Iniciada';
     case OSStatus.PARA_ORCAMENTO: return 'Para Orçamento';
     case OSStatus.ORCAMENTO_ENVIADO: return 'Orçamento Enviado';
+    case OSStatus.ORCAMENTO_ACEITE: return 'Orçamento Aceite';
+    case OSStatus.ORCAMENTO_REJEITADO: return 'Orçamento Rejeitado';
     case OSStatus.AGUARDA_PECAS: return 'Aguarda Peças';
     case OSStatus.PECAS_RECEBIDAS: return 'Peças Recebidas';
     case OSStatus.CONCLUIDA: return 'Concluída';

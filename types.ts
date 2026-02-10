@@ -1,6 +1,4 @@
 
-
-
 export enum UserRole {
   ADMIN = 'admin',
   BACKOFFICE = 'backoffice',
@@ -12,10 +10,18 @@ export enum OSStatus {
   INICIADA = 'iniciada',
   PARA_ORCAMENTO = 'para_orcamento',
   ORCAMENTO_ENVIADO = 'orcamento_enviado',
+  ORCAMENTO_ACEITE = 'orcamento_aceite',
+  ORCAMENTO_REJEITADO = 'orcamento_rejeitado',
   AGUARDA_PECAS = 'aguarda_pecas',
   PECAS_RECEBIDAS = 'pecas_recebidas',
   CONCLUIDA = 'concluida',
   CANCELADA = 'cancelada'
+}
+
+export enum QuoteStatus {
+  PENDENTE = 'pendente',
+  ACEITE = 'aceite',
+  REJEITADO = 'rejeitado'
 }
 
 export enum OSType {
@@ -28,19 +34,7 @@ export enum OSType {
 export enum VacationStatus {
   PENDENTE = 'pendente',
   APROVADA = 'aprovada',
-  CONCLUIDA = 'concluida',
   REJEITADA = 'rejeitada'
-}
-
-export interface Vacation {
-  id: string;
-  user_id: string;
-  user_name: string;
-  start_date: string;
-  end_date: string;
-  status: VacationStatus;
-  store: string;
-  notes?: string;
 }
 
 export interface Client {
@@ -63,7 +57,6 @@ export interface Establishment {
   address: string;
   phone: string;
   contact_person: string;
-  notes?: string;
 }
 
 export interface EquipmentAttachment {
@@ -81,8 +74,8 @@ export interface Equipment {
   brand?: string | null;
   model?: string | null;
   serial_number?: string | null;
-  install_date?: string | null;
   nameplate_url?: string | null;
+  install_date?: string | null;
   attachments?: EquipmentAttachment[];
 }
 
@@ -95,21 +88,48 @@ export interface PartCatalogItem {
 
 export interface PartUsed {
   id: string;
-  part_id: string;
+  os_id: string;
+  part_id?: string;
   name: string;
   reference: string;
   quantity: number;
-  // Fix: Added technician_name, work_date and created_at to support tracking and fix errors in mockData.ts
-  technician_name?: string;
+  unit_price?: number;
   work_date?: string;
-  created_at?: string;
+}
+
+export interface QuoteItem {
+  id: string;
+  quote_id: string;
+  name: string;
+  reference: string;
+  quantity: number;
+  unit_price: number;
+  is_labor: boolean;
+}
+
+export interface Quote {
+  id: string;
+  code: string;
+  client_id: string;
+  establishment_id?: string;
+  equipment_id?: string;
+  description: string;
+  status: QuoteStatus;
+  total_amount: number;
+  created_at: string;
+  store: string;
+  client_signature?: string | null;
+  client?: Client;
+  establishment?: Establishment;
+  equipment?: Equipment;
+  items?: QuoteItem[];
 }
 
 export interface OSPhoto {
   id: string;
   os_id: string;
   url: string;
-  type: 'antes' | 'depois' | 'peca' | 'geral';
+  type: string;
   created_at: string;
 }
 
@@ -122,22 +142,12 @@ export interface OSNote {
   created_at: string;
 }
 
-export interface OSActivity {
-  id: string;
-  os_id: string;
-  user_id: string;
-  user_name: string;
-  description: string;
-  created_at: string;
-}
-
 export interface ServiceOrder {
   id: string;
   code: string;
   client_id: string;
   establishment_id?: string;
   equipment_id?: string;
-  technician_id?: string;
   type: OSType;
   status: OSStatus;
   description: string;
@@ -147,15 +157,8 @@ export interface ServiceOrder {
   anomaly_detected?: string;
   resolution_notes?: string;
   observations?: string;
-  client_signature?: string | null;
-  technician_signature?: string | null; 
-  client?: Client;
-  establishment?: Establishment;
-  equipment?: Equipment;
-  store: string;
   is_warranty?: boolean;
   warranty_info?: {
-    rma_code?: string;
     has_brand?: boolean;
     has_model?: boolean;
     has_serial?: boolean;
@@ -163,7 +166,12 @@ export interface ServiceOrder {
     has_photo_parts?: boolean;
     has_failure_reason?: boolean;
   };
-  // Fix: added timer fields to support the global shared timer functionality used in ServiceOrderDetail.tsx
+  client_signature?: string | null;
+  technician_signature?: string | null; 
+  client?: Client;
+  establishment?: Establishment;
+  equipment?: Equipment;
+  store: string;
   timer_is_active?: boolean;
   timer_start_time?: string | null;
 }
@@ -176,10 +184,28 @@ export interface Profile {
   store: string; 
 }
 
+export interface OSActivity {
+  id: string;
+  os_id: string;
+  user_name: string;
+  description: string;
+  created_at: string;
+}
+
+export interface Vacation {
+  id: string;
+  user_id: string;
+  user_name: string;
+  start_date: string;
+  end_date: string;
+  store: string;
+  status: VacationStatus;
+  notes?: string;
+}
+
 export interface TimeEntry {
   id: string;
   os_id: string;
-  client_id?: string;
   start_time: string;
   duration_minutes: number;
   description?: string;

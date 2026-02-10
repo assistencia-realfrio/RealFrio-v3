@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { mockData } from './services/mockData';
@@ -7,6 +8,10 @@ import Dashboard from './pages/Dashboard';
 import ServiceOrders from './pages/ServiceOrders';
 import { ServiceOrderDetail } from './pages/ServiceOrderDetail';
 import NewServiceOrder from './pages/NewServiceOrder';
+import NewQuote from './pages/NewQuote';
+import Quotes from './pages/Quotes';
+import QuoteDetail from './pages/QuoteDetail';
+import PublicQuoteView from './pages/PublicQuoteView';
 import Appointments from './pages/Appointments';
 import Vacations from './pages/Vacations';
 import Clients from './pages/Clients';
@@ -31,41 +36,37 @@ function App() {
   useEffect(() => {
     const checkSession = () => {
       const sessionUser = mockData.getSession();
-      if (sessionUser) {
-        setUser(sessionUser);
-      }
+      if (sessionUser) setUser(sessionUser);
       setLoading(false);
     };
     checkSession();
   }, []);
 
-  const handleLogin = () => {
-    const sessionUser = mockData.getSession();
-    setUser(sessionUser);
-  };
+  const handleLogin = () => setUser(mockData.getSession());
+  const handleLogout = async () => { await mockData.signOut(); setUser(null); };
 
-  const handleLogout = async () => {
-    await mockData.signOut();
-    setUser(null);
-  };
-
-  const isAdmin = user?.role?.toLowerCase() === UserRole.ADMIN;
-
-  if (loading) {
-    return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 text-gray-500 uppercase font-black text-[10px] tracking-widest">A iniciar aplicação...</div>;
-  }
+  if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 text-gray-500 uppercase font-black text-[10px] tracking-widest">A iniciar...</div>;
   
   return (
     <ThemeProvider>
       <StoreProvider>
         <HashRouter>
           <Routes>
+            {/* Rota Pública para Clientes */}
+            <Route path="/proposal/:id" element={<PublicQuoteView />} />
+
             <Route path="/login" element={!user ? <Login onLogin={handleLogin} /> : <Navigate to="/" />} />
             
             <Route path="/" element={user ? <Layout user={user} onLogout={handleLogout}><Dashboard /></Layout> : <Navigate to="/login" />} />
             <Route path="/os" element={user ? <Layout user={user} onLogout={handleLogout}><ServiceOrders /></Layout> : <Navigate to="/login" />} />
             <Route path="/os/new" element={user ? <Layout user={user} onLogout={handleLogout}><NewServiceOrder /></Layout> : <Navigate to="/login" />} />
             <Route path="/os/:id" element={user ? <Layout user={user} onLogout={handleLogout}><ServiceOrderDetail /></Layout> : <Navigate to="/login" />} />
+            
+            <Route path="/quotes" element={user ? <Layout user={user} onLogout={handleLogout}><Quotes /></Layout> : <Navigate to="/login" />} />
+            <Route path="/quotes/new" element={user ? <Layout user={user} onLogout={handleLogout}><NewQuote /></Layout> : <Navigate to="/login" />} />
+            <Route path="/quotes/:id" element={user ? <Layout user={user} onLogout={handleLogout}><QuoteDetail /></Layout> : <Navigate to="/login" />} />
+            <Route path="/quotes/:id/edit" element={user ? <Layout user={user} onLogout={handleLogout}><NewQuote /></Layout> : <Navigate to="/login" />} />
+
             <Route path="/appointments" element={user ? <Layout user={user} onLogout={handleLogout}><Appointments /></Layout> : <Navigate to="/login" />} />
             <Route path="/vacations" element={user ? <Layout user={user} onLogout={handleLogout}><Vacations /></Layout> : <Navigate to="/login" />} />
             
@@ -73,25 +74,15 @@ function App() {
             <Route path="/clients/new" element={user ? <Layout user={user} onLogout={handleLogout}><NewClient /></Layout> : <Navigate to="/login" />} />
             <Route path="/clients/:id" element={user ? <Layout user={user} onLogout={handleLogout}><ClientDetail /></Layout> : <Navigate to="/login" />} />
             
-            <Route path="/equipments" element={user ? <Layout user={user} onLogout={handleLogout}><Equipments /></Layout> : <Navigate to="/login" />} />
+            <Route path="/equipments" element={user ? <Layout user={user} onLogout={handleLogout}><Equipments /></Route> : <Navigate to="/login" />} />
             <Route path="/equipments/:id" element={user ? <Layout user={user} onLogout={handleLogout}><EquipmentDetail /></Layout> : <Navigate to="/login" />} />
             <Route path="/clients/:clientId/equipments/new" element={user ? <Layout user={user} onLogout={handleLogout}><NewEquipment /></Layout> : <Navigate to="/login" />} />
             <Route path="/equipments/:id/edit" element={user ? <Layout user={user} onLogout={handleLogout}><EditEquipment /></Layout> : <Navigate to="/login" />} />
             
             <Route path="/inventory" element={user ? <Layout user={user} onLogout={handleLogout}><Inventory /></Layout> : <Navigate to="/login" />} />
-            
-            {/* Rotas restritas a Administradores */}
-            <Route 
-              path="/users" 
-              element={user && isAdmin ? <Layout user={user} onLogout={handleLogout}><Users /></Layout> : (user ? <Navigate to="/" /> : <Navigate to="/login" />)} 
-            />
-            <Route 
-              path="/maintenance" 
-              element={user && isAdmin ? <Layout user={user} onLogout={handleLogout}><Maintenance /></Layout> : (user ? <Navigate to="/" /> : <Navigate to="/login" />)} 
-            />
-            
+            <Route path="/users" element={user && user.role === UserRole.ADMIN ? <Layout user={user} onLogout={handleLogout}><Users /></Layout> : <Navigate to="/" />} />
+            <Route path="/maintenance" element={user && user.role === UserRole.ADMIN ? <Layout user={user} onLogout={handleLogout}><Maintenance /></Layout> : <Navigate to="/" />} />
             <Route path="/profile" element={user ? <Layout user={user} onLogout={handleLogout}><Profile /></Layout> : <Navigate to="/login" />} />
-            
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </HashRouter>

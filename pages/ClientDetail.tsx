@@ -4,10 +4,10 @@ import {
   MapPin, Phone, Mail, User, HardDrive, History as HistoryIcon, 
   Edit2, X, Save, ArrowLeft, ChevronRight, ChevronDown,
   Plus, Building2, FileText, ExternalLink, Filter, Trash2, Eye,
-  Cloud, AlertTriangle, ShieldAlert
+  Cloud, AlertTriangle, ShieldAlert, Calculator, Coins
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
-import { Client, Establishment, Equipment, ServiceOrder } from '../types';
+import { Client, Establishment, Equipment, ServiceOrder, Quote, QuoteStatus } from '../types';
 import OSStatusBadge from '../components/OSStatusBadge';
 import FloatingEditBar from '../components/FloatingEditBar';
 
@@ -64,8 +64,9 @@ const ClientDetail: React.FC = () => {
   const [establishments, setEstablishments] = useState<Establishment[]>([]);
   const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [history, setHistory] = useState<ServiceOrder[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'info' | 'establishments' | 'equipments' | 'history'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'establishments' | 'equipments' | 'history' | 'quotes'>('info');
   
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Client | null>(null);
@@ -107,11 +108,12 @@ const ClientDetail: React.FC = () => {
     if (!id) return;
     setLoading(true);
     try {
-      const [c, ests, eqs, allOs] = await Promise.all([
+      const [c, ests, eqs, allOs, allQuotes] = await Promise.all([
         mockData.getClientById(id),
         mockData.getEstablishmentsByClient(id),
         mockData.getEquipments(),
-        mockData.getServiceOrders()
+        mockData.getServiceOrders(),
+        mockData.getQuotes()
       ]);
 
       if (c) {
@@ -120,6 +122,7 @@ const ClientDetail: React.FC = () => {
           setEstablishments(ests);
           setEquipments(eqs.filter(e => e.client_id === id));
           setHistory(allOs.filter(o => o.client_id === id));
+          setQuotes(allQuotes.filter(q => q.client_id === id));
       }
     } catch (err: any) {
       console.error("Erro ao carregar dados:", err);
@@ -216,8 +219,6 @@ const ClientDetail: React.FC = () => {
     }
   };
 
-  // Fixed errors: Removed executeRemoveAttachment and handleRemoveAttachment which were unused and causing errors due to missing 'equipment' state in ClientDetail.
-
   const getMapLink = (address: string) => {
     if (!address) return '#';
     if (address.toLowerCase().startsWith('http')) return address;
@@ -300,7 +301,7 @@ const ClientDetail: React.FC = () => {
           
           {activeTab === 'info' && !isEditing && (
             <div className="space-y-4 px-1">
-              <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden divide-y divide-slate-50 dark:divide-slate-800 transition-colors">
+              <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden divide-y divide-slate-50 dark:divide-slate-800 transition-colors">
                 <div className="flex items-center gap-4 p-4.5 sm:p-5">
                   <div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500 flex-shrink-0">
                     <FileText size={20} />
@@ -533,6 +534,58 @@ const ClientDetail: React.FC = () => {
             </div>
           )}
 
+          {activeTab === 'quotes' && !isEditing && (
+            <div className="space-y-4 pb-10 px-1">
+               <div className="flex items-center justify-between px-2 mb-2">
+                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Orçamentos & Cotações ({quotes.length})</h3>
+               </div>
+               {quotes.length === 0 ? (
+                 <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-gray-100 dark:border-slate-800 transition-colors">
+                    <Calculator size={32} className="mx-auto text-gray-200 dark:text-slate-700 mb-4" />
+                    <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest">Sem orçamentos para este cliente</p>
+                 </div>
+               ) : (
+                 <div className="space-y-3">
+                   {quotes.map(q => {
+                     const netValue = q.total_amount / 1.23;
+                     return (
+                       <Link key={q.id} to={`/quotes/${q.id}`} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all group flex flex-col gap-4">
+                          <div className="flex justify-between items-start">
+                             <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-500 flex items-center justify-center flex-shrink-0">
+                                   <Coins size={20} />
+                                </div>
+                                <div className="min-w-0">
+                                   <div className="flex items-center gap-2 mb-0.5">
+                                      <span className="text-[10px] font-mono font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded">{q.code}</span>
+                                      <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest">{new Date(q.created_at).toLocaleDateString('pt-PT')}</span>
+                                   </div>
+                                   <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase truncate">{q.description}</h4>
+                                </div>
+                             </div>
+                             <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase border transition-colors ${
+                                q.status === QuoteStatus.ACEITE ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                q.status === QuoteStatus.PENDENTE ? 'bg-blue-50 text-blue-600 border-blue-100' : 
+                                'bg-rose-50 text-rose-600 border-rose-100'
+                             }`}>
+                                {q.status}
+                             </div>
+                          </div>
+                          <div className="flex justify-between items-center pt-3 border-t border-slate-50 dark:border-slate-800">
+                             <div>
+                                <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Valor Líquido</p>
+                                <p className="text-lg font-black text-slate-900 dark:text-white">{netValue.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}</p>
+                             </div>
+                             <ChevronRight className="text-slate-200 dark:text-slate-700 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" size={20} />
+                          </div>
+                       </Link>
+                     );
+                   })}
+                 </div>
+               )}
+            </div>
+          )}
+
           {isEditing && (
             <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-blue-100 dark:border-slate-800 space-y-6 relative animate-in zoom-in-95 duration-200 transition-colors mb-20">
               <button onClick={handleCancelEdit} className="absolute top-6 right-6 p-2 text-slate-300 hover:text-red-500 transition-colors" title="Cancelar Edição">
@@ -603,7 +656,8 @@ const ClientDetail: React.FC = () => {
             { id: 'info', icon: User, label: 'DADOS' },
             { id: 'establishments', icon: Building2, label: 'LOCAIS' },
             { id: 'equipments', icon: HardDrive, label: 'ATIVOS' },
-            { id: 'history', icon: HistoryIcon, label: 'HIST.' }
+            { id: 'history', icon: HistoryIcon, label: 'HIST.' },
+            { id: 'quotes', icon: Calculator, label: 'ORÇAM.' }
           ].map((tab) => (
             <button 
               key={tab.id} 

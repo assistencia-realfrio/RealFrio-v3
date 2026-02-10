@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench, RefreshCw, Loader2, QrCode, Scan } from 'lucide-react';
+import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench, RefreshCw, Loader2, QrCode, Scan, Building2, Calculator } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { UserRole, OSActivity, ServiceOrder, Client, Equipment } from '../types';
+import { UserRole, OSActivity, ServiceOrder, Client, Equipment, Establishment } from '../types';
 import { mockData } from '../services/mockData';
 import BrandLogo from './BrandLogo';
 import { useStore } from '../contexts/StoreContext';
@@ -26,7 +26,8 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     os: ServiceOrder[];
     clients: Client[];
     equipments: Equipment[];
-  }>({ os: [], clients: [], equipments: [] });
+    establishments: (Establishment & { client_name?: string })[];
+  }>({ os: [], clients: [], equipments: [], establishments: [] });
   
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -94,13 +95,19 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   useEffect(() => {
     const fetchSearchData = async () => {
-      if (searchTerm.length < 2) { setSearchResults({ os: [], clients: [], equipments: [] }); return; }
-      const [allOS, allClients, allEquipments] = await Promise.all([mockData.getServiceOrders(), mockData.getClients(), mockData.getEquipments()]);
+      if (searchTerm.length < 2) { setSearchResults({ os: [], clients: [], equipments: [], establishments: [] }); return; }
+      const [allOS, allClients, allEquipments, allEsts] = await Promise.all([
+        mockData.getServiceOrders(), 
+        mockData.getClients(), 
+        mockData.getEquipments(),
+        mockData.getAllEstablishments()
+      ]);
       const term = normalizeString(searchTerm);
       setSearchResults({
         os: allOS.filter(o => normalizeString(o.code).includes(term) || normalizeString(o.client?.name || '').includes(term) || normalizeString(o.description).includes(term)).slice(0, 5),
         clients: allClients.filter(c => normalizeString(c.name).includes(term) || normalizeString(c.billing_name || '').includes(term)).slice(0, 5),
-        equipments: allEquipments.filter(e => normalizeString(e.serial_number).includes(term) || normalizeString(e.brand).includes(term) || normalizeString(e.model).includes(term) || normalizeString(e.type).includes(term)).slice(0, 5)
+        equipments: allEquipments.filter(e => normalizeString(e.serial_number || '').includes(term) || normalizeString(e.brand || '').includes(term) || normalizeString(e.model || '').includes(term) || normalizeString(e.type || '').includes(term)).slice(0, 5),
+        establishments: allEsts.filter(e => normalizeString(e.name).includes(term) || normalizeString(e.address || '').includes(term) || normalizeString(e.client_name || '').includes(term)).slice(0, 5)
       });
     };
     const debounce = setTimeout(fetchSearchData, 300);
@@ -115,10 +122,8 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   useEffect(() => { if (notificationsOpen) { setSearchOpen(false); setScannerOpen(false); fetchGlobalActivities(); } }, [notificationsOpen]);
   useEffect(() => { if (searchOpen) { setNotificationsOpen(false); setScannerOpen(false); setTimeout(() => searchInputRef.current?.focus(), 150); } }, [searchOpen]);
 
-  // Lógica Robusta do Scanner QR Code
   useEffect(() => {
     let isMounted = true;
-    
     const stopScanner = async () => {
       if (qrScannerRef.current) {
         try {
@@ -132,85 +137,40 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         }
       }
     };
-
     if (scannerOpen) {
       setNotificationsOpen(false);
       setSearchOpen(false);
-      
       const startScanner = async () => {
         try {
-          // Criar nova instância
           qrScannerRef.current = new Html5Qrcode("qr-reader");
-          
-          // Tentar iniciar com câmara traseira
           await qrScannerRef.current.start(
             { facingMode: "environment" },
             { fps: 10, qrbox: { width: 250, height: 250 } },
-            (decodedText) => {
-              if (isMounted) handleQRSuccess(decodedText);
-            },
-            () => { /* Ignorar erros de frames vazios */ }
+            (decodedText) => { if (isMounted) handleQRSuccess(decodedText); },
+            () => { }
           ).catch(async (err) => {
-             // Fallback se "environment" falhar (ex: Desktop sem câmara traseira)
-             console.warn("Falha em facingMode: environment, tentando padrão...", err);
              if (qrScannerRef.current && isMounted) {
-                await qrScannerRef.current.start(
-                  { facingMode: "user" },
-                  { fps: 10, qrbox: { width: 250, height: 250 } },
-                  (decodedText) => { if (isMounted) handleQRSuccess(decodedText); },
-                  () => {}
-                );
+                await qrScannerRef.current.start({ facingMode: "user" }, { fps: 10, qrbox: { width: 250, height: 250 } }, (decodedText) => { if (isMounted) handleQRSuccess(decodedText); }, () => {});
              }
           });
         } catch (err: any) {
-          console.error("Erro fatal ao iniciar scanner:", err);
-          if (isMounted) {
-            if (err?.name === "NotFoundError") {
-              alert("Erro: Câmara não detetada ou não disponível no dispositivo.");
-            } else {
-              alert("Não foi possível aceder à câmara. Verifique as permissões do browser.");
-            }
-            setScannerOpen(false);
-          }
+          if (isMounted) { alert("Câmara não disponível."); setScannerOpen(false); }
         }
       };
-      
-      // Delay pequeno para garantir que o elemento DOM "qr-reader" está pronto
       const timer = setTimeout(startScanner, 300);
-      return () => {
-        isMounted = false;
-        clearTimeout(timer);
-        stopScanner();
-      };
-    } else {
-      stopScanner();
-    }
+      return () => { isMounted = false; clearTimeout(timer); stopScanner(); };
+    } else { stopScanner(); }
   }, [scannerOpen]);
 
   const handleQRSuccess = (decodedText: string) => {
     try {
-      // Se for um URL absoluto (completo com o domínio da app)
       if (decodedText.includes('/#/equipments/') || decodedText.includes('/#/os/')) {
         const hashPart = decodedText.includes('#') ? decodedText.split('#')[1] : '';
-        if (hashPart) {
-           setScannerOpen(false);
-           navigate(hashPart);
-           return;
-        }
+        if (hashPart) { setScannerOpen(false); navigate(hashPart); return; }
       }
-      
-      // Suporte para rotas amigáveis sem o domínio (ex: /equipments/123)
-      if (decodedText.startsWith('/equipments/') || decodedText.startsWith('/os/')) {
-         setScannerOpen(false);
-         navigate(decodedText);
-         return;
-      }
-
-      alert("Código lido não reconhecido como um ativo ou OS Real Frio.");
-    } catch (e) {
-      console.error("Erro ao processar QR:", e);
-      alert("Conteúdo do QR Code inválido.");
-    }
+      if (decodedText.startsWith('/equipments/') || decodedText.startsWith('/os/')) { setScannerOpen(false); navigate(decodedText); return; }
+      alert("Código lido não reconhecido.");
+    } catch (e) { alert("Conteúdo do QR Code inválido."); }
   };
 
   const handleLogoutClick = async () => { onLogout(); navigate('/login'); };
@@ -221,6 +181,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Ordens de Serviço', path: '/os', icon: ClipboardList },
+    { name: 'Orçamentos', path: '/quotes', icon: Calculator },
     { name: 'Agendamentos', path: '/appointments', icon: Calendar },
     { name: 'Férias', path: '/vacations', icon: Palmtree },
     { name: 'Clientes', path: '/clients', icon: UsersIcon },
@@ -246,7 +207,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const isActive = (path: string) => location.pathname === path;
   const showFab = location.pathname === '/os';
   const fabConfig = { to: '/os/new', title: 'Nova Ordem de Serviço' };
-  const hasResults = searchResults.os.length > 0 || searchResults.clients.length > 0 || searchResults.equipments.length > 0;
+  const hasResults = searchResults.os.length > 0 || searchResults.clients.length > 0 || searchResults.equipments.length > 0 || searchResults.establishments.length > 0;
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-slate-950 overflow-hidden font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300">
@@ -258,7 +219,6 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
       {sidebarOpen && <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      {/* Fix: Corrected broken ternary operator string literal interpolation in className on line 262 */}
       <aside className={`fixed inset-y-0 left-0 z-[80] w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none lg:relative lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between h-20 px-6 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
@@ -306,11 +266,13 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                  <button onClick={() => setSearchOpen(!searchOpen)} className={`p-2 rounded-xl transition-all relative active:scale-90 ${searchOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="Pesquisar Sistema"><Search size={18} /></button>
                  {searchOpen && (
                    <div className="fixed sm:absolute inset-x-4 sm:inset-auto top-24 sm:top-full sm:right-0 mt-0 sm:mt-4 w-auto sm:w-[460px] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden z-[100] animate-in fade-in slide-in-from-top-4 duration-300">
-                      <div className="p-4 border-b border-slate-50 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50"><div className="relative"><Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500" /><input ref={searchInputRef} type="text" placeholder="Procurar OS, Cliente, S/N..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-10 py-3.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium text-slate-900 dark:text-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none" />{searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"><X size={16} /></button>}</div></div>
+                      <div className="p-4 border-b border-slate-50 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50"><div className="relative"><Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500" /><input ref={searchInputRef} type="text" placeholder="Procurar OS, Cliente, S/N, Local..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-10 py-3.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-700 rounded-2xl text-sm font-medium text-slate-900 dark:text-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none" />{searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"><X size={16} /></button>}</div></div>
                       <div className="max-h-[60vh] overflow-y-auto no-scrollbar py-2">
                         {searchTerm.length < 2 ? <div className="py-12 text-center"><Search size={32} className="mx-auto text-slate-100 dark:text-slate-800 mb-2" /><p className="text-[10px] font-medium text-slate-400 dark:text-slate-600 uppercase tracking-widest px-8 leading-relaxed">Digite pelo menos 2 caracteres</p></div> : hasResults ? <>
                             {searchResults.os.length > 0 && <div className="p-4 border-b border-slate-50 dark:border-slate-800 last:border-0"><h4 className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-3 px-2">Ordens de Serviço</h4><div className="space-y-1">{searchResults.os.map(os => (<button key={os.id} onClick={() => navigateToResult(`/os/${os.id}`)} className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group"><div className="text-left"><div className="flex items-center gap-2"><span className="text-[10px] font-medium text-blue-600 font-mono">{os.code}</span><span className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate uppercase">{os.client?.name}</span></div><p className="text-[10px] text-slate-500 italic truncate mt-0.5">{os.description}</p></div><ArrowRight size={14} className="text-slate-300 group-hover:text-blue-500 transition-all" /></button>))}</div></div>}
                             {searchResults.clients.length > 0 && <div className="p-4 border-b border-slate-50 dark:border-slate-800 last:border-0"><h4 className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-3 px-2">Clientes</h4><div className="space-y-1">{searchResults.clients.map(client => (<button key={client.id} onClick={() => navigateToResult(`/clients/${client.id}`)} className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group"><div className="text-left"><div className="text-sm font-medium text-slate-900 dark:text-slate-100 uppercase">{client.name}</div><p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">{client.address}</p></div><ArrowRight size={14} className="text-slate-300 group-hover:text-blue-500" /></button>))}</div></div>}
+                            {searchResults.establishments.length > 0 && <div className="p-4 border-b border-slate-50 dark:border-slate-800 last:border-0"><h4 className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-3 px-2">Locais / Estabelecimentos</h4><div className="space-y-1">{searchResults.establishments.map(est => (<button key={est.id} onClick={() => navigateToResult(`/clients/${est.client_id}`)} className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group"><div className="text-left"><div className="text-sm font-medium text-slate-900 dark:text-slate-100 uppercase">{est.name}</div><p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">{est.address} • {est.client_name}</p></div><ArrowRight size={14} className="text-slate-300 group-hover:text-blue-500" /></button>))}</div></div>}
+                            {searchResults.equipments.length > 0 && <div className="p-4 border-b border-slate-50 dark:border-slate-800 last:border-0"><h4 className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-3 px-2">Ativos / Equipamentos</h4><div className="space-y-1">{searchResults.equipments.map(eq => (<button key={eq.id} onClick={() => navigateToResult(`/equipments/${eq.id}`)} className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group"><div className="text-left"><div className="text-sm font-medium text-slate-900 dark:text-slate-100 uppercase">{eq.type} - {eq.brand}</div><p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">SN: {eq.serial_number}</p></div><ArrowRight size={14} className="text-slate-300 group-hover:text-blue-500" /></button>))}</div></div>}
                           </> : <div className="py-12 text-center"><Search size={32} className="mx-auto text-slate-100 dark:text-slate-800 mb-2" /><p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Sem resultados</p></div>}
                       </div>
                    </div>
@@ -373,7 +335,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         )}
 
         <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-3">
-          {showScrollTop && <button onClick={scrollToTop} className="p-3.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full shadow-xl border border-slate-100 dark:border-slate-700 hover:bg-slate-50 transition-all transform hover:scale-110 active:scale-95" title="Topo"><ArrowUp size={20} /></button>}
+          {showScrollTop && <button onClick={scrollToTop} className="p-3.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full shadow-xl border border-slate-100 dark:border-700 hover:bg-slate-50 transition-all transform hover:scale-110 active:scale-95" title="Topo"><ArrowUp size={20} /></button>}
           {showFab && <Link to={fabConfig.to} className="p-5 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-600/40 hover:bg-blue-700 hover:scale-110 transition-all transform flex items-center justify-center active:scale-95" title={fabConfig.title}><Plus size={28} /></Link>}
         </div>
       </div>

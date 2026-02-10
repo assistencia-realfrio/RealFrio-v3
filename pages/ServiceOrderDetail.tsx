@@ -11,7 +11,8 @@ import {
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
   RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
   Settings2, FileDown, Key, Mail, Share2, UploadCloud, Play, Square as StopIcon, Timer, CloudRain,
-  Wrench, Snowflake, Printer, Check, Image as LucideImage, QrCode, ExternalLink
+  Wrench, Snowflake, Printer, Check, Image as LucideImage, QrCode, ExternalLink, Calculator,
+  ThumbsUp, ThumbsDown, Coins
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -107,6 +108,8 @@ const getStatusLabelText = (status: string) => {
     case OSStatus.INICIADA: return 'INICIADA';
     case OSStatus.PARA_ORCAMENTO: return 'PARA ORÇAMENTO';
     case OSStatus.ORCAMENTO_ENVIADO: return 'ORÇAMENTO ENVIADO';
+    case OSStatus.ORCAMENTO_ACEITE: return 'ORÇAMENTO ACEITE';
+    case OSStatus.ORCAMENTO_REJEITADO: return 'ORÇAMENTO REJEITADO';
     case OSStatus.AGUARDA_PECAS: return 'AGUARDA PEÇAS';
     case OSStatus.PECAS_RECEBIDAS: return 'PEÇAS RECEBIDAS';
     case OSStatus.CONCLUIDA: return 'CONCLUÍDA';
@@ -220,7 +223,6 @@ export const ServiceOrderDetail: React.FC = () => {
     const currentTechSig = technicianSignature || '';
     const originalTechSig = os.technician_signature || '';
     
-    // Comparação profunda para warranty_info para evitar falsos negativos
     const currentWarrantyInfoStr = JSON.stringify(warrantyInfo || {});
     const originalWarrantyInfoStr = JSON.stringify(os.warranty_info || {});
 
@@ -377,6 +379,13 @@ export const ServiceOrderDetail: React.FC = () => {
       }
     } catch (error: any) { console.error("ERRO AO CARREGAR OS:", error.message || error); } finally { if (showLoader) setLoading(false); }
   };
+
+  const quoteTotals = useMemo(() => {
+    const subtotal = partsUsed.reduce((acc, p) => acc + (p.quantity * (p.unit_price || 0)), 0);
+    const iva = subtotal * 0.23;
+    const total = subtotal + iva;
+    return { subtotal, iva, total, hasValues: subtotal > 0 };
+  }, [partsUsed]);
 
   const handleUpdateStatus = async (newStatus: OSStatus) => {
     if (!id || !os) return;
@@ -563,7 +572,6 @@ export const ServiceOrderDetail: React.FC = () => {
     if (!file || !id) return;
     setIsUploadingPhoto(true);
     try {
-      // Comprimir imagem antes do upload
       const compressedBase64 = await compressImage(file);
       await mockData.addOSPhoto(id, { url: compressedBase64, type });
       await mockData.addOSActivity(id, { description: `ADICIONOU FOTO: ${type.toUpperCase()}` });
@@ -592,6 +600,34 @@ export const ServiceOrderDetail: React.FC = () => {
   const handleDeletePart = async () => { if (!partToDelete) return; setActionLoading(true); try { await mockData.removeOSPart(partToDelete.id); await mockData.addOSActivity(id!, { description: `REMOVEU MATERIAL: ${partToDelete.name}` }); setShowDeletePartModal(false); setPartToDelete(null); fetchOSDetails(false); } finally { setActionLoading(false); } };
 
   const handleGenerateAISummary = async () => { if (!anomaly?.trim()) { setErrorMessage("DESCREVA A CAUSA PRIMEIRO."); return; } setIsGenerating(true); try { const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity.toLocaleString('pt-PT')}x ${p.name}`), os?.type || "INTERVENÇÃO"); if (summary) { setResolutionNotes(summary.toUpperCase()); await mockData.addOSActivity(id!, { description: "GEROU RESUMO VIA IA" }); } } catch (e: any) { setErrorMessage("ERRO IA."); } finally { setIsGenerating(false); } };
+
+  const handleDeleteQuote = () => {
+    if (!os) return;
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Eliminar Orçamento',
+      message: 'Esta ação irá remover permanentemente todos os artigos, mão de obra e preços deste orçamento. A OS voltará ao estado "Por Iniciar". Deseja continuar?',
+      confirmLabel: 'ELIMINAR ORÇAMENTO',
+      variant: 'danger',
+      action: async () => {
+        setActionLoading(true);
+        try {
+          // Remover partes
+          for (const part of partsUsed) {
+            await mockData.removeOSPart(part.id);
+          }
+          // Reset status
+          await mockData.updateServiceOrder(os.id, { status: OSStatus.POR_INICIAR });
+          await mockData.addOSActivity(os.id, { description: "ELIMINOU ORÇAMENTO COMPLETO (RESET DE FINANCEIRO)" });
+          fetchOSDetails(true);
+        } catch (e) {
+          setErrorMessage("ERRO AO ELIMINAR ORÇAMENTO.");
+        } finally {
+          setActionLoading(false);
+        }
+      }
+    });
+  };
 
   const handleResetAnomaly = () => setAnomaly('');
   const handleResetResolution = () => setResolutionNotes('');
@@ -685,7 +721,6 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
 
-      {/* Diálogo de Confirmação Único para a página */}
       <div className={confirmConfig.isOpen ? "block" : "hidden"}>
         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-200">
@@ -744,6 +779,57 @@ export const ServiceOrderDetail: React.FC = () => {
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {activeTab === 'info' && (
           <div className="space-y-3">
+            {/* CARD DE ORÇAMENTO NO TOPO DA FICHA */}
+            {quoteTotals.hasValues && (os?.status === OSStatus.PARA_ORCAMENTO || os?.status === OSStatus.ORCAMENTO_ENVIADO || os?.status === OSStatus.ORCAMENTO_ACEITE || os?.status === OSStatus.ORCAMENTO_REJEITADO) && (
+              <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-100 dark:border-blue-900/40 p-6 animate-in zoom-in-95 duration-500 overflow-hidden relative group">
+                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
+                  <Calculator size={80} className="text-blue-600" />
+                </div>
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.3em]">Resumo do Orçamento</h3>
+                    <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                      {quoteTotals.total.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}
+                    </p>
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Inclui IVA 23%</span>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <button 
+                      onClick={() => navigate('/quotes/new', { state: { osId: os?.id } })}
+                      className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 transition-all shadow-sm"
+                    >
+                      <Edit2 size={12} /> Rever Valores
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Ações de Estado e Limpeza */}
+                <div className="grid grid-cols-12 gap-2">
+                  <button 
+                    onClick={() => handleUpdateStatus(OSStatus.ORCAMENTO_ACEITE)}
+                    disabled={os.status === OSStatus.ORCAMENTO_ACEITE}
+                    className="col-span-5 flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                  >
+                    <ThumbsUp size={14} /> Aceite
+                  </button>
+                  <button 
+                    onClick={() => handleUpdateStatus(OSStatus.ORCAMENTO_REJEITADO)}
+                    disabled={os.status === OSStatus.ORCAMENTO_REJEITADO}
+                    className="col-span-5 flex items-center justify-center gap-2 py-3 bg-rose-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                  >
+                    <ThumbsDown size={14} /> Rejeitado
+                  </button>
+                  <button 
+                    onClick={handleDeleteQuote}
+                    className="col-span-2 flex items-center justify-center py-3 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-red-500 rounded-xl transition-all border border-slate-100 dark:border-slate-700"
+                    title="Eliminar Orçamento"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {os?.equipment && (
               <button 
                 onClick={generateTechnicalTag}
@@ -801,7 +887,7 @@ export const ServiceOrderDetail: React.FC = () => {
                             <button 
                               onClick={handleStopTimer}
                               disabled={actionLoading}
-                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-900/40 animate-in zoom-in-95 disabled:opacity-50"
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-900/40 animate-in zoom-in-95 disabled:opacity-50"
                             >
                                {actionLoading ? <RefreshCw className="animate-spin" size={14} /> : <StopIcon size={14} fill="currentColor" />} PARAR
                             </button>
@@ -843,6 +929,7 @@ export const ServiceOrderDetail: React.FC = () => {
                 </div>
               </div>
             )}
+
             <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
               <div className="flex items-center gap-3 mb-3">
                  <AlertCircle size={18} className="text-orange-500" />
@@ -1022,15 +1109,22 @@ export const ServiceOrderDetail: React.FC = () => {
             <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-colors">
                <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3"><Package size={18} className="text-slate-400" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Material Aplicado</h3></div>
-                  <button onClick={() => { setShowPartModal(true); setIsCreatingNewPart(false); setPartQuantityStr("1"); }} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 active:scale-95 disabled:opacity-50"><Plus size={14} /> ADICIONAR</button>
+                  <div className="flex items-center gap-2">
+                    {quoteTotals.hasValues && (
+                       <button onClick={() => navigate('/quotes/new', { state: { osId: os?.id } })} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 transition-all">
+                         <Calculator size={14} /> Orçamento
+                       </button>
+                    )}
+                    <button onClick={() => { setShowPartModal(true); setIsCreatingNewPart(false); setPartQuantityStr("1"); }} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 active:scale-95 disabled:opacity-50"><Plus size={14} /> ADICIONAR</button>
+                  </div>
                </div>
                <div className="space-y-2">
                   {partsUsed.length === 0 ? <div className="text-center py-10 opacity-20"><Package size={32} className="mx-auto mb-2" /><p className="text-[10px] font-black uppercase tracking-widest">Nenhum material registado</p></div> : partsUsed.map((part) => (
                     <div key={part.id} className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center gap-3 transition-all hover:border-blue-100 dark:hover:border-blue-900/30 group">
-                       <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 text-slate-300 dark:text-slate-600 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:text-blue-500 group-hover:text-white transition-all"><Package size={14} /></div>
+                       <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:text-blue-500 group-hover:text-white transition-all"><Package size={14} /></div>
                        <div className="flex-1 min-w-0">
                           <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase leading-tight truncate">{part.name}</p>
-                          <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mt-0.5">REF: {part.reference} • <span className="text-blue-600 dark:text-blue-400 font-black">{part.quantity.toLocaleString('pt-PT', { maximumFractionDigits: 3 })} UN</span></p>
+                          <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mt-0.5">REF: {part.reference} • <span className="text-blue-600 dark:text-blue-400 font-black">{part.quantity.toLocaleString('pt-PT', { maximumFractionDigits: 3 })} UN</span> {part.unit_price ? `• ${part.unit_price.toFixed(2)}€/un` : ''}</p>
                        </div>
                        <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-200/60 dark:border-slate-700 shadow-sm flex-shrink-0">
                           <button onClick={() => { setPartToEditQuantity(part); setTempQuantityStr(part.quantity.toString().replace('.', ',')); setShowEditQuantityModal(true); }} disabled={os?.status === OSStatus.CONCLUIDA} className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"><Edit2 size={14} /></button>
@@ -1114,7 +1208,7 @@ export const ServiceOrderDetail: React.FC = () => {
                      <button type="button" onClick={handleGenerateAISummary} disabled={isGenerating || os?.status === OSStatus.CONCLUIDA} className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-[9px] font-black uppercase hover:bg-blue-100 transition-all disabled:opacity-50">{isGenerating ? <RefreshCw size={12} className="animate-spin" /> : <Sparkle size={12} />} GERAR IA</button>
                    </div>
                 </div>
-                <textarea className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-[2rem] px-6 py-5 text-sm text-slate-800 dark:text-slate-200 leading-relaxed outline-none focus:ring-4 focus:ring-blue-500/10 transition-all min-h-[160px] resize-none" value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} placeholder="..." />
+                <textarea className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-[2rem] px-6 py-5 text-sm text-slate-800 dark:text-slate-200 leading-relaxed outline-none focus:ring-4 focus:ring-blue-500/10 transition-all min-h-[160px] resize-none" value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} placeholder="..." />
              </div>
              <div className="space-y-4">
                <div className="flex items-center justify-between px-2"><h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Validação de Trabalho</h3></div>

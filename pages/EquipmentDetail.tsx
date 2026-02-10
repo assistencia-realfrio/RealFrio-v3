@@ -5,23 +5,17 @@ import {
   Paperclip, Plus, Trash2, Camera, MapPin, Building2, ExternalLink,
   ChevronRight, Download, FileText, X, Eye, Activity, Tag, UploadCloud,
   FileImage, AlertTriangle, ShieldAlert, Printer, FileImage as ImageIcon2,
-  Image as LucideImage, Loader2, ChevronDown
+  Image as LucideImage, Loader2, ChevronDown, Calculator, Coins
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { mockData } from '../services/mockData';
-import { Equipment, ServiceOrder, EquipmentAttachment, OSStatus } from '../types';
+import { Equipment, ServiceOrder, EquipmentAttachment, OSStatus, Quote, QuoteStatus } from '../types';
 import { compressImage } from '../utils';
 import OSStatusBadge from '../components/OSStatusBadge';
 
 // Componente de Diálogo de Confirmação
 interface ConfirmDialogProps {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  confirmLabel: string;
-  variant: 'danger' | 'warning' | 'info';
-  onConfirm: () => void;
-  onCancel: () => void;
+  isOpen: boolean; title: string; message: string; confirmLabel: string; variant: 'danger' | 'warning' | 'info'; onConfirm: () => void; onCancel: () => void;
 }
 
 const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ isOpen, title, message, confirmLabel, variant, onConfirm, onCancel }) => {
@@ -72,8 +66,9 @@ const EquipmentDetail: React.FC = () => {
   const [clientName, setClientName] = useState('');
   const [establishmentName, setEstablishmentName] = useState('');
   const [history, setHistory] = useState<ServiceOrder[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'info' | 'chapa' | 'history' | 'attachments'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'chapa' | 'history' | 'attachments' | 'quotes'>('info');
   const [isUploading, setIsUploading] = useState(false);
   const [selectedAttachmentForView, setSelectedAttachmentForView] = useState<EquipmentAttachment | null>(null);
   const [showNameplateFullscreen, setShowNameplateFullscreen] = useState(false);
@@ -100,13 +95,18 @@ const EquipmentDetail: React.FC = () => {
     if (!id) return;
     setLoading(true);
     try {
-      const [eq, allOs] = await Promise.all([ mockData.getEquipmentById(id), mockData.getServiceOrders() ]);
+      const [eq, allOs, allQuotes] = await Promise.all([ 
+        mockData.getEquipmentById(id), 
+        mockData.getServiceOrders(),
+        mockData.getQuotes()
+      ]);
       if (eq) {
         setEquipment(eq);
         const [client, establishments] = await Promise.all([ mockData.getClientById(eq.client_id), mockData.getEstablishmentsByClient(eq.client_id) ]);
         setClientName(client?.name || 'Cliente Desconhecido'); setEstablishmentName(establishments.find(e => e.id === eq.establishment_id)?.name || 'Localização Desconhecida');
         const eqOs = allOs.filter(o => o.equipment_id === id).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setHistory(eqOs);
+        setQuotes(allQuotes.filter(q => q.equipment_id === id));
       }
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
@@ -404,6 +404,58 @@ const EquipmentDetail: React.FC = () => {
             </div>
           )}
 
+          {activeTab === 'quotes' && (
+            <div className="space-y-4 pb-10 px-1">
+               <div className="flex items-center justify-between px-4 mb-2">
+                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Orçamentos Vinculados ({quotes.length})</h3>
+               </div>
+               {quotes.length === 0 ? (
+                 <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-gray-100 dark:border-slate-800 mx-1">
+                    <Calculator size={32} className="mx-auto text-gray-200 dark:text-slate-700 mb-4" />
+                    <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest">Nenhum orçamento para este ativo</p>
+                 </div>
+               ) : (
+                 <div className="space-y-3">
+                   {quotes.map(q => {
+                     const netValue = q.total_amount / 1.23;
+                     return (
+                       <Link key={q.id} to={`/quotes/${q.id}`} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all group flex flex-col gap-4">
+                          <div className="flex justify-between items-start">
+                             <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-500 flex items-center justify-center flex-shrink-0">
+                                   <Coins size={20} />
+                                </div>
+                                <div className="min-w-0">
+                                   <div className="flex items-center gap-2 mb-0.5">
+                                      <span className="text-[10px] font-mono font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded">{q.code}</span>
+                                      <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest">{new Date(q.created_at).toLocaleDateString('pt-PT')}</span>
+                                   </div>
+                                   <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase truncate">{q.description}</h4>
+                                </div>
+                             </div>
+                             <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase border transition-colors ${
+                                q.status === QuoteStatus.ACEITE ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                q.status === QuoteStatus.PENDENTE ? 'bg-blue-50 text-blue-600 border-blue-100' : 
+                                'bg-rose-50 text-rose-600 border-rose-100'
+                             }`}>
+                                {q.status}
+                             </div>
+                          </div>
+                          <div className="flex justify-between items-center pt-3 border-t border-slate-50 dark:border-slate-800">
+                             <div>
+                                <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Valor Líquido</p>
+                                <p className="text-lg font-black text-slate-900 dark:text-white">{netValue.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}</p>
+                             </div>
+                             <ChevronRight className="text-slate-200 dark:text-slate-700 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" size={20} />
+                          </div>
+                       </Link>
+                     );
+                   })}
+                 </div>
+               )}
+            </div>
+          )}
+
           {activeTab === 'attachments' && (
             <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 space-y-6 transition-colors pb-10">
               <div className="flex justify-between items-center mb-2">
@@ -423,7 +475,13 @@ const EquipmentDetail: React.FC = () => {
       {showNameplateFullscreen && equipment.nameplate_url && ( <div className="fixed inset-0 z-[300] bg-slate-950 flex flex-col animate-in fade-in duration-300"> <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 z-[310] bg-gradient-to-b from-black/80 to-transparent"> <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] truncate pr-10"> CHAPA DE CARACTERÍSTICAS: {equipment.type} </span> <button onClick={() => setShowNameplateFullscreen(false)} className="p-4 bg-white/10 text-white rounded-full hover:bg-white/10 transition-all active:scale-90 backdrop-blur-lg"> <X size={24} /> </button> </div> <div className="flex-1 w-full h-full"> <ZoomableImage src={equipment.nameplate_url} alt="Chapa de Características" /> </div> </div> )}
 
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-[#9d1c24] dark:border-[#9d1c24]/60 shadow-[0_12px_40px_rgba(157,28,36,0.15)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
-        {[ { id: 'info', icon: HardDrive, label: 'GERAL' }, { id: 'chapa', icon: ImageIcon, label: 'CHAPA' }, { id: 'history', icon: History, label: 'HIST.' }, { id: 'attachments', icon: Paperclip, label: 'ANEXOS' } ].map((tab) => (
+        {[ 
+          { id: 'info', icon: HardDrive, label: 'GERAL' }, 
+          { id: 'chapa', icon: ImageIcon, label: 'CHAPA' }, 
+          { id: 'history', icon: History, label: 'HIST.' }, 
+          { id: 'quotes', icon: Calculator, label: 'ORÇAM.' },
+          { id: 'attachments', icon: Paperclip, label: 'ANEXOS' } 
+        ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-full transition-all gap-1 ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>
             <tab.icon size={18} /><span className="text-[7px] font-black uppercase tracking-widest">{tab.label}</span>
           </button>
