@@ -93,11 +93,12 @@ const PublicQuoteView: React.FC = () => {
   }
 
   const isReadOnly = quote.status !== QuoteStatus.PENDENTE;
+  const netValue = quote.total_amount / 1.23;
 
   return (
     <div className="h-full overflow-y-auto bg-gray-100 font-sans text-slate-900 selection:bg-blue-100 no-scrollbar">
       <div className="max-w-2xl mx-auto bg-white min-h-full shadow-2xl flex flex-col">
-        {/* Header - Fixed aspect for document look */}
+        {/* Header */}
         <div className="p-8 sm:p-12 border-b border-gray-100 flex flex-col items-center text-center bg-white">
           <BrandLogo variant="dark" size="lg" className="mb-6" />
           <div className="inline-block bg-slate-900 text-white px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.25em] mb-6 shadow-sm">Proposta Comercial</div>
@@ -119,110 +120,74 @@ const PublicQuoteView: React.FC = () => {
             </div>
           )}
 
-          {/* Client & Asset Info - Two column grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2 mb-3 text-slate-400 text-[10px] font-black uppercase tracking-widest leading-none">
-                <Building2 size={14} className="text-blue-500" /> Cliente
-              </div>
-              <p className="font-black text-[13px] uppercase text-slate-800 dark:text-white leading-tight mb-2">{quote.client?.name}</p>
-              <div className="flex items-start gap-2 text-slate-500 dark:text-slate-400 text-[11px] font-medium italic">
-                <MapPin size={14} className="mt-0.5 flex-shrink-0" /> 
-                <span className="uppercase">{quote.establishment?.name || 'Sede / Principal'}</span>
-              </div>
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-[2rem] border border-slate-100">
+              <div className="flex items-center gap-2 mb-3 text-slate-400 text-[10px] font-black uppercase tracking-widest leading-none"><Building2 size={14} className="text-blue-500" /> Cliente</div>
+              <p className="font-black text-[13px] uppercase text-slate-800 leading-tight mb-2">{quote.client?.name}</p>
+              <div className="flex items-start gap-2 text-slate-500 text-[11px] font-medium italic"><MapPin size={14} className="mt-0.5 flex-shrink-0" /> <span className="uppercase">{quote.establishment?.name || 'Sede / Principal'}</span></div>
             </div>
-            <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2 mb-3 text-slate-400 text-[10px] font-black uppercase tracking-widest leading-none">
-                <HardDrive size={14} className="text-emerald-500" /> Equipamento
-              </div>
-              <p className="font-black text-[13px] uppercase text-slate-800 dark:text-white leading-tight mb-2">{quote.equipment?.type || 'GERAL / INTERVENÇÃO'}</p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-tight">
-                {quote.equipment?.brand ? `${quote.equipment.brand} ${quote.equipment.model || ''}` : 'S/ REFERÊNCIA TÉCNICA'}
-              </p>
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-[2rem] border border-slate-100">
+              <div className="flex items-center gap-2 mb-3 text-slate-400 text-[10px] font-black uppercase tracking-widest leading-none"><HardDrive size={14} className="text-emerald-500" /> Equipamento</div>
+              <p className="font-black text-[13px] uppercase text-slate-800 leading-tight mb-2">{quote.equipment?.type || 'GERAL / INTERVENÇÃO'}</p>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">{quote.equipment?.brand ? `${quote.equipment.brand} ${quote.equipment.model || ''}` : 'S/ REFERÊNCIA TÉCNICA'}</p>
             </div>
           </div>
 
-          {/* Itemized List */}
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">Detalhamento de Peças e Serviços</h3>
-               <span className="text-[9px] font-black text-slate-300 uppercase">{quote.items?.length} itens</span>
+               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">Detalhamento (Valores Líquidos)</h3>
             </div>
             <div className="space-y-4">
               {quote.items?.map((item, idx) => (
                 <div key={idx} className="flex justify-between items-start group">
                   <div className="flex-1 pr-6">
-                    <p className="font-black text-[12px] text-slate-700 dark:text-slate-200 uppercase leading-tight group-hover:text-blue-600 transition-colors">{item.name}</p>
+                    <p className="font-black text-[12px] text-slate-700 uppercase leading-tight">{item.name}</p>
                     <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 tracking-widest">{item.quantity} UN • {item.unit_price.toFixed(2)}€/un</p>
                   </div>
-                  <div className="font-black text-[13px] text-slate-900 dark:text-white">{(item.quantity * item.unit_price).toFixed(2)}€</div>
+                  <div className="font-black text-[13px] text-slate-900">{(item.quantity * item.unit_price).toFixed(2)}€</div>
                 </div>
               ))}
             </div>
             
             <div className="pt-8 mt-8 border-t-2 border-slate-100 flex flex-col items-end gap-2">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Estimado (Inc. IVA 23%)</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Líquido da Proposta</p>
                 <div className="flex items-baseline gap-2">
-                  <p className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">
-                    {quote.total_amount.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}
+                  <p className="text-4xl font-black text-slate-900 tracking-tighter">
+                    {netValue.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}
                   </p>
                 </div>
-                <p className="text-[8px] font-bold text-slate-300 uppercase mt-1 italic">Variação máxima prevista de 10% s/ orçamento</p>
+                <p className="text-[9px] font-black text-red-600 uppercase mt-1 italic tracking-tight">* Aos valores apresentados acresce o IVA de 23%</p>
             </div>
           </div>
 
-          {/* Notes Section */}
           {quote.description && (
             <div className="p-6 bg-blue-50/50 rounded-[2rem] border border-blue-100/50">
-               <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-2">Notas do Técnico</p>
+               <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-2">Observações Técnicas</p>
                <p className="text-xs font-medium text-blue-800 leading-relaxed uppercase italic">"{quote.description}"</p>
             </div>
           )}
 
-          {/* Conditions */}
           <div className="bg-slate-50 p-6 rounded-[2rem] text-[9px] text-slate-500 leading-relaxed font-bold uppercase tracking-tight border border-slate-100">
-            A validade desta proposta é de 30 dias. Os preços apresentados incluem a deslocação e mão de obra estimada para a resolução da anomalia descrita. Reservamo-nos o direito de ajustar o valor final em caso de detecção de anomalias ocultas durante a reparação.
+            A validade desta proposta é de 30 dias. O orçamento apresentado serve apenas para estimativa técnica, podendo ter uma variação máxima de 10% em função de anomalias ocultas detetadas no decurso da reparação.
           </div>
 
-          {/* Validation Actions */}
           {!isReadOnly && (
             <div className="space-y-8 pt-6 pb-12 animate-in slide-in-from-bottom-6 duration-700">
               <div className="space-y-4">
-                <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4">Área de Assinatura do Cliente</p>
-                <SignatureCanvas 
-                  label="Assinatura Digital"
-                  onSave={setSignature}
-                  onClear={() => setSignature(null)}
-                  initialValue={signature}
-                />
+                <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4">Assine abaixo para Aprovar</p>
+                <SignatureCanvas label="Assinatura Digital" onSave={setSignature} onClear={() => setSignature(null)} initialValue={signature} />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
-                <button 
-                  onClick={handleReject}
-                  disabled={isSubmitting}
-                  className="py-5 bg-white border-2 border-red-100 text-red-600 rounded-[1.8rem] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-red-50 transition-all active:scale-95 disabled:opacity-50"
-                >
-                  REJEITAR
-                </button>
-                <button 
-                  onClick={handleAccept}
-                  disabled={isSubmitting || !signature}
-                  className="py-5 bg-emerald-600 text-white rounded-[1.8rem] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-700 shadow-xl shadow-emerald-200 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale"
-                >
-                  {isSubmitting ? <Loader2 size={16} className="animate-spin mx-auto"/> : 'ACEITAR E ENVIAR'}
-                </button>
+                <button onClick={handleReject} disabled={isSubmitting} className="py-5 bg-white border-2 border-red-100 text-red-600 rounded-[1.8rem] font-black text-[10px] uppercase tracking-[0.2em] active:scale-95 disabled:opacity-50">REJEITAR</button>
+                <button onClick={handleAccept} disabled={isSubmitting || !signature} className="py-5 bg-emerald-600 text-white rounded-[1.8rem] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-700 shadow-xl shadow-emerald-200 active:scale-95 disabled:opacity-50"> {isSubmitting ? <Loader2 size={16} className="animate-spin mx-auto"/> : 'ACEITAR E ENVIAR'} </button>
               </div>
             </div>
           )}
         </div>
         
-        {/* Document Footer */}
         <div className="bg-slate-900 p-8 text-center">
           <p className="text-[7px] font-black text-slate-600 uppercase tracking-[0.5em] mb-1">REAL FRIO - ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO</p>
-          <p className="text-[7px] font-bold text-slate-700 uppercase tracking-widest leading-loose">
-            Plataforma Real Frio Tech • Documento Gerado em Conformidade Digital
-          </p>
+          <p className="text-[7px] font-bold text-slate-700 uppercase tracking-widest">Documento Gerado em Conformidade Digital • Real Frio Tech</p>
         </div>
       </div>
     </div>

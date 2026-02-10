@@ -171,6 +171,7 @@ const NewQuote: React.FC = () => {
 
   const totals = useMemo(() => {
     const sub = items.reduce((acc, i) => acc + ((i.quantity || 0) * (i.unit_price || 0)), 0);
+    // Armazenamos o bruto na DB, mas mostramos líquido na UI conforme pedido
     return { sub, iva: sub * 0.23, total: sub * 1.23 };
   }, [items]);
 
@@ -425,12 +426,12 @@ const NewQuote: React.FC = () => {
               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] mb-8">Resumo da Proposta</h3>
               
               <div className="space-y-4 mb-10 relative z-10">
-                 <div className="flex justify-between text-sm font-bold text-slate-400 uppercase tracking-tight"><span>Subtotal Líquido</span><span>{totals.sub.toFixed(2)}€</span></div>
-                 <div className="flex justify-between text-sm font-bold text-slate-400 uppercase tracking-tight"><span>IVA Estimado (23%)</span><span>{totals.iva.toFixed(2)}€</span></div>
+                 <div className="flex justify-between text-sm font-bold text-slate-400 uppercase tracking-tight"><span>Total Líquido</span><span>{totals.sub.toFixed(2)}€</span></div>
+                 <div className="flex justify-between text-[9px] font-bold text-slate-500 uppercase tracking-tight"><span>IVA (23%)</span><span>{totals.iva.toFixed(2)}€</span></div>
                  <div className="h-px bg-slate-800 my-4"></div>
                  <div className="flex justify-between items-baseline">
-                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Total com IVA</span>
-                    <span className="text-4xl font-black text-white">{totals.total.toFixed(2)}€</span>
+                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Total S/ IVA</span>
+                    <span className="text-4xl font-black text-white">{totals.sub.toFixed(2)}€</span>
                  </div>
               </div>
 
@@ -450,7 +451,7 @@ const NewQuote: React.FC = () => {
                 <p className="text-[9px] font-black uppercase tracking-widest">Informações Adicionais</p>
               </div>
               <p className="text-[10px] text-slate-500 leading-relaxed font-medium uppercase italic">
-                O orçamento gerado será exportado em formato PDF com QR Code de aprovação digital para o cliente.
+                Aos valores apresentados acresce o IVA à taxa legal em vigor (23%).
               </p>
            </div>
         </div>
@@ -480,7 +481,7 @@ const NewQuote: React.FC = () => {
                           <input type="text" inputMode="decimal" value={itemForm.quantity} onChange={e => setItemForm({...itemForm, quantity: e.target.value})} className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-black dark:text-white text-center outline-none focus:ring-4 focus:ring-blue-500/5" />
                        </div>
                        <div>
-                          <label className="text-[8px] font-black text-slate-400 uppercase ml-1 mb-1 block">Preço Unitário (€)</label>
+                          <label className="text-[8px] font-black text-slate-400 uppercase ml-1 mb-1 block">Preço Unitário S/ IVA (€)</label>
                           <input type="text" inputMode="decimal" value={itemForm.price} onChange={e => setItemForm({...itemForm, price: e.target.value})} className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-black dark:text-white text-center outline-none focus:ring-4 focus:ring-blue-500/5" />
                        </div>
                     </div>
