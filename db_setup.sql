@@ -6,14 +6,26 @@ CREATE TABLE IF NOT EXISTS public.quotes (
     client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
     establishment_id UUID REFERENCES public.establishments(id) ON DELETE SET NULL,
     equipment_id UUID REFERENCES public.equipments(id) ON DELETE SET NULL,
-    description TEXT, -- Removido NOT NULL
+    description TEXT,
     status TEXT NOT NULL DEFAULT 'pendente',
     total_amount NUMERIC(12,2) DEFAULT 0,
     store TEXT NOT NULL,
+    client_signature TEXT, -- Adicionado para suportar aprovação digital
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Garantir que a coluna description permite nulos caso a tabela já exista
+-- Garantir que as colunas necessárias existem caso a tabela já tenha sido criada anteriormente
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='quotes' AND column_name='description') THEN
+        ALTER TABLE public.quotes ADD COLUMN description TEXT;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='quotes' AND column_name='client_signature') THEN
+        ALTER TABLE public.quotes ADD COLUMN client_signature TEXT;
+    END IF;
+END $$;
+
 ALTER TABLE public.quotes ALTER COLUMN description DROP NOT NULL;
 
 -- 2. Criar a tabela de Itens do Orçamento
@@ -28,14 +40,13 @@ CREATE TABLE IF NOT EXISTS public.quote_items (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 3. Habilitar Row Level Security (RLS) para permitir operações
+-- 3. Habilitar Row Level Security (RLS)
 ALTER TABLE public.quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_items ENABLE ROW LEVEL SECURITY;
 
 -- 4. Criar políticas de acesso
 DO $$ 
 BEGIN
-    -- Políticas para Orçamentos (Público pode ler/escrever para aprovação)
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'quotes' AND policyname = 'Allow all operations for everyone') THEN
         CREATE POLICY "Allow all operations for everyone" ON public.quotes FOR ALL USING (true) WITH CHECK (true);
     END IF;
@@ -44,8 +55,6 @@ BEGIN
         CREATE POLICY "Allow all operations for items" ON public.quote_items FOR ALL USING (true) WITH CHECK (true);
     END IF;
 
-    -- CRÍTICO: Políticas de LEITURA PÚBLICA para tabelas relacionadas (para mostrar nome do cliente/equipamento na proposta pública)
-    
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'clients' AND policyname = 'Allow public read access') THEN
         CREATE POLICY "Allow public read access" ON public.clients FOR SELECT USING (true);
     END IF;

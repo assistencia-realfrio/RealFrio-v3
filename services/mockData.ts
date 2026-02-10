@@ -102,7 +102,6 @@ export const mockData = {
         code, 
         status: QuoteStatus.PENDENTE,
         total_amount: quoteData.total_amount || 0,
-        // Garantir que a descrição é pelo menos uma string vazia se vier null após o cleanPayload
         description: payload.description || ''
       }])
       .select()
@@ -178,11 +177,18 @@ export const mockData = {
   },
 
   clientSignQuote: async (id: string, signature: string) => {
-    const { error } = await supabase.from('quotes').update({ 
-      status: QuoteStatus.ACEITE, 
-      client_signature: signature 
-    }).eq('id', id);
-    if (error) throw error;
+    const { error } = await supabase
+      .from('quotes')
+      .update({ 
+        status: QuoteStatus.ACEITE, 
+        client_signature: signature 
+      })
+      .eq('id', id);
+    
+    if (error) {
+      console.error("Erro ao gravar assinatura no Supabase:", error);
+      throw new Error(`Erro ao aprovar proposta: ${error.message}`);
+    }
     return true;
   },
 
