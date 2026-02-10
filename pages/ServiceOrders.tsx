@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { HardDrive, Filter, MapPin, ChevronDown, RefreshCw, Calendar, LayoutList, StretchHorizontal, ShieldAlert, X, Timer } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { ServiceOrder, OSStatus } from '../types';
@@ -15,6 +16,7 @@ const STATUS_ORDER_WEIGHT: Record<string, number> = {
   [OSStatus.ORCAMENTO_REJEITADO]: 7,
   [OSStatus.AGUARDA_PECAS]: 4,
   [OSStatus.PECAS_RECEBIDAS]: 5,
+  [OSStatus.AGUARDA_VALIDACAO]: 5.5,
   [OSStatus.CONCLUIDA]: 6,
   [OSStatus.CANCELADA]: 8,
 };
@@ -29,6 +31,7 @@ const getStatusLabelText = (status: string) => {
     case OSStatus.ORCAMENTO_REJEITADO: return 'Orçamento Rejeitado';
     case OSStatus.AGUARDA_PECAS: return 'Aguarda Peças';
     case OSStatus.PECAS_RECEBIDAS: return 'Peças Recebidas';
+    case OSStatus.AGUARDA_VALIDACAO: return 'Aguarda Validação';
     case OSStatus.CONCLUIDA: return 'Concluída';
     case OSStatus.CANCELADA: return 'Cancelada';
     default: return status;
@@ -36,26 +39,43 @@ const getStatusLabelText = (status: string) => {
 };
 
 const ServiceOrders: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { currentStore, setStore } = useStore();
+  
   const [allOrders, setAllOrders] = useState<ServiceOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<OSStatus | 'all'>('all');
-  const [viewMode, setViewMode] = useState<'compact' | 'complete'>('compact');
   
-  // Estados para validação de fecho na lista
+  // Inicializar filtro de estado a partir da URL se disponível
+  const [statusFilter, setStatusFilter] = useState<OSStatus | 'all'>(() => {
+    const params = new URLSearchParams(location.search);
+    const statusParam = params.get('status');
+    if (Object.values(OSStatus).includes(statusParam as OSStatus)) {
+      return statusParam as OSStatus;
+    }
+    return 'all';
+  });
+
+  const [viewMode, setViewMode] = useState<'compact' | 'complete'>('compact');
   const [showValidationErrorModal, setShowValidationErrorModal] = useState(false);
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [osIdToValidate, setOsIdToValidate] = useState<string | null>(null);
 
-  const navigate = useNavigate();
-  const { currentStore, setStore } = useStore();
-  
   useEffect(() => {
     fetchOrders();
-    // Sincronização periódica opcional para atualizar estados de cronómetros vindos de outros técnicos
     const interval = setInterval(fetchOrdersSilently, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // Sincronizar filtro se a URL mudar (ex: ao voltar para o dashboard e clicar de novo)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const statusParam = params.get('status');
+    if (statusParam && Object.values(OSStatus).includes(statusParam as OSStatus)) {
+      setStatusFilter(statusParam as OSStatus);
+    }
+  }, [location.search]);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -135,7 +155,6 @@ const ServiceOrders: React.FC = () => {
         return matchesStatus;
       })
       .sort((a, b) => {
-        // Prioridade para cronómetros ativos
         if (a.timer_is_active && !b.timer_is_active) return -1;
         if (!a.timer_is_active && b.timer_is_active) return 1;
 
@@ -366,7 +385,7 @@ const ServiceOrders: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL ERRO DE VALIDAÇÃO (MESMO QUE NO DETALHE) */}
+      {/* MODAL ERRO DE VALIDAÇÃO */}
       {showValidationErrorModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={(e) => e.stopPropagation()}>
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 transition-colors">

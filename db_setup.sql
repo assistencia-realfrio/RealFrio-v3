@@ -11,12 +11,14 @@ CREATE TABLE IF NOT EXISTS public.quotes (
     total_amount NUMERIC(12,2) DEFAULT 0,
     store TEXT NOT NULL,
     client_signature TEXT, 
+    verified BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- MIGRATION: Garantir que a coluna de assinatura existe se a tabela já foi criada anteriormente
+-- MIGRATION: Garantir que as colunas novas existem
 ALTER TABLE public.quotes ADD COLUMN IF NOT EXISTS client_signature TEXT;
 ALTER TABLE public.quotes ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.quotes ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false;
 
 -- 2. Criar a tabela de Itens do Orçamento
 CREATE TABLE IF NOT EXISTS public.quote_items (

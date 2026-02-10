@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Building2, MapPin, HardDrive, Printer, Loader2, 
   Edit2, Trash2, ShieldAlert, ExternalLink, ThumbsUp, ThumbsDown,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, CheckCircle2, ShieldCheck, Sparkles, Check
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { Quote, QuoteStatus } from '../types';
@@ -21,6 +21,7 @@ const QuoteDetail: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
   
   const [expandedClient, setExpandedClient] = useState(false);
   const [expandedEquip, setExpandedEquip] = useState(false);
@@ -49,6 +50,27 @@ const QuoteDetail: React.FC = () => {
       setQuote(prev => prev ? { ...prev, status: s } : null);
     } catch (err) {
       alert("Erro ao atualizar estado.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!id) return;
+    setActionLoading(true);
+    try {
+      // 1. Persistir na base de dados
+      await mockData.verifyQuote(id);
+      
+      // 2. Atualizar estado local imediatamente para esconder o banner e mostrar o badge
+      setQuote(prev => prev ? { ...prev, status: QuoteStatus.ACEITE } : null);
+      
+      // 3. Feedback visual
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 3000);
+    } catch (err) {
+      console.error("Erro na verificação:", err);
+      alert("Erro ao validar orçamento. Verifique a sua ligação.");
     } finally {
       setActionLoading(false);
     }
@@ -210,6 +232,37 @@ const QuoteDetail: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20 px-2 animate-in slide-in-from-bottom-2 duration-500">
+      {/* TOAST SUCESSO VALIDAÇÃO */}
+      {showSuccessToast && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[500] animate-in slide-in-from-top-10 duration-500">
+           <div className="bg-emerald-600 text-white px-8 py-4 rounded-3xl shadow-2xl flex items-center gap-3 border border-emerald-500/50">
+              <CheckCircle2 size={24} />
+              <p className="text-xs font-black uppercase tracking-widest">Orçamento Validado com Sucesso!</p>
+           </div>
+        </div>
+      )}
+
+      {quote.status === QuoteStatus.AGUARDA_VALIDACAO && (
+        <div className="bg-indigo-600 text-white p-6 rounded-[2.5rem] shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in zoom-in-95 duration-500">
+          <div className="flex items-center gap-4 text-center sm:text-left">
+            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
+               <Sparkles className="text-white" size={24} />
+            </div>
+            <div>
+               <h3 className="font-black uppercase tracking-tight text-lg leading-tight">Aprovação Recente</h3>
+               <p className="text-[10px] font-bold text-indigo-100 uppercase tracking-widest mt-1">Este orçamento foi aceite pelo cliente e aguarda validação interna.</p>
+            </div>
+          </div>
+          <button 
+            onClick={handleVerify}
+            disabled={actionLoading}
+            className="bg-white text-indigo-600 px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-all shadow-lg active:scale-95 disabled:opacity-50 whitespace-nowrap min-w-[200px]"
+          >
+            {actionLoading ? <Loader2 className="animate-spin mx-auto" size={16} /> : 'CONFIRMAR RECEÇÃO'}
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <button onClick={() => navigate(-1)} className="p-3 bg-white dark:bg-slate-900 text-slate-500 rounded-2xl shadow-sm border dark:border-slate-800 transition-all hover:bg-slate-50 active:scale-95">
@@ -239,6 +292,14 @@ const QuoteDetail: React.FC = () => {
              }`}>
                {quote.status}
              </span>
+             {quote.status === QuoteStatus.ACEITE && (
+               <>
+                 <span className="w-1 h-1 rounded-full bg-slate-200 dark:bg-slate-800"></span>
+                 <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 uppercase tracking-widest">
+                   <ShieldCheck size={10} /> Validado
+                 </span>
+               </>
+             )}
              <span className="w-1 h-1 rounded-full bg-slate-200 dark:bg-slate-800"></span>
              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Real Frio Tech</span>
            </div>
@@ -343,7 +404,7 @@ const QuoteDetail: React.FC = () => {
         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-200">
             <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+              <div className={`w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner`}>
                 <ShieldAlert size={32} />
               </div>
               <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Eliminar Orçamento</h3>

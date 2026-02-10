@@ -1,4 +1,3 @@
-
 import { supabase } from '../supabaseClient';
 import { 
   Client, Establishment, Equipment, ServiceOrder, OSStatus, OSType, 
@@ -86,6 +85,11 @@ export const mockData = {
     const code = `ORC-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}-${Math.floor(1000 + Math.random() * 9000)}`;
     const payload = cleanPayload(quoteData);
     
+    // Garantir que a descrição não é nula para cumprir restrição NOT NULL da base de dados
+    if (!payload.description || payload.description.trim() === '') {
+      payload.description = 'ORÇAMENTO / PROPOSTA COMERCIAL';
+    }
+    
     const { data: quote, error: qError } = await supabase
       .from('quotes')
       .insert([{ 
@@ -116,6 +120,12 @@ export const mockData = {
 
   updateQuote: async (id: string, quoteData: Partial<Quote>, items: Partial<QuoteItem>[]) => {
     const payload = cleanPayload(quoteData);
+
+    // Garantir que a descrição não é nula
+    if (!payload.description || payload.description.trim() === '') {
+      payload.description = 'ORÇAMENTO / PROPOSTA COMERCIAL';
+    }
+
     const { error: qError } = await supabase.from('quotes').update(payload).eq('id', id);
     if (qError) throw qError;
 
@@ -142,18 +152,59 @@ export const mockData = {
   },
 
   clientSignQuote: async (id: string, signature: string) => {
-    const { error } = await supabase
+    // CORREÇÃO: Definir estado diretamente como ACEITE ao assinar
+    const { data: quote, error } = await supabase
       .from('quotes')
       .update({ 
         status: QuoteStatus.ACEITE, 
-        client_signature: signature 
+        client_signature: signature
       })
-      .eq('id', id);
+      .eq('id', id)
+      .select('code, client_id')
+      .single();
     
     if (error) {
       console.error("ERRO CRÍTICO SUPABASE (SIGNATURE):", error);
       throw error;
     }
+
+    // Registar atividade automaticamente (substitui verifyQuote)
+    try {
+      if (quote) {
+        const { data: linkedOS } = await supabase
+          .from('service_orders')
+          .select('id')
+          .eq('client_id', quote.client_id)
+          .or(`status.eq.${OSStatus.PARA_ORCAMENTO},status.eq.${OSStatus.ORCAMENTO_ENVIADO},status.eq.${OSStatus.ORCAMENTO_ACEITE}`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (linkedOS) {
+          await supabase.from('os_activities').insert([{
+            os_id: linkedOS.id,
+            description: `ORÇAMENTO ${quote.code} ACEITE PELO CLIENTE (PORTAL ONLINE)`,
+            user_name: 'CLIENTE (WEB)'
+          }]);
+        }
+      }
+    } catch (e) {
+      console.warn("Log de atividade falhou (clientSignQuote).", e);
+    }
+
+    return true;
+  },
+
+  verifyQuote: async (id: string) => {
+    // Método mantido para compatibilidade, mas o fluxo principal agora é direto no clientSignQuote
+    const { data: quote, error } = await supabase
+      .from('quotes')
+      .update({ status: QuoteStatus.ACEITE })
+      .eq('id', id)
+      .select('code, client_id')
+      .single();
+
+    if (error) throw error;
     return true;
   },
 
@@ -217,6 +268,7 @@ export const mockData = {
   updateEstablishment: async (id: string, updates: Partial<Establishment>) => {
     const { error } = await supabase.from('establishments').update(updates).eq('id', id);
     if (error) throw error;
+    return true;
   },
 
   // Equipments
@@ -248,7 +300,7 @@ export const mockData = {
   getServiceOrders: async () => {
     const { data, error } = await supabase
       .from('service_orders')
-      .select('*, client:clients(*), equipment:equipments(*)')
+      .select('*, client:clients(*), establishment:establishments(*), equipment:equipments(*)')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];

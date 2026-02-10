@@ -1,15 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, ClipboardList, ArrowRight, MapPin, ChevronDown, Palmtree, Database, Wifi, WifiOff, AlertCircle } from 'lucide-react';
+import { Calendar, ClipboardList, ArrowRight, MapPin, ChevronDown, Palmtree, Database, Wifi, WifiOff, Calculator, Sparkles, ShieldCheck } from 'lucide-react';
 import { mockData } from '../services/mockData';
-import { OSStatus } from '../types';
+import { OSStatus, QuoteStatus } from '../types';
 import { useStore } from '../contexts/StoreContext';
 
 const Dashboard: React.FC = () => {
   const [scheduledCount, setScheduledCount] = useState(0);
   const [activeCount, setActiveCount] = useState(0);
   const [vacationCount, setVacationCount] = useState(0);
+  const [unverifiedQuotesCount, setUnverifiedQuotesCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const { currentStore, setStore } = useStore();
@@ -22,9 +23,10 @@ const Dashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [allOS, allVacations] = await Promise.all([
+      const [allOS, allVacations, allQuotes] = await Promise.all([
         mockData.getServiceOrders(),
-        mockData.getVacations()
+        mockData.getVacations(),
+        mockData.getQuotes()
       ]);
       
       setDbStatus('connected');
@@ -33,20 +35,29 @@ const Dashboard: React.FC = () => {
         ? allOS 
         : allOS.filter(os => os.store === currentStore);
       
+      // Contagem de OS Ativas (exclui concluídas e canceladas)
       const active = storeOS.filter(os => 
         os.status !== OSStatus.CONCLUIDA && 
         os.status !== OSStatus.CANCELADA
       ).length;
       setActiveCount(active);
 
+      // Contagem de Agendamentos (com data e não concluídas)
       const scheduled = storeOS.filter(os => 
         os.scheduled_date && 
         os.status !== OSStatus.CONCLUIDA && 
         os.status !== OSStatus.CANCELADA
       ).length;
-      
       setScheduledCount(scheduled);
 
+      // Contagem de Orçamentos que Aguardam Validação
+      const unverified = allQuotes.filter(q => 
+        q.status === QuoteStatus.AGUARDA_VALIDACAO &&
+        (currentStore === 'Todas' || q.store === currentStore)
+      ).length;
+      setUnverifiedQuotesCount(unverified);
+
+      // Contagem de férias (colaboradores ausentes hoje ou nos próximos 21 dias)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const limit = new Date();
@@ -119,7 +130,8 @@ const Dashboard: React.FC = () => {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 px-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 px-1">
+          {/* OS ATIVAS */}
           <button 
             onClick={() => navigate('/os')}
             className="group bg-white dark:bg-slate-900 p-5 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 text-left relative overflow-hidden active:scale-95"
@@ -131,7 +143,6 @@ const Dashboard: React.FC = () => {
                 </div>
                 <h2 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tighter">OS Ativas</h2>
               </div>
-              
               <div className="flex items-baseline gap-4">
                 <span className="text-4xl font-black text-slate-900 dark:text-white leading-none">{activeCount}</span>
                 <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
@@ -142,6 +153,7 @@ const Dashboard: React.FC = () => {
             </div>
           </button>
 
+          {/* AGENDAMENTOS */}
           <button 
             onClick={() => navigate('/appointments')}
             className="group bg-white dark:bg-slate-900 p-5 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 text-left relative overflow-hidden active:scale-95"
@@ -153,7 +165,6 @@ const Dashboard: React.FC = () => {
                 </div>
                 <h2 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tighter">Agendamentos</h2>
               </div>
-              
               <div className="flex items-baseline gap-4">
                 <span className="text-4xl font-black text-slate-900 dark:text-white leading-none">{scheduledCount}</span>
                 <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
@@ -164,23 +175,51 @@ const Dashboard: React.FC = () => {
             </div>
           </button>
 
+          {/* APROVAÇÕES (Propostas que aguardam validação interna) */}
+          <button 
+            onClick={() => navigate('/quotes?status=aguarda_validacao')}
+            className={`group p-5 rounded-[2rem] border shadow-sm transition-all duration-300 text-left relative overflow-hidden active:scale-95 ${
+              unverifiedQuotesCount > 0 
+              ? 'bg-indigo-600 border-indigo-500 text-white shadow-indigo-200 dark:shadow-indigo-900/20' 
+              : 'bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800 text-slate-900 dark:text-white'
+            }`}
+          >
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ${
+                  unverifiedQuotesCount > 0 ? 'bg-white text-indigo-600' : 'bg-indigo-50 text-white shadow-indigo-200'
+                }`}>
+                  <Calculator size={18} />
+                </div>
+                <h2 className="text-base font-black uppercase tracking-tighter">Aprovações</h2>
+              </div>
+              <div className="flex items-baseline gap-4">
+                <span className="text-4xl font-black leading-none">{unverifiedQuotesCount}</span>
+                <div className={`flex items-center gap-1 ${unverifiedQuotesCount > 0 ? 'text-indigo-100' : 'text-indigo-600'}`}>
+                  <span className="text-[8px] font-black uppercase tracking-widest">Novos Aceites</span>
+                  <Sparkles size={10} className={unverifiedQuotesCount > 0 ? 'animate-pulse' : ''} />
+                </div>
+              </div>
+            </div>
+          </button>
+
+          {/* AUSÊNCIAS */}
           <button 
             onClick={() => navigate('/vacations')}
-            className="group bg-white dark:bg-slate-900 p-5 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 text-left relative overflow-hidden active:scale-95 sm:col-span-2 lg:col-span-1"
+            className="group bg-white dark:bg-slate-900 p-5 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 text-left relative overflow-hidden active:scale-95"
           >
             <div className="relative z-10">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-9 h-9 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200 dark:shadow-emerald-900/20 flex-shrink-0">
                   <Palmtree size={18} />
                 </div>
-                <h2 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight">Ausências <br/><span className="text-[9px] text-slate-400 lowercase tracking-normal font-bold">(próx. 3 semanas)</span></h2>
+                <h2 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight">Ausências</h2>
               </div>
-              
               <div className="flex items-baseline gap-4">
                 <span className="text-4xl font-black text-slate-900 dark:text-white leading-none">{vacationCount}</span>
                 <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                  <span className="text-[8px] font-black uppercase tracking-widest">Ver Escala</span>
-                  <ArrowRight size={10} className="group-hover:translate-x-1 transition-transform" />
+                  <span className="text-[8px] font-black uppercase tracking-widest">Equipa</span>
+                  <ArrowRight size={10} />
                 </div>
               </div>
             </div>
@@ -195,7 +234,6 @@ const Dashboard: React.FC = () => {
         >
           Nova Ordem de Serviço
         </button>
-        
         <p className="text-[8px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.4em]">Real Frio Tech v1.2</p>
       </div>
     </div>

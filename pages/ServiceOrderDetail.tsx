@@ -112,6 +112,8 @@ const getStatusLabelText = (status: string) => {
     case OSStatus.ORCAMENTO_REJEITADO: return 'ORÇAMENTO REJEITADO';
     case OSStatus.AGUARDA_PECAS: return 'AGUARDA PEÇAS';
     case OSStatus.PECAS_RECEBIDAS: return 'PEÇAS RECEBIDAS';
+    /* Added case for AGUARDA_VALIDACAO status label */
+    case OSStatus.AGUARDA_VALIDACAO: return 'AGUARDA VALIDAÇÃO';
     case OSStatus.CONCLUIDA: return 'CONCLUÍDA';
     case OSStatus.CANCELADA: return 'CANCELADA';
     default: return status;

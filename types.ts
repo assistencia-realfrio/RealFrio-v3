@@ -14,12 +14,14 @@ export enum OSStatus {
   ORCAMENTO_REJEITADO = 'orcamento_rejeitado',
   AGUARDA_PECAS = 'aguarda_pecas',
   PECAS_RECEBIDAS = 'pecas_recebidas',
+  AGUARDA_VALIDACAO = 'aguarda_validacao',
   CONCLUIDA = 'concluida',
   CANCELADA = 'cancelada'
 }
 
 export enum QuoteStatus {
   PENDENTE = 'pendente',
+  AGUARDA_VALIDACAO = 'aguarda_validacao',
   ACEITE = 'aceite',
   REJEITADO = 'rejeitado'
 }

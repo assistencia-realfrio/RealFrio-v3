@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Calculator, ChevronRight, Plus, Search, Building2, MapPin, 
   HardDrive, Coins, Loader2, Filter, ChevronDown, 
@@ -14,6 +14,7 @@ import { normalizeString } from '../utils';
 const getStatusLabelText = (status: string) => {
   switch (status) {
     case QuoteStatus.PENDENTE: return 'Pendente';
+    case QuoteStatus.AGUARDA_VALIDACAO: return 'Aguarda Validação';
     case QuoteStatus.ACEITE: return 'Aceite';
     case QuoteStatus.REJEITADO: return 'Rejeitado';
     default: return status;
@@ -22,11 +23,21 @@ const getStatusLabelText = (status: string) => {
 
 const Quotes: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentStore, setStore } = useStore();
   const [allQuotes, setAllQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<QuoteStatus | 'all'>('all');
+  
+  // Inicializar filtro de estado (pode vir da URL via Dashboard)
+  const [statusFilter, setStatusFilter] = useState<QuoteStatus | 'all' | 'aguarda_validacao'>(() => {
+    const params = new URLSearchParams(location.search);
+    const statusParam = params.get('status');
+    if (statusParam === 'aguarda_validacao') return QuoteStatus.AGUARDA_VALIDACAO;
+    if (Object.values(QuoteStatus).includes(statusParam as QuoteStatus)) return statusParam as QuoteStatus;
+    return 'all';
+  });
+
   const [viewMode, setViewMode] = useState<'compact' | 'complete'>('compact');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -59,10 +70,14 @@ const Quotes: React.FC = () => {
   const filtered = useMemo(() => {
     const term = normalizeString(searchTerm);
     return allQuotes.filter(q => {
-      // Prioridade para a loja do cliente conforme solicitado
       const clientStore = q.client?.store || q.store;
       const matchesStore = currentStore === 'Todas' || clientStore === currentStore;
-      const matchesStatus = statusFilter === 'all' ? true : q.status === statusFilter;
+      
+      let matchesStatus = true;
+      if (statusFilter !== 'all') {
+        matchesStatus = q.status === statusFilter;
+      }
+
       const matchesSearch = normalizeString(q.code).includes(term) || 
                             normalizeString(q.client?.name || '').includes(term) ||
                             normalizeString(q.description || '').includes(term);
@@ -85,7 +100,6 @@ const Quotes: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4 h-[calc(100vh-140px)] flex flex-col px-1 sm:px-0">
-      {/* CABEÇALHO E FILTROS */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0 px-1">
         <div className="w-full sm:w-auto flex items-center justify-between gap-4">
           <div>
@@ -94,18 +108,8 @@ const Quotes: React.FC = () => {
           </div>
 
           <div className="flex items-center bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-full p-1 shadow-sm transition-colors">
-             <button 
-               onClick={() => setViewMode('complete')}
-               className={`p-2 rounded-full transition-all ${viewMode === 'complete' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
-             >
-               <LayoutList size={16} />
-             </button>
-             <button 
-               onClick={() => setViewMode('compact')}
-               className={`p-2 rounded-full transition-all ${viewMode === 'compact' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
-             >
-               <StretchHorizontal size={16} />
-             </button>
+             <button onClick={() => setViewMode('complete')} className={`p-2 rounded-full transition-all ${viewMode === 'complete' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}><LayoutList size={16} /></button>
+             <button onClick={() => setViewMode('compact')} className={`p-2 rounded-full transition-all ${viewMode === 'compact' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}><StretchHorizontal size={16} /></button>
           </div>
         </div>
         
@@ -127,7 +131,7 @@ const Quotes: React.FC = () => {
           <div className="relative flex-1 sm:flex-none min-w-[140px]">
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as QuoteStatus | 'all')}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
               className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm rounded-full pl-8 pr-8 py-2 text-[10px] font-black text-gray-600 dark:text-slate-300 appearance-none cursor-pointer focus:ring-4 focus:ring-blue-500/10 transition-all outline-none uppercase tracking-tight"
             >
               <option value="all">ESTADO: TODOS</option>
@@ -143,7 +147,6 @@ const Quotes: React.FC = () => {
         </div>
       </div>
 
-      {/* BARRA DE PESQUISA */}
       <div className="bg-white dark:bg-slate-900 p-3 rounded-[1.5rem] shadow-sm border border-gray-100 dark:border-slate-800 mx-1 transition-colors">
         <div className="relative">
            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -157,7 +160,6 @@ const Quotes: React.FC = () => {
         </div>
       </div>
 
-      {/* LISTAGEM */}
       {loading ? (
         <div className="flex-1 flex flex-col justify-center items-center">
           <Loader2 className="animate-spin text-blue-600" size={32} />
@@ -175,12 +177,13 @@ const Quotes: React.FC = () => {
             filtered.map((q) => {
               const netValue = q.total_amount / 1.23;
               const quoteStore = q.client?.store || q.store;
+              const isAwaitingValidation = q.status === QuoteStatus.AGUARDA_VALIDACAO;
               
               return (
                 <div 
                   key={q.id} 
                   onClick={() => navigate(`/quotes/${q.id}`)}
-                  className={`group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 border-l-4 hover:shadow-lg transition-all duration-200 block cursor-pointer relative overflow-hidden ${getStoreColorClass(quoteStore)} ${viewMode === 'compact' ? 'p-3' : 'p-5'}`}
+                  className={`group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 border-l-4 hover:shadow-lg transition-all duration-200 block cursor-pointer relative overflow-hidden ${getStoreColorClass(quoteStore)} ${viewMode === 'compact' ? 'p-3' : 'p-5'} ${isAwaitingValidation ? 'shadow-[0_0_15px_rgba(79,70,229,0.1)]' : ''}`}
                 >
                   <div className="flex flex-col gap-1.5">
                     <div className="flex justify-between items-center">
@@ -198,6 +201,7 @@ const Quotes: React.FC = () => {
                         ) : (
                           <div className="relative">
                             <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border inline-block whitespace-nowrap ${
+                              isAwaitingValidation ? 'bg-indigo-600 text-white border-indigo-700' :
                               q.status === QuoteStatus.ACEITE ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
                               q.status === QuoteStatus.PENDENTE ? 'bg-blue-50 text-blue-600 border-blue-100' : 
                               'bg-rose-50 text-rose-600 border-rose-100'
@@ -225,7 +229,6 @@ const Quotes: React.FC = () => {
                         {q.client?.name}
                       </h3>
                       
-                      {/* Nome do Ativo/Equipamento (Visual idêntico ao módulo OS) */}
                       <div className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-tight truncate mt-0.5 flex items-center gap-1.5">
                         {q.equipment ? (
                           <>
@@ -270,7 +273,6 @@ const Quotes: React.FC = () => {
         </div>
       )}
 
-      {/* BOTÃO FLUTUANTE (FAB) */}
       <button 
         onClick={() => navigate('/quotes/new')}
         className="fixed bottom-6 right-6 p-5 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-600/40 hover:bg-blue-700 hover:scale-110 transition-all transform flex items-center justify-center active:scale-95 z-40"

@@ -26,6 +26,9 @@ const OSStatusBadge: React.FC<Props> = ({ status, className = '' }) => {
       return <span className={`bg-orange-50 text-orange-700 border-orange-200 ${commonClasses}`}>Aguarda Peças</span>;
     case OSStatus.PECAS_RECEBIDAS:
       return <span className={`bg-teal-50 text-teal-700 border-teal-200 ${commonClasses}`}>Peças Recebidas</span>;
+    /* Added UI styling for AGUARDA_VALIDACAO status */
+    case OSStatus.AGUARDA_VALIDACAO:
+      return <span className={`bg-indigo-50 text-indigo-700 border-indigo-200 ${commonClasses}`}>Aguarda Validação</span>;
     case OSStatus.CONCLUIDA:
       return <span className={`bg-green-50 text-green-700 border-green-200 ${commonClasses}`}>Concluída</span>;
     case OSStatus.CANCELADA:
