@@ -8,23 +8,16 @@ import {
 
 const SESSION_KEY = 'rf_active_session_v3';
 
-/**
- * Limpa o payload removendo propriedades computadas ou objetos aninhados
- * que não existem como colunas reais na tabela do Supabase.
- * Também converte strings vazias em null para evitar erros de UUID no Postgres.
- */
 const cleanPayload = (data: any) => {
   const cleaned = { ...data };
-  // Remover objetos que são retornos de JOINs mas não colunas de escrita
   delete cleaned.client;
   delete cleaned.establishment;
   delete cleaned.equipment;
   delete cleaned.items;
   delete cleaned.id;
   delete cleaned.created_at;
-  delete cleaned.code; // Não permitir editar o código único gerado
+  delete cleaned.code;
 
-  // Converter strings vazias em null para campos opcionais (especialmente UUIDs)
   Object.keys(cleaned).forEach(key => {
     if (cleaned[key] === '') {
       cleaned[key] = null;
@@ -35,7 +28,7 @@ const cleanPayload = (data: any) => {
 };
 
 export const mockData = {
-  // Auth & Session
+  // Auth
   signIn: async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { user: null, error };
@@ -61,7 +54,7 @@ export const mockData = {
     await supabase.auth.signOut();
   },
 
-  // Quotes (Gestão Independente)
+  // Quotes
   getQuotes: async () => {
     const { data, error } = await supabase
       .from('quotes')
@@ -91,8 +84,6 @@ export const mockData = {
   createQuote: async (quoteData: Partial<Quote>, items: Partial<QuoteItem>[]) => {
     const now = new Date();
     const code = `ORC-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}-${Math.floor(1000 + Math.random() * 9000)}`;
-    
-    // 1. Inserir Cabeçalho do Orçamento
     const payload = cleanPayload(quoteData);
     
     const { data: quote, error: qError } = await supabase
@@ -101,18 +92,13 @@ export const mockData = {
         ...payload, 
         code, 
         status: QuoteStatus.PENDENTE,
-        total_amount: quoteData.total_amount || 0,
-        description: payload.description || ''
+        total_amount: quoteData.total_amount || 0
       }])
       .select()
       .single();
     
-    if (qError) {
-      console.error("Erro ao criar cabeçalho do orçamento:", qError);
-      throw new Error(`Erro base de dados: ${qError.message}`);
-    }
+    if (qError) throw qError;
 
-    // 2. Inserir Linhas/Itens do Orçamento
     if (items && items.length > 0) {
       const itemsPayload = items.map(item => ({
         quote_id: quote.id,
@@ -122,38 +108,19 @@ export const mockData = {
         unit_price: item.unit_price || 0,
         is_labor: !!item.is_labor
       }));
-      
       const { error: iError } = await supabase.from('quote_items').insert(itemsPayload);
-      if (iError) {
-        console.error("Erro ao inserir itens do orçamento:", iError);
-        throw new Error(`Erro ao gravar itens: ${iError.message}`);
-      }
+      if (iError) throw iError;
     }
     return quote;
   },
 
   updateQuote: async (id: string, quoteData: Partial<Quote>, items: Partial<QuoteItem>[]) => {
-    // 1. Atualizar Cabeçalho
     const payload = cleanPayload(quoteData);
-    const { error: qError } = await supabase
-      .from('quotes')
-      .update({
-        ...payload,
-        description: payload.description || ''
-      })
-      .eq('id', id);
-    
+    const { error: qError } = await supabase.from('quotes').update(payload).eq('id', id);
     if (qError) throw qError;
 
-    // 2. Remover itens antigos para reinserção (estratégia mais limpa para edição de lista)
-    const { error: dError } = await supabase
-      .from('quote_items')
-      .delete()
-      .eq('quote_id', id);
-    
-    if (dError) throw dError;
+    await supabase.from('quote_items').delete().eq('quote_id', id);
 
-    // 3. Inserir novos itens
     if (items && items.length > 0) {
       const itemsPayload = items.map(item => ({
         quote_id: id,
@@ -163,9 +130,7 @@ export const mockData = {
         unit_price: item.unit_price || 0,
         is_labor: !!item.is_labor
       }));
-      
-      const { error: iError } = await supabase.from('quote_items').insert(itemsPayload);
-      if (iError) throw iError;
+      await supabase.from('quote_items').insert(itemsPayload);
     }
     return true;
   },
@@ -186,8 +151,8 @@ export const mockData = {
       .eq('id', id);
     
     if (error) {
-      console.error("Erro ao gravar assinatura no Supabase:", error);
-      throw new Error(`Erro ao aprovar proposta: ${error.message}`);
+      console.error("ERRO CRÍTICO SUPABASE (SIGNATURE):", error);
+      throw error;
     }
     return true;
   },
@@ -326,7 +291,7 @@ export const mockData = {
     if (error) throw error;
   },
 
-  // Utils & Activities
+  // Utils
   getAllActivities: async () => {
     const { data, error } = await supabase
       .from('os_activities')

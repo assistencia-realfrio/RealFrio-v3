@@ -2,10 +2,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, FileText, Coins, Check, X, Mail, Download, 
-  Printer, Loader2, Building2, MapPin, Calculator, Edit2, Trash2, 
-  AlertTriangle, ThumbsUp, ThumbsDown, HardDrive, Tag, ChevronDown, ChevronUp,
-  ShieldAlert, ExternalLink
+  ArrowLeft, Building2, MapPin, HardDrive, Printer, Loader2, 
+  Edit2, Trash2, ShieldAlert, ExternalLink, ThumbsUp, ThumbsDown,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { Quote, QuoteStatus } from '../types';
@@ -23,7 +22,6 @@ const QuoteDetail: React.FC = () => {
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
-  // Estados para quadros colapsáveis
   const [expandedClient, setExpandedClient] = useState(false);
   const [expandedEquip, setExpandedEquip] = useState(false);
 
@@ -80,7 +78,6 @@ const QuoteDetail: React.FC = () => {
 
   const generatePDF = async () => {
     if (!quote) return;
-    
     const publicUrl = getPublicLink();
     setIsExportingPDF(true); 
     
@@ -90,7 +87,6 @@ const QuoteDetail: React.FC = () => {
       const margin = 20; 
       const brandColor = [157, 28, 36];
 
-      // --- CABEÇALHO ---
       doc.setFont("helvetica", "bold");
       doc.setFontSize(18);
       doc.setTextColor(brandColor[0], brandColor[1], brandColor[2]);
@@ -109,7 +105,6 @@ const QuoteDetail: React.FC = () => {
       doc.setDrawColor(200, 200, 200);
       doc.line(margin, 30, pageWidth - margin, 30);
 
-      // --- CLIENTE E ATIVO ---
       let currentY = 42;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
@@ -129,8 +124,14 @@ const QuoteDetail: React.FC = () => {
       doc.text(`Marca/Mod: ${quote.equipment?.brand || '---'} / ${quote.equipment?.model || '---'}`, col2X, currentY + 12);
       doc.text(`Nº Série: ${quote.equipment?.serial_number || '---'}`, col2X, currentY + 17);
 
-      // --- TABELA ---
-      currentY += 28;
+      currentY += 32;
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      const introText = "Depois de examinadas todas as peças, detetadas as respetivas avarias, resultou o orçamento para reparação das suas máquinas que importa em:";
+      const splitIntro = doc.splitTextToSize(introText, pageWidth - (margin * 2));
+      doc.text(splitIntro, margin, currentY);
+
+      currentY += 15;
       const tableBody = (quote.items || []).map(i => [
         i.reference || '---',
         i.name.toUpperCase(),
@@ -150,7 +151,6 @@ const QuoteDetail: React.FC = () => {
         columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right', fontStyle: 'bold' } }
       });
 
-      // --- TOTAIS ---
       let finalY = (doc as any).lastAutoTable.finalY + 10;
       const subtotal = quote.items?.reduce((acc, i) => acc + (i.quantity * i.unit_price), 0) || 0;
       
@@ -164,8 +164,15 @@ const QuoteDetail: React.FC = () => {
       doc.setTextColor(brandColor[0], brandColor[1], brandColor[2]);
       doc.text("* Aos valores apresentados acresce o IVA de 23%.", pageWidth - margin, finalY + 8, { align: "right" });
 
-      // --- QR CODE ---
-      finalY += 20;
+      finalY += 22;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(60, 60, 60);
+      const disclaimerText = "Mais referimos que o presente orçamento serve apenas para estimativa, podendo ter uma variação, para mais ou para menos, no máximo de 10%. Para qualquer esclarecimento suplementar, utilize os contactos habituais. Pedimos-lhe que nos envie a resposta com a brevidade possível. Decorridos 30 dias, caso não nos responda por escrito, consideramos este orçamento sem efeito.";
+      const splitDisclaimer = doc.splitTextToSize(disclaimerText, pageWidth - (margin * 2));
+      doc.text(splitDisclaimer, margin, finalY);
+
+      finalY += 25;
       const qrDataUrl = await QRCode.toDataURL(publicUrl, { margin: 1, width: 100 });
       doc.addImage(qrDataUrl, 'PNG', margin, finalY, 30, 30);
       
@@ -186,7 +193,6 @@ const QuoteDetail: React.FC = () => {
 
   const netValue = useMemo(() => {
     if (!quote) return 0;
-    // O total_amount na DB é o BRUTO (com IVA). Convertemos para Líquido.
     return quote.total_amount / 1.23;
   }, [quote]);
 
@@ -240,7 +246,6 @@ const QuoteDetail: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* QUADRO CLIENTE */}
         <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-all">
             <button onClick={() => setExpandedClient(!expandedClient)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
               <div className="flex items-center gap-3 text-left min-w-0">
@@ -250,21 +255,18 @@ const QuoteDetail: React.FC = () => {
                   <p className="text-xs font-black text-slate-900 dark:text-white uppercase truncate">{quote.client?.name}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {expandedClient ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
-              </div>
+              <div>{expandedClient ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}</div>
             </button>
             {expandedClient && (
               <div className="px-6 pb-6 space-y-4 animate-in slide-in-from-top-2 duration-300">
                 <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl space-y-3">
-                    <div><p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Entidade / Firma</p><p className="text-xs font-bold dark:text-slate-300 uppercase leading-snug">{quote.client?.billing_name || quote.client?.name}</p></div>
+                    <div><p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Firma</p><p className="text-xs font-bold dark:text-slate-300 uppercase leading-snug">{quote.client?.billing_name || quote.client?.name}</p></div>
                     <div className="flex items-start gap-2 pt-2 border-t border-slate-100 dark:border-slate-800"><MapPin size={12} className="text-indigo-500 mt-0.5" /><div><p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Localização</p><p className="text-xs font-bold dark:text-slate-300 uppercase leading-snug">{quote.establishment?.name || 'Sede / Principal'}</p></div></div>
                 </div>
               </div>
             )}
         </div>
 
-        {/* QUADRO ATIVO */}
         <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-all">
             <button onClick={() => setExpandedEquip(!expandedEquip)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
               <div className="flex items-center gap-3 text-left min-w-0">
@@ -274,9 +276,7 @@ const QuoteDetail: React.FC = () => {
                   <p className="text-xs font-black text-slate-900 dark:text-white uppercase truncate">{quote.equipment?.type || 'Sem Ativo'}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {expandedEquip ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
-              </div>
+              <div>{expandedEquip ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}</div>
             </button>
             {expandedEquip && (
               <div className="px-6 pb-6 space-y-4 animate-in slide-in-from-top-2 duration-300">
@@ -301,7 +301,7 @@ const QuoteDetail: React.FC = () => {
       <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
          <div className="p-8 border-b dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
             <h3 className="text-sm font-black dark:text-white uppercase tracking-widest">Detalhamento S/ IVA</h3>
-            <span className="text-[10px] font-black text-slate-400 uppercase">{quote.items?.length} itens</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase">{quote.items?.length || 0} itens</span>
          </div>
          <div className="p-8 space-y-4">
             {(quote.items || []).map(item => (
@@ -334,10 +334,7 @@ const QuoteDetail: React.FC = () => {
              <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-2"><ExternalLink size={10} /> Link Público de Aprovação</p>
              <div className="flex items-center justify-between gap-2 bg-black/30 p-2 rounded-lg">
                 <span className="text-[8px] text-slate-400 truncate flex-1 font-mono">{getPublicLink()}</span>
-                <button onClick={() => {
-                  navigator.clipboard.writeText(getPublicLink());
-                  alert("Link copiado!");
-                }} className="text-[8px] font-bold text-white uppercase bg-white/10 px-2 py-1 rounded hover:bg-white/20">Copiar</button>
+                <button onClick={() => { navigator.clipboard.writeText(getPublicLink()); alert("Link copiado!"); }} className="text-[8px] font-bold text-white uppercase bg-white/10 px-2 py-1 rounded hover:bg-white/20">Copiar</button>
              </div>
           </div>
       </div>
