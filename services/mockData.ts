@@ -152,11 +152,11 @@ export const mockData = {
   },
 
   clientSignQuote: async (id: string, signature: string) => {
-    // CORREÇÃO: Definir estado diretamente como ACEITE ao assinar
+    // CORREÇÃO: Definir estado como AGUARDA_VALIDACAO ao assinar
     const { data: quote, error } = await supabase
       .from('quotes')
       .update({ 
-        status: QuoteStatus.ACEITE, 
+        status: QuoteStatus.AGUARDA_VALIDACAO, 
         client_signature: signature
       })
       .eq('id', id)
@@ -168,7 +168,7 @@ export const mockData = {
       throw error;
     }
 
-    // Registar atividade automaticamente (substitui verifyQuote)
+    // Registar atividade automaticamente
     try {
       if (quote) {
         const { data: linkedOS } = await supabase
@@ -183,7 +183,7 @@ export const mockData = {
         if (linkedOS) {
           await supabase.from('os_activities').insert([{
             os_id: linkedOS.id,
-            description: `ORÇAMENTO ${quote.code} ACEITE PELO CLIENTE (PORTAL ONLINE)`,
+            description: `ORÇAMENTO ${quote.code} ASSINADO PELO CLIENTE (AGUARDA VALIDAÇÃO)`,
             user_name: 'CLIENTE (WEB)'
           }]);
         }
@@ -196,7 +196,7 @@ export const mockData = {
   },
 
   verifyQuote: async (id: string) => {
-    // Método mantido para compatibilidade, mas o fluxo principal agora é direto no clientSignQuote
+    // Atualizar o estado para ACEITE (Finalizado e Validado)
     const { data: quote, error } = await supabase
       .from('quotes')
       .update({ status: QuoteStatus.ACEITE })
@@ -205,6 +205,30 @@ export const mockData = {
       .single();
 
     if (error) throw error;
+
+    // Tentar encontrar uma OS vinculada para registar a atividade no log global
+    try {
+      const { data: linkedOS } = await supabase
+        .from('service_orders')
+        .select('id')
+        .eq('client_id', quote.client_id)
+        .or(`status.eq.${OSStatus.PARA_ORCAMENTO},status.eq.${OSStatus.ORCAMENTO_ENVIADO},status.eq.${OSStatus.ORCAMENTO_ACEITE}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (linkedOS) {
+        const session = mockData.getSession();
+        await supabase.from('os_activities').insert([{
+          os_id: linkedOS.id,
+          description: `ORÇAMENTO ${quote.code} VALIDADO PELO BACKOFFICE`,
+          user_name: session?.full_name || 'Sistema'
+        }]);
+      }
+    } catch (e) {
+      console.warn("Log de atividade opcional falhou ou não existe OS vinculada.");
+    }
+
     return true;
   },
 
