@@ -22,7 +22,7 @@ const Users: React.FC = () => {
   const [userVacations, setUserVacations] = useState<Vacation[]>([]);
   const [vacationLoading, setVacationLoading] = useState(false);
   const [editingVacationId, setEditingVacationId] = useState<string | null>(null);
-  const [newVacation, setNewVacation] = useState({ start_date: '', end_date: '', notes: '', store: 'Caldas da Rainha' });
+  const [newVacation, setNewVacation] = useState({ start_date: '', end_date: '', notes: '', store: 'Todas' });
   const [formData, setFormData] = useState({ fullName: '', email: '', password: '', role: UserRole.TECNICO, store: 'Caldas da Rainha' });
 
   useEffect(() => {
@@ -42,7 +42,7 @@ const Users: React.FC = () => {
     setVacationLoading(true);
     try {
       const allVacations = await mockData.getVacations();
-      setUserVacations(allVacations.filter(v => v.user_name === editingUser.full_name).sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()));
+      setUserVacations(allVacations.filter(v => v.user_id === editingUser.id).sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()));
     } finally { setVacationLoading(false); }
   };
 
@@ -61,7 +61,7 @@ const Users: React.FC = () => {
       setUserVacations([]);
     }
     setEditingVacationId(null);
-    setNewVacation({ start_date: '', end_date: '', notes: '', store: user?.store || 'Caldas da Rainha' });
+    setNewVacation({ start_date: '', end_date: '', notes: '', store: 'Todas' });
     setShowModal(true);
   };
 
@@ -85,8 +85,8 @@ const Users: React.FC = () => {
     if (!editingUser || !newVacation.start_date || !newVacation.end_date) return;
     setVacationLoading(true);
     try {
-      if (editingVacationId) { await mockData.updateVacation(editingVacationId, { start_date: newVacation.start_date, end_date: newVacation.end_date, notes: newVacation.notes, store: newVacation.store }); }
-      else { await mockData.createVacation({ user_id: editingUser.id, user_name: editingUser.full_name, start_date: newVacation.start_date, end_date: newVacation.end_date, notes: newVacation.notes, store: newVacation.store, status: VacationStatus.APROVADA }); }
+      if (editingVacationId) { await mockData.updateVacation(editingVacationId, { start_date: newVacation.start_date, end_date: newVacation.end_date, notes: newVacation.notes, store: 'Todas' }); }
+      else { await mockData.createVacation({ user_id: editingUser.id, user_name: editingUser.full_name, start_date: newVacation.start_date, end_date: newVacation.end_date, notes: newVacation.notes, store: 'Todas', status: VacationStatus.APROVADA }); }
       setNewVacation({ ...newVacation, start_date: '', end_date: '', notes: '' });
       setEditingVacationId(null);
       await fetchUserVacations();
@@ -186,7 +186,7 @@ const Users: React.FC = () => {
                 </form>
                 {editingUser && (
                   <div className="space-y-8 animate-in fade-in duration-500">
-                    <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em] flex items-center gap-3">GESTÃO DE AUSÊNCIAS<span className="h-px bg-slate-100 dark:bg-slate-800 flex-1"></span></h4>
+                    <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em] flex items-center gap-3">GESTÃO DE AUSÊNCIAS (GLOBAL)<span className="h-px bg-slate-100 dark:bg-slate-800 flex-1"></span></h4>
                     <div className="p-8 rounded-[2.5rem] bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 space-y-6">
                       <div className="grid grid-cols-2 gap-6">
                         <div><label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Início</label><input type="date" value={newVacation.start_date} onChange={e => setNewVacation({...newVacation, start_date: e.target.value})} className="w-full px-6 py-4 bg-white dark:bg-slate-900 border-none rounded-2xl text-xs font-black outline-none dark:text-white" /></div>
@@ -196,7 +196,7 @@ const Users: React.FC = () => {
                     </div>
                     <div className="space-y-3">
                        {userVacations.length === 0 ? (<div className="py-10 text-center opacity-30"><Palmtree size={32} className="mx-auto mb-2" /><p className="text-[9px] font-black uppercase tracking-widest">Sem ausências registadas</p></div>) : (
-                         userVacations.map((v) => (<div key={v.id} className="flex items-center justify-between p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[1.8rem] shadow-sm"><div className="flex items-center gap-5"><div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center shadow-inner"><Palmtree size={20} /></div><div><p className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight">{new Date(v.start_date).toLocaleDateString()} <span className="mx-2 text-slate-300">➜</span> {new Date(v.end_date).toLocaleDateString()}</p><p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Sede: {v.store}</p></div></div></div>))
+                         userVacations.map((v) => (<div key={v.id} className="flex items-center justify-between p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[1.8rem] shadow-sm"><div className="flex items-center gap-5"><div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center shadow-inner"><Palmtree size={20} /></div><div><p className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight">{new Date(v.start_date).toLocaleDateString()} <span className="mx-2 text-slate-300">➜</span> {new Date(v.end_date).toLocaleDateString()}</p><p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Ausência Geral</p></div></div></div>))
                        )}
                     </div>
                   </div>

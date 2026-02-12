@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Palmtree, Search, Plus, Calendar as CalendarIcon, MapPin, 
@@ -12,15 +13,17 @@ import { useStore } from '../contexts/StoreContext';
 import { normalizeString } from '../utils';
 
 const getInitials = (name: string) => {
-  const parts = name.trim().split(' ');
+  const nameTrimmed = (name || "").trim();
+  if (!nameTrimmed) return "??";
+  const parts = nameTrimmed.split(' ');
   if (parts.length >= 2) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
-  return name.substring(0, 2).toUpperCase();
+  return nameTrimmed.substring(0, 2).toUpperCase();
 };
 
 const Vacations: React.FC = () => {
-  const { currentStore, setStore } = useStore();
+  const { currentStore } = useStore();
   const [vacations, setVacations] = useState<Vacation[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +46,7 @@ const Vacations: React.FC = () => {
     user_name: '',
     start_date: '',
     end_date: '',
-    store: (currentStore === 'Todas' ? 'Caldas da Rainha' : currentStore) as string,
+    store: 'Todas', // Padrão global
     notes: ''
   });
 
@@ -151,11 +154,11 @@ const Vacations: React.FC = () => {
   const baseFilteredVacations = useMemo(() => {
     const term = normalizeString(searchTerm);
     return vacations.filter(v => {
-      const matchesStore = currentStore === 'Todas' || v.store === currentStore;
-      const matchesSearch = normalizeString(v.user_name).includes(term);
-      return matchesStore && matchesSearch;
+      // ALTERAÇÃO: Férias são globais, ignoramos currentStore
+      const matchesSearch = normalizeString(v.user_name || '').includes(term);
+      return matchesSearch;
     });
-  }, [vacations, currentStore, searchTerm]);
+  }, [vacations, searchTerm]);
 
   const upcomingVacations = useMemo(() => {
     return baseFilteredVacations.filter(v => v.end_date >= todayStr).sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
@@ -181,13 +184,12 @@ const Vacations: React.FC = () => {
     return days;
   }, [viewDate, baseFilteredVacations]);
 
-  // Extrair colaboradores únicos que aparecem no calendário atual para a legenda
   const currentMonthCollaborators = useMemo(() => {
     const collaborators = new Map<string, string>();
     calendarDays.forEach(day => {
       if (day) {
         day.vacations.forEach(v => {
-          if (!collaborators.has(v.user_name)) {
+          if (v.user_name && !collaborators.has(v.user_name)) {
             collaborators.set(v.user_name, getInitials(v.user_name));
           }
         });
@@ -214,7 +216,7 @@ const Vacations: React.FC = () => {
         user_name: v.user_name, 
         start_date: v.start_date, 
         end_date: v.end_date, 
-        store: v.store, 
+        store: v.store || 'Todas', 
         notes: v.notes || '' 
       });
     } else {
@@ -224,7 +226,7 @@ const Vacations: React.FC = () => {
         user_name: isAdmin ? '' : currentUser?.full_name || '', 
         start_date: '', 
         end_date: '', 
-        store: (isAdmin ? (currentStore === 'Todas' ? 'Caldas da Rainha' : currentStore) : currentUser?.store || 'Caldas da Rainha') as string, 
+        store: 'Todas', 
         notes: '' 
       });
     }
@@ -238,8 +240,7 @@ const Vacations: React.FC = () => {
       setFormData({
         ...formData,
         user_id: selected.id,
-        user_name: selected.full_name,
-        store: selected.store || formData.store
+        user_name: selected.full_name
       });
     }
   };
@@ -281,7 +282,7 @@ const Vacations: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8 px-2">
          <div className="text-center sm:text-left">
             <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Férias do Pessoal</h1>
-            <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.3em] mt-1">Escala de Ausências</p>
+            <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.3em] mt-1">Escala de Ausências Global</p>
          </div>
 
          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -348,7 +349,6 @@ const Vacations: React.FC = () => {
                </div>
           </div>
 
-          {/* Legenda dos Colaboradores no Mês Atual */}
           {currentMonthCollaborators.length > 0 && (
             <div className="mx-4 p-6 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm animate-in slide-in-from-top-2 duration-500">
                <div className="flex items-center gap-3 mb-4">
@@ -379,7 +379,7 @@ const Vacations: React.FC = () => {
                      <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-500 flex items-center justify-center shadow-inner"><User size={22} /></div>
                      <div>
                         <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase truncate">{v.user_name}</h3>
-                        <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">{v.store}</span>
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ausência Geral</span>
                      </div>
                   </div>
                   {canEdit(v) && (
@@ -419,7 +419,6 @@ const Vacations: React.FC = () => {
         ))}
       </div>
 
-      {/* BOTÃO ADICIONAR (Todos podem adicionar, mas não-admin só para si próprios) */}
       <button 
         onClick={() => handleOpenModal()} 
         className="fixed bottom-24 right-6 p-5 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-600/40 hover:bg-blue-700 hover:scale-110 transition-all transform flex items-center justify-center active:scale-95 z-40"
@@ -427,12 +426,9 @@ const Vacations: React.FC = () => {
         <Plus size={28} />
       </button>
 
-      {/* MODAL FÉRIAS (Design conforme imagem de referência) */}
       {showModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col transition-all">
-              
-              {/* Header Modal */}
               <div className="p-10 pb-6 flex justify-between items-center bg-white dark:bg-slate-900">
                  <h3 className="text-sm font-black text-[#0f172a] dark:text-blue-400 uppercase tracking-[0.2em]">
                    {editingVacationId ? 'EDITAR FÉRIAS' : 'REGISTAR FÉRIAS'}
@@ -488,24 +484,6 @@ const Vacations: React.FC = () => {
                             <CalendarIcon size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
                           </div>
                        </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 ml-1">Loja *</label>
-                      <div className="relative">
-                        <select 
-                           required 
-                           disabled={!isAdmin}
-                           value={formData.store} 
-                           onChange={e => setFormData({...formData, store: e.target.value})} 
-                           className={`w-full px-6 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-xs font-black outline-none focus:ring-4 focus:ring-blue-500/5 appearance-none dark:text-white transition-all uppercase ${!isAdmin ? 'opacity-70 cursor-not-allowed' : ''}`}
-                        >
-                           <option value="Caldas da Rainha">CALDAS DA RAINHA</option>
-                           <option value="Porto de Mós">PORTO DE MÓS</option>
-                           <option value="Todas">AMBAS / TODAS</option>
-                        </select>
-                        {isAdmin && <ChevronDown size={18} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />}
-                      </div>
                     </div>
                  </div>
 
@@ -573,7 +551,7 @@ const Vacations: React.FC = () => {
                  </p>
                  <div className="grid grid-cols-2 gap-4">
                     <button onClick={() => { setShowImportConfirm(false); setPendingImportData(null); }} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button>
-                    <button onClick={confirmImport} className="py-4 bg-blue-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-blue-500/20 active:scale-95 transition-all">CONFIRMAR</button>
+                    <button onClick={confirmImport} className="py-4 bg-blue-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-red-500/20 active:scale-95 transition-all">CONFIRMAR</button>
                  </div>
               </div>
            </div>

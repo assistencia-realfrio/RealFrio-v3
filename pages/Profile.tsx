@@ -39,7 +39,7 @@ const Profile: React.FC = () => {
     setVacationLoading(true);
     try {
       const allVacations = await mockData.getVacations();
-      const filtered = allVacations.filter(v => v.user_name === currentUser.full_name);
+      const filtered = allVacations.filter(v => v.user_id === currentUser.id);
       setUserVacations(filtered.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()));
     } catch (err) {
       console.error("Erro ao carregar férias", err);
@@ -90,7 +90,7 @@ const Profile: React.FC = () => {
     if (!newVacation.start_date || !newVacation.end_date) return;
     setVacationLoading(true);
     try {
-      await mockData.createVacation({ user_id: user.id, user_name: user.full_name, start_date: newVacation.start_date, end_date: newVacation.end_date, store: user.store, status: VacationStatus.APROVADA });
+      await mockData.createVacation({ user_id: user.id, user_name: user.full_name, start_date: newVacation.start_date, end_date: newVacation.end_date, store: 'Todas', status: VacationStatus.APROVADA });
       setNewVacation({ start_date: '', end_date: '' });
       await fetchUserVacations(user);
     } catch (err) {
@@ -132,7 +132,7 @@ const Profile: React.FC = () => {
     reader.onload = async (event) => {
       try {
         const data = parseCSV(event.target?.result as string);
-        setPendingImportData(data.map(v => ({ ...v, user_id: user.id, user_name: user.full_name, store: v.store || user.store })));
+        setPendingImportData(data.map(v => ({ ...v, user_id: user.id, user_name: user.full_name, store: 'Todas' })));
         setShowImportConfirm(true);
       } catch (err) { setError("Erro no CSV."); }
     };
@@ -181,7 +181,7 @@ const Profile: React.FC = () => {
         <div className="space-y-3">
            {userVacations.length === 0 ? (<div className="py-10 text-center opacity-20"><Palmtree size={32} className="mx-auto mb-2" /><p className="text-[9px] font-black uppercase tracking-widest">Sem ausências registadas</p></div>) : (
              userVacations.map((v) => (
-               <div key={v.id} className="flex items-center justify-between p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[1.8rem] shadow-sm hover:border-blue-100 transition-all group"><div className="flex items-center gap-5"><div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-500 flex items-center justify-center shadow-inner group-hover:bg-blue-600 group-hover:text-white transition-all"><Palmtree size={20} /></div><div><p className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight">{new Date(v.start_date).toLocaleDateString()} <span className="mx-2 text-slate-300">➜</span> {new Date(v.end_date).toLocaleDateString()}</p><p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1">{v.store}</p></div></div></div>
+               <div key={v.id} className="flex items-center justify-between p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[1.8rem] shadow-sm hover:border-blue-100 transition-all group"><div className="flex items-center gap-5"><div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center shadow-inner group-hover:bg-blue-600 group-hover:text-white transition-all"><Palmtree size={20} /></div><div><p className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight">{new Date(v.start_date).toLocaleDateString()} <span className="mx-2 text-slate-300">➜</span> {new Date(v.end_date).toLocaleDateString()}</p><p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1">Ausência Global</p></div></div></div>
              ))
            )}
         </div>

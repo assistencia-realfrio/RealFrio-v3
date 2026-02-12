@@ -58,6 +58,7 @@ const Dashboard: React.FC = () => {
       setUnverifiedQuotesCount(unverified);
 
       // Contagem de férias (colaboradores ausentes hoje ou nos próximos 21 dias)
+      // ALTERAÇÃO: As férias são globais, ignoramos o currentStore
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const limit = new Date();
@@ -65,9 +66,7 @@ const Dashboard: React.FC = () => {
       const todayStr = today.toISOString().split('T')[0];
       const limitStr = limit.toISOString().split('T')[0];
 
-      const storeVacations = currentStore === 'Todas'
-        ? allVacations
-        : allVacations.filter(v => v.store === currentStore);
+      const storeVacations = allVacations; // Global
 
       const ongoingOrUpcomingVacations = storeVacations.filter(v => {
         return v.start_date <= limitStr && v.end_date >= todayStr;
