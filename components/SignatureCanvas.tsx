@@ -35,7 +35,7 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
   const setupExpandedContext = useCallback((canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.strokeStyle = '#1e293b'; // Cor da caneta sempre escura para contraste no papel branco
+      ctx.strokeStyle = '#1e293b'; // Caneta escura
       ctx.lineWidth = 3.5;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -48,7 +48,7 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
       const container = containerRef.current;
       
       const handleResize = () => {
-        // No modo rotacionado (mobile portrait), a largura do canvas é a altura do container e vice-versa
+        // No modo rotacionado (mobile portrait), a largura física do canvas é a altura visual do container
         if (isPortrait && window.innerWidth < 640) {
           canvas.width = container.clientHeight;
           canvas.height = container.clientWidth;
@@ -77,10 +77,8 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
       clientY = (e as React.MouseEvent).clientY;
     }
 
-    // Se estivermos em portrait mobile, o canvas está rotacionado via CSS transform
-    // Precisamos traduzir as coordenadas de ecrã para as coordenadas locais do canvas rotacionado
     if (isPortrait && window.innerWidth < 640) {
-      // O canvas está rodado 90deg no centro
+      // Tradução de coordenadas para canvas rotacionado 90deg
       const x = (clientY - rect.top) * (canvas.width / rect.height);
       const y = (rect.right - clientX) * (canvas.height / rect.width);
       return { x, y };
@@ -183,17 +181,20 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
       </div>
 
       {isExpanded && (
-        <div className="fixed inset-0 z-[1000] bg-slate-950 flex flex-col p-4 sm:p-10 animate-in fade-in duration-300">
-          <div className="flex justify-between items-center mb-6 sm:mb-10 px-4">
-            <h3 className="text-white font-black text-sm uppercase tracking-[0.3em]">{label}</h3>
-            <button onClick={() => setIsExpanded(false)} className="p-4 bg-white/10 text-white rounded-full hover:bg-white/20 border border-white/10 transition-colors"><X size={28} /></button>
-          </div>
+        <div className="fixed inset-0 z-[1000] bg-slate-950 flex flex-col animate-in fade-in duration-300 overflow-hidden">
+          {/* Botão de Fecho Flutuante para poupar espaço */}
+          <button 
+            onClick={() => setIsExpanded(false)} 
+            className="absolute top-4 right-4 z-[1010] p-4 bg-white/10 text-white rounded-full hover:bg-white/20 border border-white/10 transition-colors backdrop-blur-md active:scale-90"
+          >
+            <X size={24} />
+          </button>
           
-          <div ref={containerRef} className="relative flex-1 flex items-center justify-center">
-            {/* O "Pad" de Assinatura sempre horizontal */}
+          <div ref={containerRef} className="relative flex-1 w-full h-full flex items-center justify-center">
+            {/* O "Pad" de Assinatura ocupando o máximo de ecrã */}
             <div className={`
-              relative bg-white rounded-[2.5rem] shadow-2xl overflow-hidden touch-none border border-white/10
-              ${isPortrait && window.innerWidth < 640 ? 'w-[92vw] h-[75vh] flex items-center justify-center' : 'w-full h-full'}
+              relative bg-white shadow-2xl overflow-hidden touch-none
+              ${isPortrait && window.innerWidth < 640 ? 'w-screen h-screen' : 'w-full h-full rounded-[2.5rem]'}
             `}>
               <canvas
                 ref={expandedCanvasRef}
@@ -204,23 +205,43 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
                 onTouchStart={(e) => expandedCanvasRef.current && startDrawing(e, expandedCanvasRef.current)}
                 onTouchMove={(e) => expandedCanvasRef.current && draw(e, expandedCanvasRef.current)}
                 onTouchEnd={() => stopDrawing()}
-                style={isPortrait && window.innerWidth < 640 ? { transform: 'rotate(90deg)', transformOrigin: 'center', width: '75vh', height: '92vw' } : { width: '100%', height: '100%' }}
+                style={isPortrait && window.innerWidth < 640 ? { 
+                  transform: 'rotate(90deg)', 
+                  transformOrigin: 'center', 
+                  width: '100vh', 
+                  height: '100vw' 
+                } : { width: '100%', height: '100%' }}
                 className="bg-[radial-gradient(#e5e7eb_2px,transparent_2px)] [background-size:32px_32px] cursor-crosshair block"
               />
               
-              {/* Botões dentro do painel, mais pequenos como pedido */}
+              {/* Botões reposicionados para o canto visual inferior direito */}
               <div className={`
-                absolute flex gap-3 z-10 
-                ${isPortrait && window.innerWidth < 640 ? 'bottom-8 right-8 rotate-90 origin-bottom-right' : 'bottom-8 right-8'}
+                absolute flex gap-2 z-10 
+                ${isPortrait && window.innerWidth < 640 ? 'bottom-4 left-4 rotate-90 origin-bottom-left mb-6' : 'bottom-6 right-6'}
               `}>
-                <button type="button" onClick={handleClearExpanded} className="bg-slate-50 text-slate-500 px-5 py-2.5 rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:bg-slate-100 transition-all shadow-sm active:scale-95 border border-slate-100"><RotateCcw size={14} /> LIMPAR</button>
-                <button type="button" onClick={confirmExpandedSignature} className="bg-blue-600 text-white px-6 py-2.5 rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 shadow-xl shadow-blue-500/20 active:scale-95 transition-all"><Check size={16} /> CONFIRMAR</button>
+                <button 
+                  type="button" 
+                  onClick={handleClearExpanded} 
+                  className="bg-slate-50 text-slate-500 px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:bg-slate-100 transition-all shadow-sm active:scale-95 border border-slate-100"
+                >
+                  <RotateCcw size={12} /> LIMPAR
+                </button>
+                <button 
+                  type="button" 
+                  onClick={confirmExpandedSignature} 
+                  className="bg-blue-600 text-white px-5 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
+                >
+                  <Check size={14} /> CONFIRMAR
+                </button>
               </div>
+
+              {/* Marca d'água lateral no modo vertical */}
+              {isPortrait && window.innerWidth < 640 && (
+                <div className="absolute top-1/2 left-4 -translate-y-1/2 -rotate-90 pointer-events-none opacity-20 origin-left">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.5em] whitespace-nowrap">Assinatura Digital Real Frio</span>
+                </div>
+              )}
             </div>
-          </div>
-          
-          <div className="mt-8 text-center hidden sm:block">
-             <p className="text-[8px] font-black text-slate-600 uppercase tracking-[0.4em]">Área de Validação Digital Real Frio</p>
           </div>
         </div>
       )}

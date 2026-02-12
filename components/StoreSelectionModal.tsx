@@ -1,12 +1,18 @@
+
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { MapPin, Building2, Layers, ChevronRight, Sparkles } from 'lucide-react';
 import { useStore } from '../contexts/StoreContext';
 import BrandLogo from './BrandLogo';
 
 const StoreSelectionModal: React.FC = () => {
   const { showSelectionModal, setStore } = useStore();
+  const location = useLocation();
 
-  if (!showSelectionModal) return null;
+  // Se estivermos na página pública de aprovação de orçamento, nunca mostrar este modal
+  const isPublicQuotePage = location.pathname.startsWith('/proposal/');
+
+  if (!showSelectionModal || isPublicQuotePage) return null;
 
   const options = [
     { 
