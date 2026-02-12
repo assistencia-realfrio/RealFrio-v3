@@ -1,6 +1,6 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Maximize2, RotateCcw, Check, X, PenLine } from 'lucide-react';
+import { Maximize2, RotateCcw, Check, X, PenLine, Smartphone, ScreenShare } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface SignatureCanvasProps {
@@ -22,10 +22,15 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
+  // Detetar se é um dispositivo táctil (telemóvel ou tablet)
+  const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+
   useEffect(() => {
-    const handleOrientation = () => setIsPortrait(window.innerHeight > window.innerWidth);
-    window.addEventListener('resize', handleOrientation);
-    return () => window.removeEventListener('resize', handleOrientation);
+    const handleResize = () => {
+      setIsPortrait(window.innerHeight > window.innerWidth);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -47,24 +52,18 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
       const canvas = expandedCanvasRef.current;
       const container = containerRef.current;
       
-      const handleResize = () => {
-        // Ajuste dinâmico do tamanho do canvas interno
-        if (isPortrait && window.innerWidth < 640) {
-          // Em portrait, invertemos as dimensões para o canvas desenhar corretamente após o rotate(90deg)
-          canvas.width = window.innerHeight * 0.92;
-          canvas.height = window.innerWidth * 0.88;
-        } else {
-          canvas.width = container.clientWidth;
-          canvas.height = container.clientHeight;
-        }
+      const updateCanvasSize = () => {
+        // Agora usamos a dimensão real do ecrã pós-rotação física
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
         setupExpandedContext(canvas);
       };
 
-      handleResize();
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
+      updateCanvasSize();
+      window.addEventListener('resize', updateCanvasSize);
+      return () => window.removeEventListener('resize', updateCanvasSize);
     }
-  }, [isExpanded, isPortrait, setupExpandedContext]);
+  }, [isExpanded, setupExpandedContext]);
 
   const getPos = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
     const rect = canvas.getBoundingClientRect();
@@ -76,13 +75,6 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
     } else {
       clientX = (e as React.MouseEvent).clientX;
       clientY = (e as React.MouseEvent).clientY;
-    }
-
-    if (isPortrait && window.innerWidth < 640) {
-      // Mapeamento matemático para canvas rotacionado 90 graus no centro
-      const x = (clientY - rect.top) * (canvas.width / rect.height);
-      const y = (rect.right - clientX) * (canvas.height / rect.width);
-      return { x, y };
     }
 
     const scaleX = canvas.width / rect.width;
@@ -184,7 +176,27 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
       {isExpanded && (
         <div className="fixed inset-0 z-[1000] bg-slate-950 flex flex-col items-center justify-center animate-in fade-in duration-300 overflow-hidden">
           
-          {/* Botão de Fecho (X) - Fora da área de rotação para garantir visibilidade */}
+          {/* AVISO DE ROTAÇÃO PARA MOBILE/TABLET EM PORTRAIT */}
+          {isTouchDevice && isPortrait && (
+            <div className="fixed inset-0 z-[1200] bg-slate-950/95 backdrop-blur-2xl flex flex-col items-center justify-center p-10 text-center animate-in zoom-in-95 duration-500">
+               <div className="relative mb-8">
+                  <Smartphone size={80} className="text-white opacity-20" />
+                  <ScreenShare size={48} className="text-blue-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-bounce" />
+               </div>
+               <h3 className="text-xl font-black text-white uppercase tracking-tight mb-4">Rode o Dispositivo</h3>
+               <p className="text-slate-400 text-sm font-medium uppercase leading-relaxed max-w-xs mb-10">
+                 Para assinar com maior precisão e conforto, por favor coloque o seu telemóvel ou tablet na <span className="text-blue-400">horizontal</span>.
+               </p>
+               <button 
+                 onClick={() => setIsExpanded(false)}
+                 className="px-8 py-4 bg-white/10 text-slate-300 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 active:scale-95"
+               >
+                 CANCELAR
+               </button>
+            </div>
+          )}
+
+          {/* Botão de Fecho (X) */}
           <button 
             onClick={() => setIsExpanded(false)} 
             className="fixed top-4 right-4 z-[1100] p-4 bg-white/10 text-white rounded-full hover:bg-white/20 border border-white/10 transition-colors backdrop-blur-xl active:scale-90 shadow-2xl"
@@ -192,16 +204,10 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
             <X size={24} />
           </button>
           
-          <div ref={containerRef} className="relative w-full h-full flex items-center justify-center">
+          <div ref={containerRef} className="relative w-full h-full flex items-center justify-center p-4 sm:p-8">
             {/* White Pad Box */}
-            <div className={`
-              relative bg-white shadow-2xl transition-all duration-300 overflow-hidden flex items-center justify-center
-              ${isPortrait && window.innerWidth < 640 
-                ? 'w-[88vw] h-[92vh] rounded-[3rem]' 
-                : 'w-[95%] h-[90%] rounded-[2.5rem]'}
-            `}>
+            <div className="relative w-full h-full bg-white shadow-2xl transition-all duration-300 overflow-hidden flex items-center justify-center rounded-[2.5rem] sm:rounded-[3rem]">
               
-              {/* Canvas com rotação CSS se estiver em Portrait */}
               <canvas
                 ref={expandedCanvasRef}
                 onMouseDown={(e) => expandedCanvasRef.current && startDrawing(e, expandedCanvasRef.current)}
@@ -211,23 +217,11 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
                 onTouchStart={(e) => expandedCanvasRef.current && startDrawing(e, expandedCanvasRef.current)}
                 onTouchMove={(e) => expandedCanvasRef.current && draw(e, expandedCanvasRef.current)}
                 onTouchEnd={() => stopDrawing()}
-                style={isPortrait && window.innerWidth < 640 ? { 
-                  transform: 'rotate(90deg)', 
-                  transformOrigin: 'center',
-                  // Invertemos largura/altura no style para preencher o container pai que NÃO está rodado
-                  width: '92vh',
-                  height: '88vw' 
-                } : { width: '100%', height: '100%' }}
-                className="bg-[radial-gradient(#e5e7eb_2px,transparent_2px)] [background-size:32px_32px] cursor-crosshair block z-10"
+                className="bg-[radial-gradient(#e5e7eb_2px,transparent_2px)] [background-size:32px_32px] cursor-crosshair block z-10 w-full h-full"
               />
               
-              {/* Botões de Ação - Posicionamento Absoluto dentro do Pad */}
-              <div className={`
-                absolute flex gap-3 z-[20] 
-                ${isPortrait && window.innerWidth < 640 
-                  ? 'bottom-10 left-8 rotate-90 origin-bottom-left' 
-                  : 'bottom-8 right-8'}
-              `}>
+              {/* Botões de Ação */}
+              <div className="absolute bottom-8 right-8 flex gap-3 z-[20]">
                 <button 
                   type="button" 
                   onClick={handleClearExpanded} 
@@ -238,18 +232,16 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ label, onSave, onClea
                 <button 
                   type="button" 
                   onClick={confirmExpandedSignature} 
-                  className="bg-blue-600 text-white px-7 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 shadow-xl shadow-blue-500/30 active:scale-95 transition-all"
+                  className="bg-blue-600 text-white px-7 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
                 >
                   <Check size={16} /> CONFIRMAR
                 </button>
               </div>
 
-              {/* Texto de Marca d'água lateral (Apenas Mobile Portrait) */}
-              {isPortrait && window.innerWidth < 640 && (
-                <div className="absolute top-1/2 left-4 -translate-y-1/2 -rotate-90 pointer-events-none opacity-20 origin-left">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.5em] whitespace-nowrap">Área de Validação Real Frio</span>
-                </div>
-              )}
+              {/* Texto de Marca d'água lateral (Landscape) */}
+              <div className="absolute top-1/2 left-4 -translate-y-1/2 -rotate-90 pointer-events-none opacity-20 origin-left">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.5em] whitespace-nowrap">Área de Validação Digital Real Frio</span>
+              </div>
             </div>
           </div>
         </div>
