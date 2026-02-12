@@ -4,7 +4,8 @@ import {
   MapPin, Phone, Mail, User, HardDrive, History as HistoryIcon, 
   Edit2, X, Save, ArrowLeft, ChevronRight, ChevronDown,
   Plus, Building2, FileText, ExternalLink, Filter, Trash2, Eye,
-  Cloud, AlertTriangle, ShieldAlert, Calculator, Coins
+  Cloud, AlertTriangle, ShieldAlert, Calculator, Coins,
+  ChevronUp
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { Client, Establishment, Equipment, ServiceOrder, Quote, QuoteStatus } from '../types';
@@ -235,6 +236,9 @@ const ClientDetail: React.FC = () => {
     return history.filter(h => h.establishment_id === selectedEstIdHist);
   }, [history, selectedEstIdHist]);
 
+  const [expandedClient, setExpandedClient] = useState(false);
+  const [expandedEquip, setExpandedEquip] = useState(false);
+
   if (loading) return (
     <div className="h-full flex flex-col items-center justify-center p-20">
       <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -280,22 +284,26 @@ const ClientDetail: React.FC = () => {
       )}
 
       <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2 px-1">
-          <button onClick={() => navigate(-1)} className="p-3 text-slate-500 dark:text-slate-400 hover:text-blue-600 rounded-2xl transition-all bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm active:scale-95">
-            <ArrowLeft size={22} />
+        {/* CABEÇALHO ALINHADO CONFORME REFERÊNCIA VISUAL */}
+        <div className="flex items-stretch gap-3 px-1 mb-2">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="flex-shrink-0 flex items-center justify-center w-14 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:text-blue-600 rounded-[1.5rem] transition-all border border-gray-200 dark:border-slate-800 shadow-sm active:scale-95 active:bg-slate-50"
+          >
+            <ArrowLeft size={24} />
           </button>
-        </div>
 
-        {!isEditing && (
-          <div className="bg-white dark:bg-slate-900 shadow-xl rounded-[2rem] p-6 border border-gray-100 dark:border-slate-800 text-center animate-in fade-in duration-300 relative group transition-colors">
-            <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight">
-              {client.name}
-            </h1>
-            <p className="text-[8px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.4em] mt-1.5">
-              Sede Social | Loja: {client.store}
-            </p>
-          </div>
-        )}
+          {!isEditing && (
+            <div className="flex-1 bg-white dark:bg-slate-900 shadow-xl rounded-[2.5rem] p-6 border border-gray-100 dark:border-slate-800 text-center animate-in fade-in slide-in-from-right-4 duration-500 relative transition-colors flex flex-col justify-center">
+              <h1 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-tight">
+                {client.name}
+              </h1>
+              <p className="text-[8px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.4em] mt-1.5">
+                Sede Social | Loja: {client.store}
+              </p>
+            </div>
+          )}
+        </div>
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           
