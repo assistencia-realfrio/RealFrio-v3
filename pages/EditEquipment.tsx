@@ -19,6 +19,7 @@ const EditEquipment: React.FC = () => {
     type: '',
     brand: '',
     model: '',
+    pnc: '',
     serial_number: '',
     install_date: ''
   });
@@ -39,6 +40,7 @@ const EditEquipment: React.FC = () => {
           type: eq.type,
           brand: eq.brand || '',
           model: eq.model || '',
+          pnc: eq.pnc || '',
           serial_number: eq.serial_number || '',
           install_date: eq.install_date || ''
         });
@@ -71,6 +73,7 @@ const EditEquipment: React.FC = () => {
         type: formData.type.toUpperCase().trim(),
         brand: formData.brand.trim() ? formData.brand.toUpperCase().trim() : null,
         model: formData.model.trim() ? formData.model.toUpperCase().trim() : null,
+        pnc: formData.pnc.trim() ? formData.pnc.toUpperCase().trim() : null,
         serial_number: formData.serial_number.trim() ? formData.serial_number.toUpperCase().trim() : null,
         install_date: formData.install_date || null
       };
@@ -162,6 +165,11 @@ const EditEquipment: React.FC = () => {
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Modelo <span className="text-blue-500">(Recomendado)</span></label>
               <input type="text" name="model" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase" value={formData.model} onChange={handleChange} placeholder="---" />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">PNC (Product Number Code)</label>
+              <input type="text" name="pnc" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase" value={formData.pnc} onChange={handleChange} placeholder="Opcional" />
             </div>
 
             <div className="md:col-span-2">

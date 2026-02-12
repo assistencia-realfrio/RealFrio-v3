@@ -32,11 +32,14 @@ CREATE TABLE IF NOT EXISTS public.quote_items (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 3. Habilitar Row Level Security (RLS)
+-- 3. MIGRATION EQUIPAMENTOS: Adicionar campo PNC
+ALTER TABLE public.equipments ADD COLUMN IF NOT EXISTS pnc TEXT;
+
+-- 4. Habilitar Row Level Security (RLS)
 ALTER TABLE public.quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_items ENABLE ROW LEVEL SECURITY;
 
--- 4. Criar políticas de acesso (Acesso público para aceitação de propostas)
+-- 5. Criar políticas de acesso (Acesso público para aceitação de propostas)
 DO $$ 
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'quotes' AND policyname = 'Allow all operations for everyone') THEN

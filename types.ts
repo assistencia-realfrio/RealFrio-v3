@@ -75,6 +75,7 @@ export interface Equipment {
   type: string;
   brand?: string | null;
   model?: string | null;
+  pnc?: string | null;
   serial_number?: string | null;
   nameplate_url?: string | null;
   install_date?: string | null;

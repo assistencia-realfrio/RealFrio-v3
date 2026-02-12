@@ -26,7 +26,6 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ isOpen, title, message, c
       <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-200">
         <div className="p-8 text-center">
           <div className={`w-16 h-16 ${isDanger ? 'bg-red-50 text-red-500' : 'bg-orange-50 text-orange-500'} dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner`}>
-            {/* Fix: Added missing Info icon import from lucide-react */}
             {variant === 'danger' ? <ShieldAlert className="text-red-500" size={32} /> : variant === 'warning' ? <AlertTriangle className="text-orange-500" size={32} /> : <Info className="text-blue-500" size={32} />}
           </div>
           <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">{title}</h3>
@@ -134,10 +133,11 @@ const EquipmentDetail: React.FC = () => {
       equipment.type.toUpperCase(),
       (equipment.brand || '---').toUpperCase(),
       (equipment.model || '---').toUpperCase(),
+      (equipment.pnc || '---').toUpperCase(),
       (equipment.serial_number || '---').toUpperCase()
     ];
     
-    // Altura total: 1 linha de 8 + 4 linhas de 6 + 4 espaços
+    // Altura total: 1 linha de 8 + 5 linhas de 6 + 5 espaços
     const totalBlockHeight = fontSizeMain + (fontSizeOther * otherLines.length) + (lineSpacing * otherLines.length); 
     let currentY = (heightPX - totalBlockHeight) / 2 + (fontSizeMain * 0.85);
     
@@ -343,7 +343,7 @@ const EquipmentDetail: React.FC = () => {
                 </div>
                 <div className="p-4 flex items-center gap-4">
                    <div className="w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center flex-shrink-0"> <Tag size={20} /> </div>
-                   <div className="min-w-0 pr-4"> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Marca / Modelo</p> <p className="text-[13px] font-black text-slate-900 dark:text-slate-100 uppercase truncate">{equipment.brand} <span className="text-slate-300 dark:text-slate-700 mx-1 font-normal">|</span> {equipment.model || '---'}</p> </div>
+                   <div className="min-w-0 pr-4"> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Marca / Modelo / PNC</p> <p className="text-[13px] font-black text-slate-900 dark:text-white uppercase truncate">{equipment.brand} <span className="text-slate-300 dark:text-slate-700 mx-1 font-normal">|</span> {equipment.model || '---'} {equipment.pnc ? <span className="ml-1.5">({equipment.pnc})</span> : ''}</p> </div>
                 </div>
                 <div className="p-4 flex items-center gap-4">
                    <div className="w-11 h-11 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0"> <FileText size={20} /> </div>

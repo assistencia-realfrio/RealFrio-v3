@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -135,7 +134,8 @@ const NewServiceOrder: React.FC = () => {
     return equipments.filter(e => 
       normalizeString(e.type).includes(term) || 
       normalizeString(e.brand || '').includes(term) ||
-      normalizeString(e.serial_number || '').includes(term)
+      normalizeString(e.serial_number || '').includes(term) ||
+      normalizeString(e.pnc || '').includes(term)
     );
   }, [equipments, equipmentSearch]);
 
@@ -230,6 +230,7 @@ const NewServiceOrder: React.FC = () => {
     const sn = (data.get('serial_number') as string || '').toUpperCase().trim();
     const type = (data.get('type') as string).toUpperCase();
     const brand = (data.get('brand') as string || '').toUpperCase().trim();
+    const pnc = (data.get('pnc') as string || '').toUpperCase().trim();
     
     try {
       const payload: Partial<Equipment> = {
@@ -238,6 +239,7 @@ const NewServiceOrder: React.FC = () => {
         type: type,
         brand: brand || null,
         model: (data.get('model') as string || '').toUpperCase() || null,
+        pnc: pnc || null,
         serial_number: sn || null,
         install_date: new Date().toISOString().split('T')[0]
       };
@@ -388,7 +390,10 @@ const NewServiceOrder: React.FC = () => {
                         className="w-full text-left px-5 py-4 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border-b border-slate-50 dark:border-slate-800/50 last:border-0 transition-colors group"
                       >
                          <p className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{e.type} {e.brand ? `- ${e.brand}` : ''}</p>
-                         {e.serial_number && <p className="text-[10px] text-slate-400 font-black font-mono uppercase tracking-widest">SN: {e.serial_number}</p>}
+                         <div className="flex gap-3">
+                           {e.pnc && <p className="text-[9px] text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest">PNC: {e.pnc}</p>}
+                           {e.serial_number && <p className="text-[9px] text-slate-400 font-black font-mono uppercase tracking-widest">SN: {e.serial_number}</p>}
+                         </div>
                       </button>
                     ))
                   ) : (
@@ -521,6 +526,10 @@ const NewServiceOrder: React.FC = () => {
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Modelo <span className="text-blue-500">(Rec.)</span></label>
                         <input name="model" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 uppercase" placeholder="---" />
                       </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">PNC (Product Number Code)</label>
+                      <input name="pnc" className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 uppercase" placeholder="Opcional" />
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Número de Série (S/N) <span className="text-blue-500">(Rec.)</span></label>

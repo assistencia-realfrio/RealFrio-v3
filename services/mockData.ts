@@ -18,7 +18,7 @@ const cleanPayload = (data: any) => {
   delete cleaned.code;
 
   Object.keys(cleaned).forEach(key => {
-    if (cleaned[key] === '') {
+    if (cleaned[key] === '' || cleaned[key] === undefined) {
       cleaned[key] = null;
     }
   });
@@ -85,7 +85,6 @@ export const mockData = {
     const code = `ORC-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}-${Math.floor(1000 + Math.random() * 9000)}`;
     const payload = cleanPayload(quoteData);
     
-    // Garantir que a descrição não é nula para cumprir restrição NOT NULL da base de dados
     if (!payload.description || payload.description.trim() === '') {
       payload.description = 'ORÇAMENTO / PROPOSTA COMERCIAL';
     }
@@ -121,7 +120,6 @@ export const mockData = {
   updateQuote: async (id: string, quoteData: Partial<Quote>, items: Partial<QuoteItem>[]) => {
     const payload = cleanPayload(quoteData);
 
-    // Garantir que a descrição não é nula
     if (!payload.description || payload.description.trim() === '') {
       payload.description = 'ORÇAMENTO / PROPOSTA COMERCIAL';
     }
@@ -152,7 +150,6 @@ export const mockData = {
   },
 
   clientSignQuote: async (id: string, signature: string) => {
-    // CORREÇÃO: Definir estado como AGUARDA_VALIDACAO ao assinar
     const { data: quote, error } = await supabase
       .from('quotes')
       .update({ 
@@ -163,12 +160,8 @@ export const mockData = {
       .select('code, client_id')
       .single();
     
-    if (error) {
-      console.error("ERRO CRÍTICO SUPABASE (SIGNATURE):", error);
-      throw error;
-    }
+    if (error) throw error;
 
-    // Registar atividade automaticamente
     try {
       if (quote) {
         const { data: linkedOS } = await supabase
@@ -188,15 +181,12 @@ export const mockData = {
           }]);
         }
       }
-    } catch (e) {
-      console.warn("Log de atividade falhou (clientSignQuote).", e);
-    }
+    } catch (e) {}
 
     return true;
   },
 
   verifyQuote: async (id: string) => {
-    // Atualizar o estado para ACEITE (Finalizado e Validado)
     const { data: quote, error } = await supabase
       .from('quotes')
       .update({ status: QuoteStatus.ACEITE })
@@ -206,7 +196,6 @@ export const mockData = {
 
     if (error) throw error;
 
-    // Tentar encontrar uma OS vinculada para registar a atividade no log global
     try {
       const { data: linkedOS } = await supabase
         .from('service_orders')
@@ -225,9 +214,7 @@ export const mockData = {
           user_name: session?.full_name || 'Sistema'
         }]);
       }
-    } catch (e) {
-      console.warn("Log de atividade opcional falhou ou não existe OS vinculada.");
-    }
+    } catch (e) {}
 
     return true;
   },
@@ -307,7 +294,7 @@ export const mockData = {
     return data;
   },
   createEquipment: async (eq: Partial<Equipment>) => {
-    const { data, error } = await supabase.from('equipments').insert([eq]).select().single();
+    const { data, error } = await supabase.from('equipments').insert([cleanPayload(eq)]).select().single();
     if (error) throw error;
     return data;
   },
