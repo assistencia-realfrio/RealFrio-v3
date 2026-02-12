@@ -50,6 +50,8 @@ export const mockData = {
   },
   signOut: async () => {
     localStorage.removeItem(SESSION_KEY);
+    // Limpar flag de seleção de loja para forçar popup no próximo login
+    sessionStorage.removeItem('rf_store_selected_session');
     await supabase.auth.signOut();
   },
 
