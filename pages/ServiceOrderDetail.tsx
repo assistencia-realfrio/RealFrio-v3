@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+// Added Calculator and UploadCloud to lucide-react imports to fix "Cannot find name" errors
 import { 
   Camera, Save, Plus, Trash2, X, Package, 
   Download, ArrowLeft, CheckCircle2, 
@@ -10,9 +12,9 @@ import {
   User, ChevronRight, ChevronDown, ChevronUp, Calendar, RotateCcw,
   RefreshCw, Sparkle, Maximize2, ZoomIn, ZoomOut, AlertTriangle, FileText,
   RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
-  Settings2, FileDown, Key, Mail, Share2, UploadCloud, Play, Square as StopIcon, Timer, CloudRain,
-  Wrench, Snowflake, Printer, Check, Image as LucideImage, QrCode, ExternalLink, Calculator,
-  ThumbsUp, ThumbsDown, Coins
+  Settings2, FileDown, Key, Mail, ThumbsUp, ThumbsDown, ThumbsDown as CancelIcon, Play, Square as StopIcon, Timer, 
+  Wrench, Snowflake, Printer, Check, Image as LucideImage, QrCode,
+  Calculator, UploadCloud
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -108,12 +110,8 @@ const getStatusLabelText = (status: string) => {
     case OSStatus.INICIADA: return 'INICIADA';
     case OSStatus.PARA_ORCAMENTO: return 'PARA ORÇAMENTO';
     case OSStatus.ORCAMENTO_ENVIADO: return 'ORÇAMENTO ENVIADO';
-    case OSStatus.ORCAMENTO_ACEITE: return 'ORÇAMENTO ACEITE';
-    case OSStatus.ORCAMENTO_REJEITADO: return 'ORÇAMENTO REJEITADO';
     case OSStatus.AGUARDA_PECAS: return 'AGUARDA PEÇAS';
     case OSStatus.PECAS_RECEBIDAS: return 'PEÇAS RECEBIDAS';
-    /* Added case for AGUARDA_VALIDACAO status label */
-    case OSStatus.AGUARDA_VALIDACAO: return 'AGUARDA VALIDAÇÃO';
     case OSStatus.CONCLUIDA: return 'CONCLUÍDA';
     case OSStatus.CANCELADA: return 'CANCELADA';
     default: return status;
@@ -174,6 +172,10 @@ export const ServiceOrderDetail: React.FC = () => {
   const [showTimerTypeModal, setShowTimerTypeModal] = useState(false);
   const [showTagPreview, setShowTagPreview] = useState(false);
   
+  // Estados para cancelamento
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+
   const [tagPdfUrl, setTagPdfUrl] = useState<string | null>(null);
   const [partToDelete, setPartToDelete] = useState<PartUsed | null>(null);
   const [partToEditQuantity, setPartToEditQuantity] = useState<PartUsed | null>(null);
@@ -392,6 +394,12 @@ export const ServiceOrderDetail: React.FC = () => {
   const handleUpdateStatus = async (newStatus: OSStatus) => {
     if (!id || !os) return;
     if (newStatus === OSStatus.CONCLUIDA && missingFields.length > 0) { setShowValidationErrorModal(true); setShowValidationErrors(true); setActiveTab('finalizar'); return; }
+    
+    if (newStatus === OSStatus.CANCELADA) {
+      setShowCancelModal(true);
+      return;
+    }
+
     setActionLoading(true);
     try {
       const oldStatusLabel = getStatusLabelText(os.status).toUpperCase();
@@ -400,6 +408,36 @@ export const ServiceOrderDetail: React.FC = () => {
       await mockData.addOSActivity(id, { description: `ALTEROU ESTADO: DE ${oldStatusLabel} PARA ${newStatusLabel}` });
       fetchOSDetails(false);
     } catch (e: any) { setErrorMessage("ERRO AO ATUALIZAR ESTADO."); } finally { setActionLoading(false); }
+  };
+
+  const handleConfirmCancellation = async () => {
+    if (!id || !os || !cancelReason.trim()) return;
+    setActionLoading(true);
+    setShowCancelModal(false);
+    try {
+      const session = mockData.getSession();
+      const reasonText = cancelReason.trim().toUpperCase();
+      
+      // 1. Atualizar Estado da OS
+      await mockData.updateServiceOrder(id, { status: OSStatus.CANCELADA });
+      
+      // 2. Registar Nota Interna com o motivo
+      await mockData.addOSNote(id, { 
+        content: `OS CANCELADA POR ${session?.full_name?.toUpperCase()}. MOTIVO: ${reasonText}` 
+      });
+
+      // 3. Registar Atividade
+      await mockData.addOSActivity(id, { 
+        description: `CANCELOU A ORDEM DE SERVIÇO. MOTIVO: ${reasonText}` 
+      });
+
+      setCancelReason('');
+      fetchOSDetails(true);
+    } catch (e: any) { 
+      setErrorMessage("ERRO AO CANCELAR ORDEM DE SERVIÇO."); 
+    } finally { 
+      setActionLoading(false); 
+    }
   };
 
   const handleSaveData = async () => {
@@ -782,7 +820,7 @@ export const ServiceOrderDetail: React.FC = () => {
         {activeTab === 'info' && (
           <div className="space-y-3">
             {/* CARD DE ORÇAMENTO NO TOPO DA FICHA */}
-            {quoteTotals.hasValues && (os?.status === OSStatus.PARA_ORCAMENTO || os?.status === OSStatus.ORCAMENTO_ENVIADO || os?.status === OSStatus.ORCAMENTO_ACEITE || os?.status === OSStatus.ORCAMENTO_REJEITADO) && (
+            {quoteTotals.hasValues && (os?.status === OSStatus.PARA_ORCAMENTO || os?.status === OSStatus.ORCAMENTO_ENVIADO) && (
               <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-100 dark:border-blue-900/40 p-6 animate-in zoom-in-95 duration-500 overflow-hidden relative group">
                 <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
                   <Calculator size={80} className="text-blue-600" />
@@ -808,15 +846,13 @@ export const ServiceOrderDetail: React.FC = () => {
                 {/* Ações de Estado e Limpeza */}
                 <div className="grid grid-cols-12 gap-2">
                   <button 
-                    onClick={() => handleUpdateStatus(OSStatus.ORCAMENTO_ACEITE)}
-                    disabled={os.status === OSStatus.ORCAMENTO_ACEITE}
+                    onClick={() => handleUpdateStatus(OSStatus.AGUARDA_PECAS)}
                     className="col-span-5 flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md active:scale-95 disabled:opacity-50"
                   >
                     <ThumbsUp size={14} /> Aceite
                   </button>
                   <button 
-                    onClick={() => handleUpdateStatus(OSStatus.ORCAMENTO_REJEITADO)}
-                    disabled={os.status === OSStatus.ORCAMENTO_REJEITADO}
+                    onClick={() => handleUpdateStatus(OSStatus.POR_INICIAR)}
                     className="col-span-5 flex items-center justify-center gap-2 py-3 bg-rose-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-md active:scale-95 disabled:opacity-50"
                   >
                     <ThumbsDown size={14} /> Rejeitado
@@ -889,7 +925,7 @@ export const ServiceOrderDetail: React.FC = () => {
                             <button 
                               onClick={handleStopTimer}
                               disabled={actionLoading}
-                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-900/40 animate-in zoom-in-95 disabled:opacity-50"
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-blue-900/40 animate-in zoom-in-95 disabled:opacity-50"
                             >
                                {actionLoading ? <RefreshCw className="animate-spin" size={14} /> : <StopIcon size={14} fill="currentColor" />} PARAR
                             </button>
@@ -1092,8 +1128,8 @@ export const ServiceOrderDetail: React.FC = () => {
                 <div className="flex items-center gap-3 mb-6"><MessageSquare size={18} className="text-blue-500" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Notas Internas</h3></div>
                 <div className="flex-1 space-y-4 overflow-y-auto max-h-[500px] no-scrollbar mb-6">
                    {notesList.length === 0 ? <div className="h-full flex flex-col items-center justify-center opacity-30 py-20 text-slate-400"><MessageSquare size={32} className="mb-2" /><p className="text-[10px] font-black uppercase tracking-widest">Sem mensagens.</p></div> : notesList.map((note) => (
-                       <div key={note.id} className={`flex flex-col ${note.user_id === 'current' ? 'items-end' : 'items-start'}`}>
-                          <div className={`max-w-[85%] p-4 rounded-3xl text-sm font-medium ${note.user_id === 'current' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-tl-none'}`}><p className="leading-relaxed">{note.content}</p></div>
+                       <div key={note.id} className={`flex flex-col ${note.user_id === 'current' || note.user_name === mockData.getSession()?.full_name ? 'items-end' : 'items-start'}`}>
+                          <div className={`max-w-[85%] p-4 rounded-3xl text-sm font-medium ${note.user_id === 'current' || note.user_name === mockData.getSession()?.full_name ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-tl-none'}`}><p className="leading-relaxed">{note.content}</p></div>
                           <div className="flex items-center gap-2 mt-1.5 px-2 text-[8px] font-black text-slate-400 uppercase"><span>{note.user_name}</span><span className="text-[7px] text-slate-300 dark:text-slate-600">•</span><span>{new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
                        </div>
                     ))}
@@ -1404,6 +1440,50 @@ export const ServiceOrderDetail: React.FC = () => {
                  <div className="grid grid-cols-2 gap-3">
                     <button onClick={() => setShowFinalizeModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">VOLTAR</button>
                     <button onClick={async () => { setShowFinalizeModal(false); await handleUpdateStatus(OSStatus.CONCLUIDA); }} className="py-4 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">CONCLUIR AGORA</button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL CANCELAMENTO OBRIGATÓRIO */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-white/5">
+              <div className="p-8 text-center">
+                 <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                    <CancelIcon size={40}/>
+                 </div>
+                 <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Motivo do Cancelamento</h3>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4 tracking-widest">
+                    Para cancelar esta OS, deve obrigatoriamente indicar o motivo. Este será registado nas notas.
+                 </p>
+                 
+                 <div className="mb-8">
+                    <textarea 
+                      autoFocus
+                      required
+                      placeholder="EX: CLIENTE DESISTIU DA REPARAÇÃO..."
+                      className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-xs font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-red-500/10 transition-all min-h-[120px] resize-none"
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                    />
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      onClick={() => { setShowCancelModal(false); setCancelReason(''); }} 
+                      className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all"
+                    >
+                      ABORTAR
+                    </button>
+                    <button 
+                      onClick={handleConfirmCancellation}
+                      disabled={!cancelReason.trim() || actionLoading}
+                      className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-red-500/20 active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      {actionLoading ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'CONFIRMAR CANCELAMENTO'}
+                    </button>
                  </div>
               </div>
            </div>

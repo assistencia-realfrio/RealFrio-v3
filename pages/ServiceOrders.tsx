@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { HardDrive, Filter, MapPin, ChevronDown, RefreshCw, Calendar, LayoutList, StretchHorizontal, ShieldAlert, X, Timer } from 'lucide-react';
+import { HardDrive, Filter, MapPin, ChevronDown, RefreshCw, Calendar, LayoutList, StretchHorizontal, ShieldAlert, X, Timer, ThumbsDown as CancelIcon, Loader2 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { ServiceOrder, OSStatus } from '../types';
 import { useStore } from '../contexts/StoreContext';
@@ -12,13 +12,10 @@ const STATUS_ORDER_WEIGHT: Record<string, number> = {
   [OSStatus.INICIADA]: 1,
   [OSStatus.PARA_ORCAMENTO]: 2,
   [OSStatus.ORCAMENTO_ENVIADO]: 3,
-  [OSStatus.ORCAMENTO_ACEITE]: 3.5,
-  [OSStatus.ORCAMENTO_REJEITADO]: 7,
   [OSStatus.AGUARDA_PECAS]: 4,
   [OSStatus.PECAS_RECEBIDAS]: 5,
-  [OSStatus.AGUARDA_VALIDACAO]: 5.5,
   [OSStatus.CONCLUIDA]: 6,
-  [OSStatus.CANCELADA]: 8,
+  [OSStatus.CANCELADA]: 7,
 };
 
 const getStatusLabelText = (status: string) => {
@@ -27,11 +24,8 @@ const getStatusLabelText = (status: string) => {
     case OSStatus.INICIADA: return 'Iniciada';
     case OSStatus.PARA_ORCAMENTO: return 'Para Orçamento';
     case OSStatus.ORCAMENTO_ENVIADO: return 'Orçamento Enviado';
-    case OSStatus.ORCAMENTO_ACEITE: return 'Orçamento Aceite';
-    case OSStatus.ORCAMENTO_REJEITADO: return 'Orçamento Rejeitado';
     case OSStatus.AGUARDA_PECAS: return 'Aguarda Peças';
     case OSStatus.PECAS_RECEBIDAS: return 'Peças Recebidas';
-    case OSStatus.AGUARDA_VALIDACAO: return 'Aguarda Validação';
     case OSStatus.CONCLUIDA: return 'Concluída';
     case OSStatus.CANCELADA: return 'Cancelada';
     default: return status;
@@ -47,6 +41,14 @@ const ServiceOrders: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   
+  // Estados para validação e cancelamento
+  const [showValidationErrorModal, setShowValidationErrorModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [osToCancel, setOsToCancel] = useState<string | null>(null);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [osIdToValidate, setOsIdToValidate] = useState<string | null>(null);
+
   // Inicializar filtro de estado a partir da URL se disponível
   const [statusFilter, setStatusFilter] = useState<OSStatus | 'all'>(() => {
     const params = new URLSearchParams(location.search);
@@ -58,9 +60,6 @@ const ServiceOrders: React.FC = () => {
   });
 
   const [viewMode, setViewMode] = useState<'compact' | 'complete'>('compact');
-  const [showValidationErrorModal, setShowValidationErrorModal] = useState(false);
-  const [missingFields, setMissingFields] = useState<string[]>([]);
-  const [osIdToValidate, setOsIdToValidate] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -121,6 +120,12 @@ const ServiceOrders: React.FC = () => {
       }
     }
 
+    if (newStatus === OSStatus.CANCELADA) {
+      setOsToCancel(osId);
+      setShowCancelModal(true);
+      return;
+    }
+
     setUpdatingId(osId);
     try {
       await mockData.updateServiceOrder(osId, { status: newStatus });
@@ -130,6 +135,38 @@ const ServiceOrders: React.FC = () => {
       setAllOrders(prev => prev.map(os => os.id === osId ? { ...os, status: newStatus } : os));
     } catch (error) {
       console.error('Erro ao atualizar estado:', error);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleConfirmCancellation = async () => {
+    if (!osToCancel || !cancelReason.trim()) return;
+    setUpdatingId(osToCancel);
+    setShowCancelModal(false);
+    try {
+      const session = mockData.getSession();
+      const reasonText = cancelReason.trim().toUpperCase();
+      
+      // 1. Atualizar Estado
+      await mockData.updateServiceOrder(osToCancel, { status: OSStatus.CANCELADA });
+      
+      // 2. Nota Interna
+      await mockData.addOSNote(osToCancel, { 
+        content: `OS CANCELADA POR ${session?.full_name?.toUpperCase()}. MOTIVO: ${reasonText}` 
+      });
+
+      // 3. Atividade
+      await mockData.addOSActivity(osToCancel, { 
+        description: `CANCELOU A ORDEM DE SERVIÇO. MOTIVO: ${reasonText}` 
+      });
+
+      setAllOrders(prev => prev.map(os => os.id === osToCancel ? { ...os, status: OSStatus.CANCELADA } : os));
+      setCancelReason('');
+      setOsToCancel(null);
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao processar cancelamento.");
     } finally {
       setUpdatingId(null);
     }
@@ -413,6 +450,50 @@ const ServiceOrders: React.FC = () => {
                  >
                     ENTENDIDO, VOU PREENCHER
                  </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL CANCELAMENTO OBRIGATÓRIO (LISTAGEM) */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-300" onClick={(e) => e.stopPropagation()}>
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-white/5">
+              <div className="p-8 text-center">
+                 <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                    <CancelIcon size={40}/>
+                 </div>
+                 <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Motivo do Cancelamento</h3>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4 tracking-widest">
+                    Para cancelar esta OS, deve obrigatoriamente indicar o motivo.
+                 </p>
+                 
+                 <div className="mb-8">
+                    <textarea 
+                      autoFocus
+                      required
+                      placeholder="EX: CLIENTE DESISTIU DA REPARAÇÃO..."
+                      className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-xs font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-red-500/10 transition-all min-h-[120px] resize-none"
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                    />
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      onClick={() => { setShowCancelModal(false); setCancelReason(''); setOsToCancel(null); }} 
+                      className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all"
+                    >
+                      ABORTAR
+                    </button>
+                    <button 
+                      onClick={handleConfirmCancellation}
+                      disabled={!cancelReason.trim() || updatingId !== null}
+                      className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl shadow-red-500/20 active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      {updatingId ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'CANCELAR OS'}
+                    </button>
+                 </div>
               </div>
            </div>
         </div>

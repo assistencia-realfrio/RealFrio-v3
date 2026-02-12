@@ -10,11 +10,8 @@ export enum OSStatus {
   INICIADA = 'iniciada',
   PARA_ORCAMENTO = 'para_orcamento',
   ORCAMENTO_ENVIADO = 'orcamento_enviado',
-  ORCAMENTO_ACEITE = 'orcamento_aceite',
-  ORCAMENTO_REJEITADO = 'orcamento_rejeitado',
-  AGUARDA_PECAS = 'aguarda_pecas',
+  AGUARDA_PECAS = 'aguarda_cas',
   PECAS_RECEBIDAS = 'pecas_recebidas',
-  AGUARDA_VALIDACAO = 'aguarda_validacao',
   CONCLUIDA = 'concluida',
   CANCELADA = 'cancelada'
 }

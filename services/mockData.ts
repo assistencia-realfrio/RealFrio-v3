@@ -1,3 +1,4 @@
+
 import { supabase } from '../supabaseClient';
 import { 
   Client, Establishment, Equipment, ServiceOrder, OSStatus, OSType, 
@@ -24,6 +25,23 @@ const cleanPayload = (data: any) => {
   });
 
   return cleaned;
+};
+
+// Helper para formatar o ID com base na loja e timestamp
+const generateSmartCode = (prefix: string, storeName: string) => {
+  const now = new Date();
+  const storeMap: Record<string, string> = {
+    'Caldas da Rainha': 'CR',
+    'Porto de Mós': 'PM'
+  };
+  
+  const sPrefix = storeMap[storeName] || 'OS';
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  
+  const dateStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+  const timeStr = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  
+  return prefix ? `${sPrefix}-${prefix}-${dateStr}-${timeStr}` : `${sPrefix}-${dateStr}-${timeStr}`;
 };
 
 export const mockData = {
@@ -83,8 +101,7 @@ export const mockData = {
   },
 
   createQuote: async (quoteData: Partial<Quote>, items: Partial<QuoteItem>[]) => {
-    const now = new Date();
-    const code = `ORC-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const code = generateSmartCode('ORC', quoteData.store || 'Todas');
     const payload = cleanPayload(quoteData);
     
     if (!payload.description || payload.description.trim() === '') {
@@ -170,7 +187,7 @@ export const mockData = {
           .from('service_orders')
           .select('id')
           .eq('client_id', quote.client_id)
-          .or(`status.eq.${OSStatus.PARA_ORCAMENTO},status.eq.${OSStatus.ORCAMENTO_ENVIADO},status.eq.${OSStatus.ORCAMENTO_ACEITE}`)
+          .or(`status.eq.${OSStatus.PARA_ORCAMENTO},status.eq.${OSStatus.ORCAMENTO_ENVIADO}`)
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
@@ -178,7 +195,7 @@ export const mockData = {
         if (linkedOS) {
           await supabase.from('os_activities').insert([{
             os_id: linkedOS.id,
-            description: `ORÇAMENTO ${quote.code} ASSINADO PELO CLIENTE (AGUARDA VALIDAÇÃO)`,
+            description: `ORÇAMENTO ${quote.code} ASSINADO PELO CLIENTE (AGUARDA VALIDAÇÃO NO SISTEMA DE COTAÇÕES)`,
             user_name: 'CLIENTE (WEB)'
           }]);
         }
@@ -203,7 +220,7 @@ export const mockData = {
         .from('service_orders')
         .select('id')
         .eq('client_id', quote.client_id)
-        .or(`status.eq.${OSStatus.PARA_ORCAMENTO},status.eq.${OSStatus.ORCAMENTO_ENVIADO},status.eq.${OSStatus.ORCAMENTO_ACEITE}`)
+        .or(`status.eq.${OSStatus.PARA_ORCAMENTO},status.eq.${OSStatus.ORCAMENTO_ENVIADO}`)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -212,7 +229,7 @@ export const mockData = {
         const session = mockData.getSession();
         await supabase.from('os_activities').insert([{
           os_id: linkedOS.id,
-          description: `ORÇAMENTO ${quote.code} VALIDADO PELO BACKOFFICE`,
+          description: `ORÇAMENTO ${quote.code} VALIDADO PELO BACKOFFICE (SISTEMA COTAÇÕES)`,
           user_name: session?.full_name || 'Sistema'
         }]);
       }
@@ -328,8 +345,7 @@ export const mockData = {
     return data;
   },
   createServiceOrder: async (os: Partial<ServiceOrder>) => {
-    const now = new Date();
-    const code = `OS-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const code = generateSmartCode('', os.store || 'Todas');
     const { data, error } = await supabase.from('service_orders').insert([{ ...os, code }]).select().single();
     if (error) throw error;
     return data;
