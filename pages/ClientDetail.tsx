@@ -236,9 +236,6 @@ const ClientDetail: React.FC = () => {
     return history.filter(h => h.establishment_id === selectedEstIdHist);
   }, [history, selectedEstIdHist]);
 
-  const [expandedClient, setExpandedClient] = useState(false);
-  const [expandedEquip, setExpandedEquip] = useState(false);
-
   if (loading) return (
     <div className="h-full flex flex-col items-center justify-center p-20">
       <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -284,7 +281,7 @@ const ClientDetail: React.FC = () => {
       )}
 
       <div className="space-y-4">
-        {/* CABEÇALHO ALINHADO CONFORME REFERÊNCIA VISUAL */}
+        {/* CABEÇALHO */}
         <div className="flex items-stretch gap-3 px-1 mb-2">
           <button 
             onClick={() => navigate(-1)} 
@@ -453,9 +450,10 @@ const ClientDetail: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mx-1 pb-10">
+              {/* Grelha de Ativos Otimizada: Mais colunas e cartões compactos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mx-1 pb-10">
                 {filteredEquipments.length === 0 ? (
-                  <div className="sm:col-span-2 text-center py-12 bg-white dark:bg-slate-900 rounded-3xl border-2 border-dashed border-gray-100 dark:border-slate-800">
+                  <div className="sm:col-span-2 lg:col-span-3 text-center py-12 bg-white dark:bg-slate-900 rounded-3xl border-2 border-dashed border-gray-100 dark:border-slate-800">
                     <p className="text-gray-400 font-black text-[9px] uppercase tracking-widest">Nenhum ativo encontrado para este local</p>
                   </div>
                 ) : (
@@ -463,24 +461,27 @@ const ClientDetail: React.FC = () => {
                     <div 
                       key={eq.id} 
                       onClick={() => navigate(`/equipments/${eq.id}`)}
-                      className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl p-5 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 transition-all group relative overflow-hidden cursor-pointer active:scale-[0.98]"
+                      className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl p-4 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 transition-all group relative overflow-hidden cursor-pointer active:scale-[0.98]"
                     >
-                      <div className="space-y-1.5">
-                        <div className="flex items-baseline text-slate-900 dark:text-white uppercase gap-2">
-                          <span className="text-[9px] font-bold text-slate-300 dark:text-slate-600 w-11 flex-shrink-0">EQUIP.:</span> 
-                          <span className="text-base font-black tracking-tight leading-tight group-hover:text-blue-600 transition-colors">{eq.type}</span>
+                      <div className="space-y-1">
+                        <div className="flex items-baseline text-slate-900 dark:text-white uppercase gap-2 mb-1 border-b border-slate-50 dark:border-slate-800/50 pb-1">
+                          <span className="text-[8px] font-black text-slate-300 dark:text-slate-600 w-10 flex-shrink-0">EQUIP:</span> 
+                          <span className="text-[13px] font-black tracking-tight leading-tight group-hover:text-blue-600 transition-colors truncate">{eq.type}</span>
                         </div>
                         <div className="flex items-baseline text-slate-900 dark:text-white uppercase gap-2">
-                          <span className="text-[9px] font-bold text-slate-300 dark:text-slate-600 w-11 flex-shrink-0">MARCA:</span> 
-                          <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{eq.brand}</span>
+                          <span className="text-[8px] font-black text-slate-300 dark:text-slate-600 w-10 flex-shrink-0">MARCA:</span> 
+                          <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 truncate">{eq.brand || '---'}</span>
                         </div>
                         <div className="flex items-baseline text-slate-900 dark:text-white uppercase gap-2">
-                          <span className="text-[9px] font-bold text-slate-300 dark:text-slate-600 w-11 flex-shrink-0">MODELO:</span> 
-                          <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{eq.model || '---'}</span>
+                          <span className="text-[8px] font-black text-slate-300 dark:text-slate-600 w-10 flex-shrink-0">MODELO:</span> 
+                          <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 truncate">
+                            {eq.model || '---'} 
+                            {eq.pnc && <span className="text-slate-400 dark:text-slate-500 ml-1 font-medium">({eq.pnc})</span>}
+                          </span>
                         </div>
                         <div className="flex items-baseline text-slate-900 dark:text-white uppercase gap-2">
-                          <span className="text-[9px] font-bold text-slate-300 dark:text-slate-600 w-11 flex-shrink-0">S/N:</span> 
-                          <span className="text-xs font-bold text-slate-600 dark:text-slate-400 font-mono tracking-tighter">{eq.serial_number}</span>
+                          <span className="text-[8px] font-black text-slate-300 dark:text-slate-600 w-10 flex-shrink-0">S/N:</span> 
+                          <span className="text-[11px] font-black text-slate-600 dark:text-slate-400 font-mono tracking-tighter truncate">{eq.serial_number || '---'}</span>
                         </div>
                       </div>
                     </div>
@@ -688,6 +689,7 @@ const ClientDetail: React.FC = () => {
                  </h3>
                  <button onClick={() => setShowModalEst(false)} className="text-gray-400 hover:text-gray-600 p-2"><X size={24}/></button>
               </div>
+              {/* Fix: Applied correct function name handleSubmitEstablishment */}
               <form onSubmit={handleSubmitEstablishment} className="p-8 space-y-4">
                  <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Nome do Local (Ex: Loja Porto)</label>
