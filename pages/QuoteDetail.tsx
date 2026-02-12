@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Building2, MapPin, HardDrive, Printer, Loader2, 
   Edit2, Trash2, ShieldAlert, ExternalLink, ThumbsUp, ThumbsDown,
-  ChevronDown, ChevronUp, CheckCircle2, ShieldCheck, Sparkles, Check
+  ChevronDown, ChevronUp, CheckCircle2, ShieldCheck, Sparkles, Check,
+  Mail
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { Quote, QuoteStatus } from '../types';
@@ -58,18 +60,13 @@ const QuoteDetail: React.FC = () => {
     if (!id) return;
     setActionLoading(true);
     try {
-      // 1. Persistir na base de dados
       await mockData.verifyQuote(id);
-      
-      // 2. Atualizar estado local imediatamente para esconder o banner e mostrar o badge
       setQuote(prev => prev ? { ...prev, status: QuoteStatus.ACEITE } : null);
-      
-      // 3. Feedback visual
       setShowSuccessToast(true);
       setTimeout(() => setShowSuccessToast(false), 3000);
     } catch (err) {
       console.error("Erro na verificação:", err);
-      alert("Erro ao validar orçamento. Verifique a sua ligação.");
+      alert("Erro ao validar orçamento.");
     } finally {
       setActionLoading(false);
     }
@@ -97,116 +94,147 @@ const QuoteDetail: React.FC = () => {
     return `${baseUrl}/#/proposal/${id}`;
   };
 
+  const generatePDFBlob = async () => {
+    if (!quote) return null;
+    const publicUrl = getPublicLink();
+    
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 20; 
+    const brandColor = [157, 28, 36];
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(brandColor[0], brandColor[1], brandColor[2]);
+    doc.text("REAL FRIO, LDA", margin, 20);
+    
+    doc.setFontSize(8);
+    doc.setTextColor(80, 80, 80);
+    doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", margin, 25);
+
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`ORÇAMENTO: ${quote.code}`, pageWidth - margin, 20, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.text(`Data: ${new Date(quote.created_at).toLocaleDateString('pt-PT')}`, pageWidth - margin, 25, { align: "right" });
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, 30, pageWidth - margin, 30);
+
+    let currentY = 42;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("DADOS DO CLIENTE", margin, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text((quote.client?.name || "---").toUpperCase(), margin, currentY + 7);
+    doc.setFontSize(8);
+    doc.text(`Local: ${quote.establishment?.name || 'SEDE / PRINCIPAL'}`, margin, currentY + 14);
+
+    const col2X = pageWidth / 2 + 10;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("EQUIPAMENTO / ATIVO", col2X, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text((quote.equipment?.type || "NÃO ESPECIFICADO").toUpperCase(), col2X, currentY + 7);
+    doc.setFontSize(8);
+    doc.text(`Marca/Mod: ${quote.equipment?.brand || '---'} / ${quote.equipment?.model || '---'}`, col2X, currentY + 12);
+    doc.text(`Nº Série: ${quote.equipment?.serial_number || '---'}`, col2X, currentY + 17);
+
+    currentY += 32;
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    const introText = "Depois de examinadas todas as peças, detetadas as respetivas avarias, resultou o orçamento para reparação das suas máquinas que importa em:";
+    const splitIntro = doc.splitTextToSize(introText, pageWidth - (margin * 2));
+    doc.text(splitIntro, margin, currentY);
+
+    currentY += 15;
+    const tableBody = (quote.items || []).map(i => [
+      i.reference || '---',
+      i.name.toUpperCase(),
+      `${i.quantity} UN`,
+      `${i.unit_price.toFixed(2)} €`,
+      `${(i.quantity * i.unit_price).toFixed(2)} €`
+    ]);
+
+    autoTable(doc, {
+      startY: currentY,
+      margin: { left: margin, right: margin },
+      head: [['REF', 'DESIGNAÇÃO', 'QTD', 'P. UNIT (LÍQUIDO)', 'TOTAL (LÍQUIDO)']],
+      body: tableBody,
+      theme: 'grid',
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+      styles: { fontSize: 8, cellPadding: 3 },
+      columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right', fontStyle: 'bold' } }
+    });
+
+    let finalY = (doc as any).lastAutoTable.finalY + 10;
+    const subtotal = quote.items?.reduce((acc, i) => acc + (i.quantity * i.unit_price), 0) || 0;
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text("TOTAL (VALOR LÍQUIDO):", pageWidth - margin - 65, finalY, { align: "right" });
+    doc.text(`${subtotal.toFixed(2)} €`, pageWidth - margin, finalY, { align: "right" });
+    
+    doc.setFontSize(9);
+    doc.setTextColor(brandColor[0], brandColor[1], brandColor[2]);
+    doc.text("* Aos valores apresentados acresce o IVA de 23%.", pageWidth - margin, finalY + 8, { align: "right" });
+
+    finalY += 22;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(60, 60, 60);
+    const disclaimerText = "Mais referimos que o presente orçamento serve apenas para estimativa, podendo ter uma variação, para mais ou para menos, no máximo de 10%. Para qualquer esclarecimento suplementar, utilize os contactos habituais. Pedimos-lhe que nos envie a resposta com a brevidade possível. Decorridos 30 dias, caso nos responda por escrito, consideramos este orçamento sem efeito.";
+    const splitDisclaimer = doc.splitTextToSize(disclaimerText, pageWidth - (margin * 2));
+    doc.text(splitDisclaimer, margin, finalY);
+
+    finalY += 25;
+    const qrDataUrl = await QRCode.toDataURL(publicUrl, { margin: 1, width: 100 });
+    doc.addImage(qrDataUrl, 'PNG', margin, finalY, 30, 30);
+    
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Digitalize para Aprovação Online", margin + 32, finalY + 12);
+    doc.setFontSize(6);
+    doc.text(publicUrl, margin + 32, finalY + 18, { maxWidth: 100 });
+
+    return doc;
+  };
+
   const generatePDF = async () => {
     if (!quote) return;
-    const publicUrl = getPublicLink();
     setIsExportingPDF(true); 
-    
     try {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.width;
-      const margin = 20; 
-      const brandColor = [157, 28, 36];
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.setTextColor(brandColor[0], brandColor[1], brandColor[2]);
-      doc.text("REAL FRIO, LDA", margin, 20);
-      
-      doc.setFontSize(8);
-      doc.setTextColor(80, 80, 80);
-      doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", margin, 25);
-
-      doc.setFontSize(10);
-      doc.setTextColor(0, 0, 0);
-      doc.text(`ORÇAMENTO: ${quote.code}`, pageWidth - margin, 20, { align: "right" });
-      doc.setFont("helvetica", "normal");
-      doc.text(`Data: ${new Date(quote.created_at).toLocaleDateString('pt-PT')}`, pageWidth - margin, 25, { align: "right" });
-
-      doc.setDrawColor(200, 200, 200);
-      doc.line(margin, 30, pageWidth - margin, 30);
-
-      let currentY = 42;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text("DADOS DO CLIENTE", margin, currentY);
-      doc.setFont("helvetica", "normal");
-      doc.text((quote.client?.name || "---").toUpperCase(), margin, currentY + 7);
-      doc.setFontSize(8);
-      doc.text(`Local: ${quote.establishment?.name || 'SEDE / PRINCIPAL'}`, margin, currentY + 14);
-
-      const col2X = pageWidth / 2 + 10;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text("EQUIPAMENTO / ATIVO", col2X, currentY);
-      doc.setFont("helvetica", "normal");
-      doc.text((quote.equipment?.type || "NÃO ESPECIFICADO").toUpperCase(), col2X, currentY + 7);
-      doc.setFontSize(8);
-      doc.text(`Marca/Mod: ${quote.equipment?.brand || '---'} / ${quote.equipment?.model || '---'}`, col2X, currentY + 12);
-      doc.text(`Nº Série: ${quote.equipment?.serial_number || '---'}`, col2X, currentY + 17);
-
-      currentY += 32;
-      doc.setFontSize(10);
-      doc.setTextColor(0, 0, 0);
-      const introText = "Depois de examinadas todas as peças, detetadas as respetivas avarias, resultou o orçamento para reparação das suas máquinas que importa em:";
-      const splitIntro = doc.splitTextToSize(introText, pageWidth - (margin * 2));
-      doc.text(splitIntro, margin, currentY);
-
-      currentY += 15;
-      const tableBody = (quote.items || []).map(i => [
-        i.reference || '---',
-        i.name.toUpperCase(),
-        `${i.quantity} UN`,
-        `${i.unit_price.toFixed(2)} €`,
-        `${(i.quantity * i.unit_price).toFixed(2)} €`
-      ]);
-
-      autoTable(doc, {
-        startY: currentY,
-        margin: { left: margin, right: margin },
-        head: [['REF', 'DESIGNAÇÃO', 'QTD', 'P. UNIT (LÍQUIDO)', 'TOTAL (LÍQUIDO)']],
-        body: tableBody,
-        theme: 'grid',
-        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
-        styles: { fontSize: 8, cellPadding: 3 },
-        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right', fontStyle: 'bold' } }
-      });
-
-      let finalY = (doc as any).lastAutoTable.finalY + 10;
-      const subtotal = quote.items?.reduce((acc, i) => acc + (i.quantity * i.unit_price), 0) || 0;
-      
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
-      doc.text("TOTAL (VALOR LÍQUIDO):", pageWidth - margin - 65, finalY, { align: "right" });
-      doc.text(`${subtotal.toFixed(2)} €`, pageWidth - margin, finalY, { align: "right" });
-      
-      doc.setFontSize(9);
-      doc.setTextColor(brandColor[0], brandColor[1], brandColor[2]);
-      doc.text("* Aos valores apresentados acresce o IVA de 23%.", pageWidth - margin, finalY + 8, { align: "right" });
-
-      finalY += 22;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8.5);
-      doc.setTextColor(60, 60, 60);
-      const disclaimerText = "Mais referimos que o presente orçamento serve apenas para estimativa, podendo ter uma variação, para mais ou para menos, no máximo de 10%. Para qualquer esclarecimento suplementar, utilize os contactos habituais. Pedimos-lhe que nos envie a resposta com a brevidade possível. Decorridos 30 dias, caso não nos responda por escrito, consideramos este orçamento sem efeito.";
-      const splitDisclaimer = doc.splitTextToSize(disclaimerText, pageWidth - (margin * 2));
-      doc.text(splitDisclaimer, margin, finalY);
-
-      finalY += 25;
-      const qrDataUrl = await QRCode.toDataURL(publicUrl, { margin: 1, width: 100 });
-      doc.addImage(qrDataUrl, 'PNG', margin, finalY, 30, 30);
-      
-      doc.setFontSize(8);
-      doc.setTextColor(100, 100, 100);
-      doc.text("Digitalize para Aprovação Online", margin + 32, finalY + 12);
-      doc.setFontSize(6);
-      doc.text(publicUrl, margin + 32, finalY + 18, { maxWidth: 100 });
-
-      doc.save(`ORCAMENTO_${quote.code}.pdf`);
+      const doc = await generatePDFBlob();
+      if (doc) doc.save(`ORCAMENTO_${quote.code}.pdf`);
     } catch (e) {
       console.error(e);
       alert("Erro ao gerar PDF.");
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!quote) return;
+    const clientEmail = quote.client?.email?.trim();
+    if (!clientEmail) {
+      alert("ATENÇÃO: CLIENTE SEM EMAIL REGISTADO. DEVERÁ INSERIR MANUALMENTE.");
+    }
+    
+    setIsExportingPDF(true);
+    try {
+      // Geramos o PDF para o utilizador o ter disponível para anexar
+      const doc = await generatePDFBlob();
+      if (doc) doc.save(`ORCAMENTO_${quote.code}.pdf`);
+      
+      const subject = `ORÇAMENTO TÉCNICO - ${quote.code} - REAL FRIO`;
+      const publicLink = getPublicLink();
+      const body = `Exmos. Srs.\n\nEnviamos em anexo o orçamento técnico relativo à assistência solicitada para o equipamento ${quote.equipment?.type || 'em epígrafe'}.\n\nPoderá também consultar o detalhe, anexos técnicos e aprovar a proposta digitalmente através do seguinte link seguro:\n${publicLink}\n\nFicamos a aguardar a vossa resposta.\n\nCom os melhores cumprimentos,\nEquipa Técnica Real Frio`;
+      
+      window.location.href = `mailto:${clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    } catch (err) {
+      alert("Erro ao preparar e-mail.");
     } finally {
       setIsExportingPDF(false);
     }
@@ -270,6 +298,9 @@ const QuoteDetail: React.FC = () => {
           <div className="flex gap-2">
             <button onClick={() => navigate(`/quotes/${id}/edit`)} className="p-3.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl shadow-md border dark:border-slate-700 hover:bg-blue-50 transition-all">
               <Edit2 size={20}/>
+            </button>
+            <button onClick={handleSendEmail} disabled={isExportingPDF} className="p-3.5 bg-white dark:bg-slate-800 text-emerald-600 rounded-2xl shadow-md border dark:border-slate-700 hover:bg-emerald-50 disabled:opacity-50 transition-all" title="Enviar Orçamento">
+              {isExportingPDF ? <Loader2 className="animate-spin" size={20} /> : <Mail size={20}/>}
             </button>
             <button onClick={generatePDF} disabled={isExportingPDF} className="p-3.5 bg-white dark:bg-slate-800 text-blue-600 rounded-2xl shadow-md border dark:border-slate-700 hover:bg-blue-50 disabled:opacity-50 transition-all">
               {isExportingPDF ? <Loader2 className="animate-spin" size={20} /> : <Printer size={20}/>}
@@ -392,9 +423,18 @@ const QuoteDetail: React.FC = () => {
           </div>
           <div className="mt-6 p-4 bg-white/5 rounded-xl border border-white/10">
              <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-2"><ExternalLink size={10} /> Link Público de Aprovação</p>
-             <div className="flex items-center justify-between gap-2 bg-black/30 p-2 rounded-lg">
-                <span className="text-[8px] text-slate-400 truncate flex-1 font-mono">{getPublicLink()}</span>
-                <button onClick={() => { navigator.clipboard.writeText(getPublicLink()); alert("Link copiado!"); }} className="text-[8px] font-bold text-white uppercase bg-white/10 px-2 py-1 rounded hover:bg-white/20">Copiar</button>
+             <div className="flex flex-col gap-3">
+               <div className="flex items-center justify-between gap-2 bg-black/30 p-2 rounded-lg">
+                  <span className="text-[8px] text-slate-400 truncate flex-1 font-mono">{getPublicLink()}</span>
+                  <button onClick={() => { navigator.clipboard.writeText(getPublicLink()); alert("Link copiado!"); }} className="text-[8px] font-bold text-white uppercase bg-white/10 px-2 py-1 rounded hover:bg-white/20">Copiar</button>
+               </div>
+               <button 
+                onClick={handleSendEmail}
+                disabled={isExportingPDF}
+                className="w-full py-3 bg-white/10 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-white/20 transition-all flex items-center justify-center gap-2"
+               >
+                 <Mail size={14} /> ENVIAR POR E-MAIL AO CLIENTE
+               </button>
              </div>
           </div>
       </div>
