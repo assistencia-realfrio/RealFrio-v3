@@ -5,7 +5,7 @@ import {
   Paperclip, Plus, Trash2, Camera, MapPin, Building2, ExternalLink,
   ChevronRight, Download, FileText, X, Eye, Activity, Tag, UploadCloud,
   FileImage, AlertTriangle, ShieldAlert, Printer, FileImage as ImageIcon2,
-  Image as LucideImage, Loader2, ChevronDown, Calculator, Coins
+  Image as LucideImage, Loader2, ChevronDown, Calculator, Coins, Info
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { mockData } from '../services/mockData';
@@ -26,7 +26,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ isOpen, title, message, c
       <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-200">
         <div className="p-8 text-center">
           <div className={`w-16 h-16 ${isDanger ? 'bg-red-50 text-red-500' : 'bg-orange-50 text-orange-500'} dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner`}>
-            {isDanger ? <ShieldAlert size={32} /> : <AlertTriangle size={32} />}
+            {/* Fix: Added missing Info icon import from lucide-react */}
+            {variant === 'danger' ? <ShieldAlert className="text-red-500" size={32} /> : variant === 'warning' ? <AlertTriangle className="text-orange-500" size={32} /> : <Info className="text-blue-500" size={32} />}
           </div>
           <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">{title}</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase px-4">{message}</p>
@@ -133,7 +134,7 @@ const EquipmentDetail: React.FC = () => {
       equipment.type.toUpperCase(),
       (equipment.brand || '---').toUpperCase(),
       (equipment.model || '---').toUpperCase(),
-      (equipment.serial_number || '---').toUpperCase() // Prefixo removido conforme solicitado
+      (equipment.serial_number || '---').toUpperCase()
     ];
     
     // Altura total: 1 linha de 8 + 4 linhas de 6 + 4 espaços
@@ -176,6 +177,31 @@ const EquipmentDetail: React.FC = () => {
     }
   };
 
+  const handleRemoveNameplate = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Remover Chapa',
+      message: 'Deseja eliminar permanentemente a foto da chapa de características deste ativo?',
+      confirmLabel: 'ELIMINAR FOTO',
+      variant: 'danger',
+      action: async () => {
+        if (!equipment) return;
+        setIsUploading(true);
+        try {
+          await mockData.updateEquipment(equipment.id, { nameplate_url: null });
+          setEquipment(prev => prev ? { ...prev, nameplate_url: null } : null);
+        } catch (err) {
+          console.error(err);
+          alert("ERRO AO REMOVER CHAPA.");
+        } finally {
+          setIsUploading(false);
+        }
+      }
+    });
+  };
+
   const handleAddAttachment = async (fileOrEvent: React.ChangeEvent<HTMLInputElement> | File) => {
     let file = fileOrEvent instanceof File ? fileOrEvent : fileOrEvent.target.files?.[0];
     if (file && equipment) {
@@ -183,11 +209,9 @@ const EquipmentDetail: React.FC = () => {
       setIsUploading(true);
       try {
         let finalData: string;
-        // Só comprime se for imagem
         if (file.type.startsWith('image/')) {
           finalData = await compressImage(file);
         } else {
-          // Se for PDF ou outro ficheiro, faz upload normal via FileReader
           finalData = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
@@ -195,7 +219,6 @@ const EquipmentDetail: React.FC = () => {
             reader.readAsDataURL(file!);
           });
         }
-
         const newAttachment: EquipmentAttachment = { id: Math.random().toString(36).substr(2, 9), name: fileName, url: finalData, created_at: new Date().toISOString() };
         const updatedAttachments = [...(equipment.attachments || []), newAttachment];
         await mockData.updateEquipment(equipment.id, { attachments: updatedAttachments });
@@ -256,23 +279,7 @@ const EquipmentDetail: React.FC = () => {
         }} 
       />
 
-      {/* Loader Global para Upload */}
-      {isUploading && (
-        <div className="fixed inset-0 z-[700] bg-slate-900/60 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
-           <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 border border-white/10">
-              <div className="relative">
-                 <Loader2 size={48} className="text-blue-600 animate-spin" />
-                 <UploadCloud size={20} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-400" />
-              </div>
-              <div className="text-center">
-                 <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Processando Arquivo</p>
-                 <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">A otimizar e guardar dados...</p>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* Seletor de Origem Centrado */}
+      {/* Diálogo de Origem Centrado */}
       {showSourceModal && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-300">
@@ -332,7 +339,7 @@ const EquipmentDetail: React.FC = () => {
                 </div>
                 <div className="p-4 flex items-center gap-4">
                    <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 flex items-center justify-center flex-shrink-0"> <MapPin size={20} /> </div>
-                   <div className="min-w-0 pr-4"> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Localização de Instalação</p> <p className="text-[13px] font-black text-slate-900 dark:text-slate-100 uppercase truncate">{establishmentName}</p> </div>
+                   <div className="min-w-0 pr-4"> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Localização de Instalação</p> <p className="text-[13px] font-black text-slate-900 dark:text-white uppercase truncate">{establishmentName}</p> </div>
                 </div>
                 <div className="p-4 flex items-center gap-4">
                    <div className="w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center flex-shrink-0"> <Tag size={20} /> </div>
@@ -351,43 +358,75 @@ const EquipmentDetail: React.FC = () => {
           )}
 
           {activeTab === 'chapa' && (
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 space-y-6 text-center transition-colors">
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 space-y-8 text-center transition-colors">
                <div className="flex flex-col items-center">
                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-8">Chapa de Características</h3>
-                  <div 
-                    onClick={() => openSourceSelector('chapa')}
-                    onDragOver={handleDrag}
-                    onDragEnter={(e) => { handleDrag(e); setIsDraggingNameplate(true); }}
-                    onDragLeave={(e) => { handleDrag(e); setIsDraggingNameplate(false); }}
-                    onDrop={async (e) => {
-                      handleDrag(e); setIsDraggingNameplate(false); const files = e.dataTransfer.files;
-                      if (files && files.length > 0) { const file = files[0]; if (file.type.startsWith('image/')) handleUploadNameplate(file); }
-                    }}
-                    className={`relative group w-full max-w-md mx-auto aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl border-2 border-dashed transition-all cursor-pointer ${isDraggingNameplate ? 'border-blue-500 bg-blue-50/50 scale-105 ring-4 ring-blue-500/10' : 'border-gray-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:border-blue-200'}`}
-                  >
-                    {isDraggingNameplate && (
-                      <div className="absolute inset-0 bg-blue-600/10 backdrop-blur-[2px] flex items-center justify-center z-20 pointer-events-none">
-                        <div className="flex flex-col items-center gap-2 animate-bounce">
-                          <UploadCloud size={48} className="text-blue-600" />
-                          <span className="text-[12px] font-black text-blue-600 uppercase">Largar para Carregar</span>
+                  
+                  {equipment.nameplate_url ? (
+                    <div className="relative w-full max-w-md mx-auto animate-in zoom-in-95 duration-300">
+                      <div 
+                         onClick={() => setShowNameplateFullscreen(true)}
+                         className="aspect-[4/3] rounded-[2rem] overflow-hidden shadow-2xl border border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 cursor-zoom-in group"
+                      >
+                        <img src={equipment.nameplate_url} className="w-full h-full object-contain" alt="Chapa de Características" />
+                        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                           <div className="p-3 bg-white/20 backdrop-blur-md rounded-full text-white">
+                             <Eye size={24} />
+                           </div>
                         </div>
                       </div>
-                    )}
-                    {equipment.nameplate_url ? (
-                      <>
-                        <img src={equipment.nameplate_url} className="w-full h-full object-contain" alt="Chapa de Características" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 z-10">
-                           <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowNameplateFullscreen(true); }} className="p-4 bg-white text-slate-900 rounded-full hover:bg-blue-50 transition-colors shadow-xl active:scale-90" > <Eye size={24} /> </button>
-                           <div className="p-4 bg-blue-600 text-white rounded-full shadow-xl"> <Camera size={24} /> </div>
+                      
+                      {/* Botões de Ação Sempre Visíveis para Mobile */}
+                      <div className="grid grid-cols-5 gap-3 mt-8">
+                         <button 
+                           type="button" 
+                           onClick={() => setShowNameplateFullscreen(true)}
+                           className="col-span-2 py-4 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-slate-100 dark:border-slate-700 shadow-sm flex items-center justify-center gap-2 active:scale-95 transition-all"
+                         >
+                           <Eye size={16} /> Ver
+                         </button>
+                         <button 
+                           type="button" 
+                           onClick={() => openSourceSelector('chapa')}
+                           className="col-span-2 py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 active:scale-95 transition-all"
+                         >
+                           <Camera size={16} /> Alterar
+                         </button>
+                         <button 
+                           type="button" 
+                           onClick={handleRemoveNameplate}
+                           className="col-span-1 h-[52px] bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl flex items-center justify-center border border-red-100 dark:border-red-900/30 shadow-sm hover:bg-red-100 transition-all active:scale-95"
+                         >
+                           <Trash2 size={20} />
+                         </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div 
+                      onClick={() => openSourceSelector('chapa')}
+                      onDragOver={handleDrag}
+                      onDragEnter={(e) => { handleDrag(e); setIsDraggingNameplate(true); }}
+                      onDragLeave={(e) => { handleDrag(e); setIsDraggingNameplate(false); }}
+                      onDrop={async (e) => {
+                        handleDrag(e); setIsDraggingNameplate(false); const files = e.dataTransfer.files;
+                        if (files && files.length > 0) { const file = files[0]; if (file.type.startsWith('image/')) handleUploadNameplate(file); }
+                      }}
+                      className={`relative group w-full max-w-md mx-auto aspect-[4/3] rounded-[2rem] overflow-hidden shadow-sm border-2 border-dashed transition-all cursor-pointer ${isDraggingNameplate ? 'border-blue-500 bg-blue-50/50 scale-105 ring-4 ring-blue-500/10' : 'border-gray-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:border-blue-200'}`}
+                    >
+                      {isDraggingNameplate && (
+                        <div className="absolute inset-0 bg-blue-600/10 backdrop-blur-[2px] flex items-center justify-center z-20 pointer-events-none">
+                          <div className="flex flex-col items-center gap-2 animate-bounce">
+                            <UploadCloud size={48} className="text-blue-600" />
+                            <span className="text-[12px] font-black text-blue-600 uppercase">Largar para Carregar</span>
+                          </div>
                         </div>
-                      </>
-                    ) : (
+                      )}
                       <div className="flex flex-col items-center justify-center h-full">
                          <Camera size={48} className={`mb-4 transition-colors ${isDraggingNameplate ? 'text-blue-600' : 'text-gray-300 group-hover:text-blue-400'}`} />
                          <p className={`text-[10px] font-black uppercase tracking-widest ${isDraggingNameplate ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-500'}`}>Adicionar Foto da Chapa</p>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                </div>
             </div>
           )}
@@ -464,7 +503,7 @@ const EquipmentDetail: React.FC = () => {
               </div>
               <div onDragOver={handleDrag} onDragEnter={(e) => { handleDrag(e); setIsDraggingAttachment(true); }} onDragLeave={(e) => { handleDrag(e); setIsDraggingAttachment(false); }} onDrop={(e) => { handleDrag(e); setIsDraggingAttachment(false); const files = e.dataTransfer.files; if (files && files.length > 0) { handleAddAttachment(files[0]); } }} className={`min-h-[200px] transition-all rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center relative overflow-hidden ${isDraggingAttachment ? 'border-blue-500 bg-blue-50/50 scale-[1.02]' : 'border-transparent'}`} >
                 {isDraggingAttachment && ( <div className="absolute inset-0 bg-blue-600/10 backdrop-blur-[2px] flex items-center justify-center z-20 pointer-events-none"> <div className="flex flex-col items-center gap-2 animate-bounce"> <UploadCloud size={48} className="text-blue-600" /> <span className="text-[12px] font-black text-blue-600 uppercase">Largar Arquivo Aqui</span> </div> </div> )}
-                {(equipment.attachments || []).length === 0 ? ( <div className="text-center py-10 transition-colors"> <Paperclip size={32} className={`mx-auto mb-3 transition-colors ${isDraggingAttachment ? 'text-blue-600' : 'text-slate-200 dark:text-slate-800'}`} /> <p className={`text-[10px] font-black uppercase tracking-widest px-8 transition-colors ${isDraggingAttachment ? 'text-blue-600' : 'text-slate-300 dark:text-slate-700'}`}> Nenhum esquema ou manual anexado.<br/> <span className="text-[8px] opacity-60">Pode arrastar arquivos diretamente para aqui.</span> </p> </div> ) : ( <div className="space-y-3 w-full p-2"> {equipment.attachments?.map(att => { const isImage = isImageAttachment(att.url); return ( <div key={att.id} className="flex items-center justify-between p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 transition-all group"> <div className="flex items-center gap-4 min-w-0 flex-1"> <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:text-blue-500 overflow-hidden"> {isImage ? ( <img src={att.url} alt={att.name} className="w-full h-full object-cover" /> ) : ( <FileText size={20} /> )} </div> <div className="min-w-0 flex-1"> <p className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase truncate mb-0.5">{att.name}</p> <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest"> {isImage ? 'Imagem' : 'Documento'} • {new Date(att.created_at).toLocaleDateString()} </p> </div> </div> <div className="flex items-center gap-2"> <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); isImage ? setSelectedAttachmentForView(att) : window.open(att.url); }} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all" title={isImage ? "Visualizar Imagem" : "Abrir Documento"} > {isImage ? <Eye size={18} /> : <ExternalLink size={18} />} </button> <button onClick={(e) => handleRemoveAttachment(e, att.id)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all" title="Remover" > <Trash2 size={18} /> </button> </div> </div> ); })} <div className="text-center py-4 opacity-30"> <p className="text-[8px] font-black uppercase tracking-widest">Arraste mais arquivos para adicionar</p> </div> </div> )}
+                {(equipment.attachments || []).length === 0 ? ( <div className="text-center py-10 transition-colors"> <Paperclip size={32} className={`mx-auto mb-3 transition-colors ${isDraggingAttachment ? 'text-blue-600' : 'text-slate-200 dark:text-slate-800'}`} /> <p className={`text-[10px] font-black uppercase tracking-widest px-8 transition-colors ${isDraggingAttachment ? 'text-blue-600' : 'text-slate-300 dark:text-slate-700'}`}> Nenhum esquema ou manual anexado.<br/> <span className="text-[8px] opacity-60">Pode arrastar arquivos diretamente para aqui.</span> </p> </div> ) : ( <div className="space-y-3 w-full p-2"> {equipment.attachments?.map(att => { const isImage = isImageAttachment(att.url); return ( <div key={att.id} className="flex items-center justify-between p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 transition-all group"> <div className="flex items-center gap-4 min-w-0 flex-1"> <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:text-blue-500 overflow-hidden"> {isImage ? ( <img src={att.url} alt={att.name} className="w-full h-full object-cover" /> ) : ( <FileText size={20} /> )} </div> <div className="min-w-0 flex-1"> <p className="text-xs font-black text-slate-900 dark:text-white uppercase truncate mb-0.5">{att.name}</p> <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest"> {isImage ? 'Imagem' : 'Documento'} • {new Date(att.created_at).toLocaleDateString()} </p> </div> </div> <div className="flex items-center gap-2"> <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); isImage ? setSelectedAttachmentForView(att) : window.open(att.url); }} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all" title={isImage ? "Visualizar Imagem" : "Abrir Documento"} > {isImage ? <Eye size={18} /> : <ExternalLink size={18} />} </button> <button onClick={(e) => handleRemoveAttachment(e, att.id)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all" title="Remover" > <Trash2 size={18} /> </button> </div> </div> ); })} <div className="text-center py-4 opacity-30"> <p className="text-[8px] font-black uppercase tracking-widest">Arraste mais arquivos para adicionar</p> </div> </div> )}
               </div>
             </div>
           )}
