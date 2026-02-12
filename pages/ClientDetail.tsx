@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   MapPin, Phone, Mail, User, HardDrive, History as HistoryIcon, 
   Edit2, X, Save, ArrowLeft, ChevronRight, ChevronDown,
@@ -61,13 +61,24 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ isOpen, title, message, c
 const ClientDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  
   const [client, setClient] = useState<Client | null>(null);
   const [establishments, setEstablishments] = useState<Establishment[]>([]);
   const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [history, setHistory] = useState<ServiceOrder[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'info' | 'establishments' | 'equipments' | 'history' | 'quotes'>('info');
+  
+  // Inicialização da aba baseada na URL
+  const [activeTab, setActiveTab] = useState<'info' | 'establishments' | 'equipments' | 'history' | 'quotes'>(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam === 'equipments' || tabParam === 'establishments' || tabParam === 'history' || tabParam === 'quotes') {
+      return tabParam as any;
+    }
+    return 'info';
+  });
   
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Client | null>(null);
@@ -284,7 +295,7 @@ const ClientDetail: React.FC = () => {
         {/* CABEÇALHO */}
         <div className="flex items-stretch gap-3 px-1 mb-2">
           <button 
-            onClick={() => navigate(-1)} 
+            onClick={() => navigate('/clients')} 
             className="flex-shrink-0 flex items-center justify-center w-14 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:text-blue-600 rounded-[1.5rem] transition-all border border-gray-200 dark:border-slate-800 shadow-sm active:scale-95 active:bg-slate-50"
           >
             <ArrowLeft size={24} />
@@ -689,7 +700,6 @@ const ClientDetail: React.FC = () => {
                  </h3>
                  <button onClick={() => setShowModalEst(false)} className="text-gray-400 hover:text-gray-600 p-2"><X size={24}/></button>
               </div>
-              {/* Fix: Applied correct function name handleSubmitEstablishment */}
               <form onSubmit={handleSubmitEstablishment} className="p-8 space-y-4">
                  <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Nome do Local (Ex: Loja Porto)</label>
@@ -706,7 +716,7 @@ const ClientDetail: React.FC = () => {
                    </div>
                    <div>
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Responsável Local</label>
-                      <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold dark:text-white outline-none" value={estForm.contact_person} onChange={e => setEditFormEst({...estForm, contact_person: e.target.value})} />
+                      <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-3 py-3 text-sm font-bold dark:text-white outline-none" value={estForm.contact_person} onChange={e => setEditFormEst({...estForm, contact_person: e.target.value})} />
                    </div>
                  </div>
                  <button type="submit" disabled={isSubmitting} className="w-full bg-blue-600 text-white py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 transition-all">

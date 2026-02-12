@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -265,7 +264,7 @@ const QuoteDetail: React.FC = () => {
 
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="p-3 bg-white dark:bg-slate-900 text-slate-500 rounded-2xl shadow-sm border dark:border-slate-800 transition-all hover:bg-slate-50 active:scale-95">
+          <button onClick={() => navigate('/quotes')} className="p-3 bg-white dark:bg-slate-900 text-slate-500 rounded-2xl shadow-sm border dark:border-slate-800 transition-all hover:bg-slate-50 active:scale-95">
             <ArrowLeft size={22} />
           </button>
           <div className="flex gap-2">
