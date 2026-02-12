@@ -181,13 +181,15 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Ordens de Serviço', path: '/os', icon: ClipboardList },
-    { name: 'Orçamentos', path: '/quotes', icon: Calculator },
     { name: 'Agendamentos', path: '/appointments', icon: Calendar },
-    { name: 'Férias', path: '/vacations', icon: Palmtree },
+    { name: 'Orçamentos', path: '/quotes', icon: Calculator },
     { name: 'Clientes', path: '/clients', icon: UsersIcon },
     { name: 'Stock & Catálogo', path: '/inventory', icon: Package },
     ...(isAdmin ? [
-      { name: 'Equipa', path: '/users', icon: UserCog },
+      { name: 'Equipa', path: '/users', icon: UserCog }
+    ] : []),
+    { name: 'Férias', path: '/vacations', icon: Palmtree },
+    ...(isAdmin ? [
       { name: 'Manutenção', path: '/maintenance', icon: Wrench }
     ] : []),
   ];
