@@ -4,7 +4,7 @@ export const notificationService = {
    * Dispara uma notificação de forma resiliente.
    */
   notify: async (title: string, body: string, url: string = '/') => {
-    console.log(`[NotificationService] Intento: ${title}`);
+    console.log(`[NotificationService] Disparando: ${title}`);
 
     if (!("Notification" in window)) return false;
 
@@ -14,23 +14,25 @@ export const notificationService = {
     }
 
     try {
-      // 1. Prioridade Máxima: Enviar para o Service Worker via Canal de Mensagens
-      // Este método é o mais robusto em Mobile/PWA porque o SW tem "privilégios" de sistema
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({
-          type: 'SHOW_NOTIFICATION',
-          title,
-          body,
-          url: window.location.origin + '/#' + url
-        });
-        console.log("[NotificationService] Comando enviado para o Service Worker.");
+      // Garantir que temos acesso ao Service Worker
+      const registration = await navigator.serviceWorker.ready;
+      
+      const payload = {
+        type: 'SHOW_NOTIFICATION',
+        title,
+        body,
+        url: window.location.origin + '/#' + url
+      };
+
+      // Tentar via postMessage se o controlador existir (mais seguro contra bloqueios de UI)
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage(payload);
+        console.log("[NotificationService] Enviado via controlador.");
         return true;
       }
 
-      // 2. Fallback: Se o controlador não estiver pronto, tentar via registro direto
-      const registration = await navigator.serviceWorker.ready;
+      // Se não houver controlador (ex: página acabou de carregar), usar a registration direta
       if (registration && registration.showNotification) {
-        // Fix: Cast options to any because the 'vibrate' property is sometimes missing from standard NotificationOptions type definitions
         await registration.showNotification(title, {
           body,
           icon: '/rf-icon-192-v5.png',
@@ -38,10 +40,11 @@ export const notificationService = {
           vibrate: [200, 100, 200],
           data: { url: window.location.origin + '/#' + url }
         } as any);
+        console.log("[NotificationService] Enviado via registration direta.");
         return true;
       }
     } catch (e) {
-      console.error("[NotificationService] Falha técnica no disparo:", e);
+      console.error("[NotificationService] Erro fatal no disparo:", e);
     }
 
     return false;
@@ -57,8 +60,12 @@ export const notificationService = {
     
     if (permission === "granted" && 'serviceWorker' in navigator) {
       try {
-        await navigator.serviceWorker.register('/sw.js?v=5.0');
-        await navigator.serviceWorker.ready;
+        await navigator.serviceWorker.register('/sw.js?v=6.0');
+        const reg = await navigator.serviceWorker.ready;
+        // Se após o registro não houver controlador, forçamos um reload ou claim
+        if (!navigator.serviceWorker.controller) {
+           console.log("Service worker registrado mas não controla a página ainda.");
+        }
       } catch (e) {
         console.error("Erro no registro do SW:", e);
       }

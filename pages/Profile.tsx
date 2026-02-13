@@ -89,11 +89,20 @@ const Profile: React.FC = () => {
     setIsTesting(true);
     setError(null);
     
+    // Proteção de Timeout: Se em 5 segundos não terminar, forçamos o reset da UI
+    const testTimeout = setTimeout(() => {
+      if (isTesting) {
+        setIsTesting(false);
+        setError("O teste demorou demasiado tempo. Tente atualizar a página (puxar para baixo) e tente novamente.");
+      }
+    }, 5000);
+
     try {
       if (Notification.permission !== 'granted') {
          const granted = await notificationService.requestPermission();
          setPushStatus(Notification.permission as any);
          if (!granted) {
+           clearTimeout(testTimeout);
            setIsTesting(false);
            return;
          }
@@ -105,14 +114,17 @@ const Profile: React.FC = () => {
         "/profile"
       );
       
+      clearTimeout(testTimeout);
+      
       if (!ok) {
-        setError("O sistema não conseguiu disparar. Verifique se a app tem permissão de 'Janelas Flutuantes' nas definições do Android.");
+        setError("Não foi possível disparar o alerta. Verifique se o navegador ou o sistema Android não estão em modo 'Poupança de Bateria'.");
       } else {
         setSuccess("Comando de teste enviado!");
         setTimeout(() => setSuccess(null), 3000);
       }
     } catch (e) {
-      setError("Falha técnica ao disparar.");
+      clearTimeout(testTimeout);
+      setError("Falha técnica ao tentar disparar o alerta.");
     } finally {
       setIsTesting(false);
     }

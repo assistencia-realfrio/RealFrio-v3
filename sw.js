@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'realfrio-tech-v5.0';
+const CACHE_NAME = 'realfrio-tech-v6.0';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -32,11 +32,11 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  // Forçar o SW a assumir o controlo das páginas abertas imediatamente
   return self.clients.claim();
 });
 
 // ESCUTAR MENSAGENS DA INTERFACE (MAIN THREAD)
-// Essencial para contornar bloqueios em Android/Xiaomi
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
     const { title, body, url } = event.data;
