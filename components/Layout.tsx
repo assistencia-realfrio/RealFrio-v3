@@ -60,20 +60,24 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     const channel = supabase
       .channel('layout-toasts')
       .on('postgres_changes', { event: '*', table: 'os_activities', schema: 'public' }, (payload) => {
-        if (payload.new.user_name !== activeSessionUser.full_name) {
+        const newData = payload.new as any;
+        if (newData && newData.user_name !== activeSessionUser.full_name) {
           showToast(
             "Atividade Recente",
-            payload.new.description,
-            `/os/${payload.new.os_id}`
+            newData.description,
+            `/os/${newData.os_id}`
           );
         }
       })
       .on('postgres_changes', { event: 'INSERT', table: 'service_orders', schema: 'public' }, (payload) => {
-          showToast(
-            "Nova Ordem de Serviço",
-            `Registada OS ${payload.new.code}.`,
-            `/os/${payload.new.id}`
-          );
+          const newData = payload.new as any;
+          if (newData) {
+            showToast(
+              "Nova Ordem de Serviço",
+              `Registada OS ${newData.code}.`,
+              `/os/${newData.id}`
+            );
+          }
       })
       .subscribe();
 
@@ -290,7 +294,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           <div className="px-4 py-6 bg-white dark:bg-slate-900">
              <div className="flex items-center text-slate-400 dark:text-slate-500 mb-3 text-[10px] uppercase font-medium tracking-[0.2em] px-2"><MapPin size={12} className="mr-2 text-blue-500" /> Loja Ativa</div>
              <div className="relative group">
-                <select value={currentStore} onChange={(e) => setStore(e.target.value as any)} className="w-full bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white text-xs font-medium rounded-xl border border-slate-200 dark:border-700/50 p-3 appearance-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all outline-none">
+                <select value={currentStore} onChange={(e) => setStore(e.target.value as any)} className="w-full bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700/50 p-3 appearance-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all outline-none">
                   <option value="Todas">Todas as Lojas</option>
                   <option value="Caldas da Rainha">Caldas da Rainha</option>
                   <option value="Porto de Mós">Porto de Mós</option>

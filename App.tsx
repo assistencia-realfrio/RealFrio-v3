@@ -79,22 +79,22 @@ const AppContent: React.FC<{
     const osChannel = supabase
       .channel('os-realtime-alerts')
       .on('postgres_changes', { event: '*', table: 'service_orders', schema: 'public' }, async (payload) => {
-        // Evitar notificar o próprio autor da mudança
-        // Nota: payload.new pode não conter todas as relações, idealmente fazemos um fetch rápido
+        const newData = payload.new as any;
+        const oldData = payload.old as any;
         
-        if (payload.eventType === 'INSERT') {
+        if (payload.eventType === 'INSERT' && newData) {
           notificationService.notify(
             "🚨 NOVA ORDEM DE SERVIÇO",
-            `Uma nova intervenção foi registada no sistema: ${payload.new.code}`,
-            `/os/${payload.new.id}`
+            `Uma nova intervenção foi registada no sistema: ${newData.code}`,
+            `/os/${newData.id}`
           );
-        } else if (payload.eventType === 'UPDATE') {
-          if (payload.old.status !== payload.new.status) {
-            const statusLabel = payload.new.status.replace('_', ' ').toUpperCase();
+        } else if (payload.eventType === 'UPDATE' && newData && oldData) {
+          if (oldData.status !== newData.status) {
+            const statusLabel = (newData.status as string).replace('_', ' ').toUpperCase();
             notificationService.notify(
               "🔄 ATUALIZAÇÃO DE ESTADO",
-              `OS ${payload.new.code} alterada para ${statusLabel}.`,
-              `/os/${payload.new.id}`
+              `OS ${newData.code} alterada para ${statusLabel}.`,
+              `/os/${newData.id}`
             );
           }
         }
@@ -105,13 +105,16 @@ const AppContent: React.FC<{
     const activityChannel = supabase
       .channel('activity-realtime-alerts')
       .on('postgres_changes', { event: 'INSERT', table: 'os_activities', schema: 'public' }, (payload) => {
-        const userName = payload.new.user_name || 'Alguém';
+        const newData = payload.new as any;
+        if (!newData) return;
+
+        const userName = newData.user_name || 'Alguém';
         // Filtrar atividades automáticas ou do próprio utilizador para não ser chato
         if (userName !== user.full_name) {
           notificationService.notify(
             "🛠️ ATIVIDADE TÉCNICA",
-            `${userName}: ${payload.new.description}`,
-            `/os/${payload.new.os_id}`
+            `${userName}: ${newData.description}`,
+            `/os/${newData.os_id}`
           );
         }
       })
