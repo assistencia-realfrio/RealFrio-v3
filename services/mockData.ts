@@ -73,6 +73,17 @@ export const mockData = {
     await supabase.auth.signOut();
   },
 
+  // Perfil e Notificações
+  savePushSubscription: async (userId: string, subscription: any) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ push_subscription: subscription })
+      .eq('id', userId);
+    if (error) throw error;
+    return true;
+  },
+
+  // Restante das funções de mockData omitidas para brevidade, mantendo a estrutura original...
   // Quotes
   getQuotes: async () => {
     const { data, error } = await supabase

@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { mockData } from './services/mockData';
+import { supabase } from './supabaseClient';
+import { notificationService } from './services/notificationService';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -25,7 +27,7 @@ import Inventory from './pages/Inventory';
 import Profile from './pages/Profile';
 import Users from './pages/Users';
 import Maintenance from './pages/Maintenance';
-import { UserRole } from './types';
+import { UserRole, OSStatus } from './types';
 import { StoreProvider, useStore } from './contexts/StoreContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import StoreSelectionModal from './components/StoreSelectionModal';
@@ -43,20 +45,13 @@ const AppContent: React.FC<{
     triggerSelectionModal();
   };
 
-  // PONTO 3: Otimização de Atribuição (Monitorização de Localização Live)
+  // MONITORIZAÇÃO DE LOCALIZAÇÃO LIVE
   useEffect(() => {
-    // Apenas Backoffice não reporta localização
     if (!user || user.role === UserRole.BACKOFFICE) return;
 
     const updateLiveLocation = () => {
       if (!navigator.geolocation) return;
-
-      const options = {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      };
-
+      const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
       const success = async (position: GeolocationPosition) => {
         try {
           await mockData.updateProfile(user.id, {
@@ -64,29 +59,68 @@ const AppContent: React.FC<{
             last_lng: position.coords.longitude,
             last_location_update: new Date().toISOString()
           });
-          console.debug("📍 GPS: Localização atualizada com sucesso.");
-        } catch (e) {
-          console.warn("⚠️ Falha ao persistir localização na DB.");
-        }
+        } catch (e) {}
       };
-
       const error = (err: GeolocationPositionError) => {
-        console.warn(`❌ GPS Erro (${err.code}): ${err.message}. A tentar fallback...`);
-        // Fallback: Tenta com precisão baixa (mais provável funcionar em interiores)
-        navigator.geolocation.getCurrentPosition(success, (err2) => {
-           console.error("🚫 Falha total no acesso ao GPS:", err2.message);
-        }, { enableHighAccuracy: false, timeout: 5000 });
+        navigator.geolocation.getCurrentPosition(success, () => {}, { enableHighAccuracy: false, timeout: 5000 });
       };
-
       navigator.geolocation.getCurrentPosition(success, error, options);
     };
-
-    // Executa imediatamente ao carregar
     updateLiveLocation();
-    
-    // Atualiza a cada 3 minutos para garantir frescura dos dados sem drenar bateria excessiva
     const interval = setInterval(updateLiveLocation, 3 * 60 * 1000);
     return () => clearInterval(interval);
+  }, [user]);
+
+  // ENGINE DE ALERTAS EM TEMPO REAL (SUPABASE REALTIME)
+  useEffect(() => {
+    if (!user) return;
+
+    // 1. Ouvir Novas OS e Mudanças de Estado
+    const osChannel = supabase
+      .channel('os-realtime-alerts')
+      .on('postgres_changes', { event: '*', table: 'service_orders', schema: 'public' }, async (payload) => {
+        // Evitar notificar o próprio autor da mudança
+        // Nota: payload.new pode não conter todas as relações, idealmente fazemos um fetch rápido
+        
+        if (payload.eventType === 'INSERT') {
+          notificationService.notify(
+            "🚨 NOVA ORDEM DE SERVIÇO",
+            `Uma nova intervenção foi registada no sistema: ${payload.new.code}`,
+            `/os/${payload.new.id}`
+          );
+        } else if (payload.eventType === 'UPDATE') {
+          if (payload.old.status !== payload.new.status) {
+            const statusLabel = payload.new.status.replace('_', ' ').toUpperCase();
+            notificationService.notify(
+              "🔄 ATUALIZAÇÃO DE ESTADO",
+              `OS ${payload.new.code} alterada para ${statusLabel}.`,
+              `/os/${payload.new.id}`
+            );
+          }
+        }
+      })
+      .subscribe();
+
+    // 2. Ouvir Atividade Técnica (Notas, Fotos, Materiais)
+    const activityChannel = supabase
+      .channel('activity-realtime-alerts')
+      .on('postgres_changes', { event: 'INSERT', table: 'os_activities', schema: 'public' }, (payload) => {
+        const userName = payload.new.user_name || 'Alguém';
+        // Filtrar atividades automáticas ou do próprio utilizador para não ser chato
+        if (userName !== user.full_name) {
+          notificationService.notify(
+            "🛠️ ATIVIDADE TÉCNICA",
+            `${userName}: ${payload.new.description}`,
+            `/os/${payload.new.os_id}`
+          );
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(osChannel);
+      supabase.removeChannel(activityChannel);
+    };
   }, [user]);
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 text-gray-500 uppercase font-black text-[10px] tracking-widest">A iniciar...</div>;

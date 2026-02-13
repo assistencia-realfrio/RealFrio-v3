@@ -42,6 +42,14 @@ const PublicQuoteView: React.FC = () => {
     try {
       await mockData.clientSignQuote(quote.id, signature);
       setSuccessMode('accept');
+
+      // Tentar notificação local se possível
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification("Proposta Aceite", {
+          body: `A proposta ${quote.code} foi enviada para processamento.`,
+          icon: '/rf-icon-192-v5.png'
+        });
+      }
     } catch (e) {
       alert("Erro ao processar aceitação.");
     } finally {

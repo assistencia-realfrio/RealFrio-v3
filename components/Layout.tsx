@@ -1,9 +1,12 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench, RefreshCw, Loader2, QrCode, Scan, Building2, Calculator } from 'lucide-react';
+// Added ChevronRight to the lucide-react imports
+import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, ChevronRight, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench, RefreshCw, Loader2, QrCode, Scan, Building2, Calculator, Info, CheckCircle2 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { UserRole, OSActivity, ServiceOrder, Client, Equipment, Establishment } from '../types';
 import { mockData } from '../services/mockData';
+import { supabase } from '../supabaseClient';
 import BrandLogo from './BrandLogo';
 import { useStore } from '../contexts/StoreContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -21,6 +24,10 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  
+  // Gestão de Toasts In-App
+  const [toast, setToast] = useState<{ title: string; body: string; url: string; id: string } | null>(null);
+
   const [activities, setActivities] = useState<(OSActivity & { os_code?: string; client_name?: string })[]>([]);
   const [searchResults, setSearchResults] = useState<{
     os: ServiceOrder[];
@@ -45,6 +52,41 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const qrScannerRef = useRef<Html5Qrcode | null>(null);
 
   const activeSessionUser = mockData.getSession() || user;
+
+  // SUBSCREVER TOASTS EM TEMPO REAL
+  useEffect(() => {
+    if (!activeSessionUser) return;
+
+    const channel = supabase
+      .channel('layout-toasts')
+      .on('postgres_changes', { event: '*', table: 'os_activities', schema: 'public' }, (payload) => {
+        if (payload.new.user_name !== activeSessionUser.full_name) {
+          showToast(
+            "Atividade Recente",
+            payload.new.description,
+            `/os/${payload.new.os_id}`
+          );
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', table: 'service_orders', schema: 'public' }, (payload) => {
+          showToast(
+            "Nova Ordem de Serviço",
+            `Registada OS ${payload.new.code}.`,
+            `/os/${payload.new.id}`
+          );
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [activeSessionUser]);
+
+  const showToast = (title: string, body: string, url: string) => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setToast({ title, body, url, id });
+    setTimeout(() => {
+      setToast(current => current?.id === id ? null : current);
+    }, 6000);
+  };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (mainRef.current && mainRef.current.scrollTop === 0 && !isRefreshing) {
@@ -213,6 +255,24 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-slate-950 overflow-hidden font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300">
+      
+      {/* TOAST FLUTUANTE EM TEMPO REAL */}
+      {toast && (
+        <div 
+          onClick={() => { navigate(toast.url); setToast(null); }}
+          className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] w-[92%] max-w-sm bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border-2 border-blue-500 p-5 flex items-center gap-4 cursor-pointer animate-in slide-in-from-top-10 duration-500 active:scale-95"
+        >
+          <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center rounded-2xl flex-shrink-0 animate-pulse">
+            <Bell size={24} />
+          </div>
+          <div className="flex-1 min-w-0">
+             <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">{toast.title}</h4>
+             <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase truncate leading-tight mt-1">{toast.body}</p>
+          </div>
+          <ChevronRight size={20} className="text-slate-300" />
+        </div>
+      )}
+
       <div className="fixed top-0 left-0 right-0 z-[100] flex justify-center pointer-events-none transition-transform duration-200" style={{ transform: `translateY(${pullDistance - 50}px)` }}>
         <div className={`w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-xl border border-gray-100 dark:border-slate-700 flex items-center justify-center transition-all duration-300 ${pullDistance > 0 ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
           {isRefreshing ? <Loader2 size={18} className="text-blue-600 animate-spin" /> : <RefreshCw size={18} className="text-blue-600 transition-transform" style={{ transform: `rotate(${pullDistance * 4}deg)` }} />}
@@ -230,7 +290,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           <div className="px-4 py-6 bg-white dark:bg-slate-900">
              <div className="flex items-center text-slate-400 dark:text-slate-500 mb-3 text-[10px] uppercase font-medium tracking-[0.2em] px-2"><MapPin size={12} className="mr-2 text-blue-500" /> Loja Ativa</div>
              <div className="relative group">
-                <select value={currentStore} onChange={(e) => setStore(e.target.value as any)} className="w-full bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700/50 p-3 appearance-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all outline-none">
+                <select value={currentStore} onChange={(e) => setStore(e.target.value as any)} className="w-full bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white text-xs font-medium rounded-xl border border-slate-200 dark:border-700/50 p-3 appearance-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all outline-none">
                   <option value="Todas">Todas as Lojas</option>
                   <option value="Caldas da Rainha">Caldas da Rainha</option>
                   <option value="Porto de Mós">Porto de Mós</option>

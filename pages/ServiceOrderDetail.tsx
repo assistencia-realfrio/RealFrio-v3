@@ -290,22 +290,6 @@ export const ServiceOrderDetail: React.FC = () => {
     if (!id || os?.timer_is_active) return;
     setActionLoading(true);
     
-    // CAPTURA DE LOCALIZAÇÃO (CHECK-IN)
-    let lat: number | null = null;
-    let lng: number | null = null;
-    
-    try {
-      if (navigator.geolocation) {
-        const pos: GeolocationPosition = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, enableHighAccuracy: true });
-        });
-        lat = pos.coords.latitude;
-        lng = pos.coords.longitude;
-      }
-    } catch (err) {
-      console.warn("GPS não disponível para Check-in:", err);
-    }
-
     try {
       const now = new Date().toISOString();
       const updates: any = { 
@@ -314,16 +298,9 @@ export const ServiceOrderDetail: React.FC = () => {
         status: OSStatus.INICIADA
       };
       
-      if (lat && lng) {
-        updates.checkin_lat = lat;
-        updates.checkin_lng = lng;
-      }
-
       await mockData.updateServiceOrder(id, updates);
       await mockData.addOSActivity(id, { 
-        description: lat && lng 
-          ? `INICIOU CRONÓMETRO (CHECK-IN VALIDADO VIA GPS)` 
-          : `INICIOU CRONÓMETRO (CHECK-IN SEM GPS)` 
+        description: `INICIOU CRONÓMETRO` 
       });
       await fetchOSDetails(false);
     } catch (e) { 
@@ -854,24 +831,6 @@ export const ServiceOrderDetail: React.FC = () => {
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {activeTab === 'info' && (
           <div className="space-y-3">
-            {/* INFORMAÇÃO DE CHECK-IN GPS */}
-            {os?.checkin_lat && os?.checkin_lng && (
-               <div className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800 rounded-2xl p-3 flex items-center justify-between px-6">
-                  <div className="flex items-center gap-3">
-                     <Navigation size={14} className="text-blue-600" />
-                     <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Presença validada no local via GPS</span>
-                  </div>
-                  <a 
-                    href={`https://www.google.com/maps/search/?api=1&query=${os.checkin_lat},${os.checkin_lng}`} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="text-[8px] font-black text-blue-400 underline uppercase hover:text-blue-600 transition-colors"
-                  >
-                    Ver Mapa
-                  </a>
-               </div>
-            )}
-
             {/* CARD DE ORÇAMENTO NO TOPO DA FICHA */}
             {quoteTotals.hasValues && (os?.status === OSStatus.PARA_ORCAMENTO || os?.status === OSStatus.ORCAMENTO_ENVIADO) && (
               <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-100 dark:border-blue-900/40 p-6 animate-in zoom-in-95 duration-500 overflow-hidden relative group">
