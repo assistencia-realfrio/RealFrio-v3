@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-// Added Calculator and UploadCloud to lucide-react imports to fix "Cannot find name" errors
 import { 
   Camera, Save, Plus, Trash2, X, Package, 
   Download, ArrowLeft, CheckCircle2, 
@@ -14,7 +13,7 @@ import {
   RotateCw, Cloud, Edit2, Layers, Tag, Hash, ShieldCheck, ScrollText, CheckSquare, Square,
   Settings2, FileDown, Key, Mail, ThumbsUp, ThumbsDown, ThumbsDown as CancelIcon, Play, Square as StopIcon, Timer, 
   Wrench, Snowflake, Printer, Check, Image as LucideImage, QrCode,
-  Calculator, UploadCloud
+  Calculator, UploadCloud, Navigation
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -290,12 +289,48 @@ export const ServiceOrderDetail: React.FC = () => {
   const handleStartTimer = async () => {
     if (!id || os?.timer_is_active) return;
     setActionLoading(true);
+    
+    // CAPTURA DE LOCALIZAÇÃO (CHECK-IN)
+    let lat: number | null = null;
+    let lng: number | null = null;
+    
+    try {
+      if (navigator.geolocation) {
+        const pos: GeolocationPosition = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, enableHighAccuracy: true });
+        });
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      }
+    } catch (err) {
+      console.warn("GPS não disponível para Check-in:", err);
+    }
+
     try {
       const now = new Date().toISOString();
-      await mockData.updateServiceOrder(id, { timer_is_active: true, timer_start_time: now });
-      await mockData.addOSActivity(id, { description: "INICIOU CRONÓMETRO GLOBAL" });
+      const updates: any = { 
+        timer_is_active: true, 
+        timer_start_time: now,
+        status: OSStatus.INICIADA
+      };
+      
+      if (lat && lng) {
+        updates.checkin_lat = lat;
+        updates.checkin_lng = lng;
+      }
+
+      await mockData.updateServiceOrder(id, updates);
+      await mockData.addOSActivity(id, { 
+        description: lat && lng 
+          ? `INICIOU CRONÓMETRO (CHECK-IN VALIDADO VIA GPS)` 
+          : `INICIOU CRONÓMETRO (CHECK-IN SEM GPS)` 
+      });
       await fetchOSDetails(false);
-    } catch (e) { setErrorMessage("ERRO AO INICIAR CRONÓMETRO."); } finally { setActionLoading(false); }
+    } catch (e) { 
+      setErrorMessage("ERRO AO INICIAR CRONÓMETRO."); 
+    } finally { 
+      setActionLoading(false); 
+    }
   };
 
   const handleStopTimer = () => { if (!id || !os?.timer_start_time) return; setShowTimerTypeModal(true); };
@@ -819,6 +854,24 @@ export const ServiceOrderDetail: React.FC = () => {
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {activeTab === 'info' && (
           <div className="space-y-3">
+            {/* INFORMAÇÃO DE CHECK-IN GPS */}
+            {os?.checkin_lat && os?.checkin_lng && (
+               <div className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800 rounded-2xl p-3 flex items-center justify-between px-6">
+                  <div className="flex items-center gap-3">
+                     <Navigation size={14} className="text-blue-600" />
+                     <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Presença validada no local via GPS</span>
+                  </div>
+                  <a 
+                    href={`https://www.google.com/maps/search/?api=1&query=${os.checkin_lat},${os.checkin_lng}`} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="text-[8px] font-black text-blue-400 underline uppercase hover:text-blue-600 transition-colors"
+                  >
+                    Ver Mapa
+                  </a>
+               </div>
+            )}
+
             {/* CARD DE ORÇAMENTO NO TOPO DA FICHA */}
             {quoteTotals.hasValues && (os?.status === OSStatus.PARA_ORCAMENTO || os?.status === OSStatus.ORCAMENTO_ENVIADO) && (
               <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-100 dark:border-blue-900/40 p-6 animate-in zoom-in-95 duration-500 overflow-hidden relative group">
@@ -1161,8 +1214,8 @@ export const ServiceOrderDetail: React.FC = () => {
                     <div key={part.id} className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center gap-3 transition-all hover:border-blue-100 dark:hover:border-blue-900/30 group">
                        <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:text-blue-500 group-hover:text-white transition-all"><Package size={14} /></div>
                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase leading-tight truncate">{part.name}</p>
-                          <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mt-0.5">REF: {part.reference} • <span className="text-blue-600 dark:text-blue-400 font-black">{part.quantity.toLocaleString('pt-PT', { maximumFractionDigits: 3 })} UN</span> {part.unit_price ? `• ${part.unit_price.toFixed(2)}€/un` : ''}</p>
+                          <p className="text-sm font-black text-slate-900 dark:text-white uppercase leading-tight truncate">{part.name}</p>
+                          <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mt-0.5">REF: {part.reference} • <span className="text-blue-600 dark:text-blue-400 font-black">{part.quantity.toLocaleString('pt-PT', { maximumFractionDigits: 3 })} UN</span> {part.unit_price ? `• ${part.unit_price.toFixed(2)}€/un` : ''}</p>
                        </div>
                        <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-200/60 dark:border-slate-700 shadow-sm flex-shrink-0">
                           <button onClick={() => { setPartToEditQuantity(part); setTempQuantityStr(part.quantity.toString().replace('.', ',')); setShowEditQuantityModal(true); }} disabled={os?.status === OSStatus.CONCLUIDA} className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"><Edit2 size={14} /></button>

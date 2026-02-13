@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { mockData } from './services/mockData';
@@ -43,6 +44,37 @@ const AppContent: React.FC<{
     // Forçar a exibição do modal de seleção de loja logo após o login
     triggerSelectionModal();
   };
+
+  // PONTO 3: Otimização de Atribuição (Monitorização de Localização)
+  useEffect(() => {
+    if (!user || user.role === UserRole.BACKOFFICE) return;
+
+    const updateLiveLocation = () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            try {
+              await mockData.updateProfile(user.id, {
+                last_lat: position.coords.latitude,
+                last_lng: position.coords.longitude,
+                last_location_update: new Date().toISOString()
+              });
+              console.debug("Live location updated");
+            } catch (e) {
+              console.warn("Falha ao atualizar localização live");
+            }
+          },
+          (err) => console.warn("GPS Indisponível:", err.message),
+          { enableHighAccuracy: false, timeout: 10000 }
+        );
+      }
+    };
+
+    // Atualiza a cada 10 minutos enquanto a app estiver aberta
+    updateLiveLocation();
+    const interval = setInterval(updateLiveLocation, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 text-gray-500 uppercase font-black text-[10px] tracking-widest">A iniciar...</div>;
 

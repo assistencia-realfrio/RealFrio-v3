@@ -1,11 +1,13 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Search, Mail, Shield, UserCog, Plus, X, Lock, User, 
-  AlertCircle, Sparkles, Edit2, ShieldAlert, LockKeyhole,
-  Palmtree, Calendar, Clock, History, Loader2,
-  ChevronDown, Building2, Download, Upload, FileSpreadsheet,
-  RotateCcw, Check, MapPin, ChevronRight
+  Search, UserCog, Plus, X, User, 
+  AlertCircle, Sparkles, Edit2, 
+  Palmtree, Loader2,
+  ChevronDown, Download, Upload,
+  Check, MapPin, ChevronRight, Navigation,
+  Clock, MonitorDot, Radio, Map as MapIcon,
+  List as ListIcon, ExternalLink
 } from 'lucide-react';
 import { Profile, UserRole, Vacation, VacationStatus } from '../types';
 import { mockData } from '../services/mockData';
@@ -15,6 +17,7 @@ const Users: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [activeView, setActiveView] = useState<'list' | 'live'>('list');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
@@ -29,11 +32,32 @@ const Users: React.FC = () => {
     const loadSessionAndUsers = async () => {
       setLoading(true);
       setCurrentUser(mockData.getSession());
-      try { setUsers(await mockData.getProfiles()); } catch (error) { console.error(error); }
+      try { 
+        const data = await mockData.getProfiles();
+        setUsers(data); 
+      } catch (error) { 
+        console.error(error); 
+      }
       setLoading(false);
     };
     loadSessionAndUsers();
-  }, []);
+
+    // Atualização automática dos dados da equipa a cada 30 segundos se estiver em modo LIVE
+    const interval = setInterval(() => {
+      if (activeView === 'live') refreshUsersSilently();
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [activeView]);
+
+  const refreshUsersSilently = async () => {
+    try {
+      const data = await mockData.getProfiles();
+      setUsers(data);
+    } catch (e) {
+      console.warn("Silent refresh failed");
+    }
+  };
 
   useEffect(() => { if (editingUser) fetchUserVacations(); }, [editingUser]);
 
@@ -77,7 +101,8 @@ const Users: React.FC = () => {
         await mockData.signUp(formData.email, formData.password, formData.fullName, formData.role, formData.store);
       }
       setShowModal(false);
-      setUsers(await mockData.getProfiles());
+      const updated = await mockData.getProfiles();
+      setUsers(updated);
     } catch (error: any) { setFormError(error.message); } finally { setIsSubmitting(false); }
   };
 
@@ -93,75 +118,152 @@ const Users: React.FC = () => {
     } finally { setVacationLoading(false); }
   };
 
+  const getLocationStatus = (lastUpdate?: string | null) => {
+    if (!lastUpdate) return { label: 'Sem GPS', color: 'bg-slate-400', pulse: false };
+    const diff = Date.now() - new Date(lastUpdate).getTime();
+    const mins = diff / 60000;
+    
+    if (mins < 15) return { label: 'Online agora', color: 'bg-emerald-500', pulse: true };
+    if (mins < 60) return { label: `Há ${Math.round(mins)} min`, color: 'bg-orange-500', pulse: false };
+    if (mins < 1440) return { label: `Há ${Math.round(mins/60)}h`, color: 'bg-slate-500', pulse: false };
+    return { label: 'Offline', color: 'bg-slate-300', pulse: false };
+  };
+
   if (loading) return (<div className="h-full flex flex-col items-center justify-center py-20"><div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6 pb-20">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Equipa Técnica</h1>
-          <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] mt-0.5">Gestão de Utilizadores</p>
+          <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] mt-0.5">Gestão e Monitorização</p>
         </div>
-        {isAdmin && (
-          <button type="button" onClick={() => handleOpenModal()} className="bg-slate-900 dark:bg-blue-600 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 dark:hover:bg-blue-700 transition-all flex items-center shadow-xl active:scale-95">
-            <Plus size={16} className="mr-2" />Novo Utilizador
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+           <div className="bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-100 dark:border-slate-800 flex shadow-sm">
+              <button 
+                onClick={() => setActiveView('list')}
+                className={`p-2.5 rounded-xl flex items-center gap-2 transition-all ${activeView === 'list' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-blue-600'}`}
+              >
+                <ListIcon size={16} />
+                <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Listagem</span>
+              </button>
+              <button 
+                onClick={() => setActiveView('live')}
+                className={`p-2.5 rounded-xl flex items-center gap-2 transition-all ${activeView === 'live' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600'}`}
+              >
+                <Radio size={16} className={activeView === 'live' ? 'animate-pulse' : ''} />
+                <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Live GPS</span>
+              </button>
+           </div>
+           {isAdmin && (
+            <button type="button" onClick={() => handleOpenModal()} className="p-3 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl shadow-xl active:scale-95 transition-all">
+              <Plus size={20} />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 mx-1 transition-colors">
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-slate-300" />
-          </div>
-          <input 
-            type="text" 
-            className="block w-full pl-12 pr-4 py-4 border-none bg-slate-50 dark:bg-slate-950 rounded-xl text-xs font-black focus:ring-4 focus:ring-blue-500/10 outline-none uppercase transition-all dark:text-white" 
-            placeholder="Pesquisar por nome..." 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)} 
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-col space-y-2 px-1">
-        {users
-          .filter(u => u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()))
-          .map((user) => (
-            <div 
-              key={user.id} 
-              onClick={() => handleOpenModal(user)}
-              className="flex items-center justify-between p-4.5 bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-blue-900 transition-all cursor-pointer active:scale-[0.99] group"
-            >
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all shadow-inner ${user.id === currentUser?.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'bg-slate-50 dark:bg-slate-800 text-slate-300 dark:text-slate-600'} group-hover:bg-blue-600 group-hover:text-white`}>
-                  <User size={18} />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[14px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight group-hover:text-blue-600 transition-colors">
-                    {user.full_name}
-                  </span>
-                  {user.id === currentUser?.id && (
-                    <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest">A Minha Conta</span>
-                  )}
-                </div>
+      {activeView === 'list' ? (
+        <>
+          <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 mx-1 transition-colors">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-slate-300" />
               </div>
-              <div className="flex items-center gap-3">
-                <span className={`hidden sm:inline-block text-[8px] px-2 py-0.5 rounded-full font-black border uppercase tracking-widest ${user.role?.toLowerCase() === UserRole.ADMIN ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-blue-50 text-blue-600 border-blue-100'} dark:bg-slate-800 dark:border-slate-700`}>
-                  {user.role}
-                </span>
-                <ChevronRight size={16} className="text-slate-200 dark:text-slate-700 group-hover:text-blue-500 transition-all" />
-              </div>
+              <input 
+                type="text" 
+                className="block w-full pl-12 pr-4 py-4 border-none bg-slate-50 dark:bg-slate-950 rounded-xl text-xs font-black focus:ring-4 focus:ring-blue-500/10 outline-none uppercase transition-all dark:text-white" 
+                placeholder="Pesquisar por nome..." 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+              />
             </div>
-          ))}
-          
-        {users.filter(u => u.full_name?.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
-          <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-gray-100 dark:border-slate-800 transition-colors">
-            <UserCog size={32} className="mx-auto text-gray-200 dark:text-slate-700 mb-4" />
-            <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest">Nenhum utilizador encontrado</p>
           </div>
-        )}
-      </div>
+
+          <div className="flex flex-col space-y-2 px-1 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            {users
+              .filter(u => u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()))
+              .map((user) => (
+                <div 
+                  key={user.id} 
+                  onClick={() => handleOpenModal(user)}
+                  className="flex items-center justify-between p-4.5 bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-blue-900 transition-all cursor-pointer active:scale-[0.99] group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all shadow-inner ${user.id === currentUser?.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'bg-slate-50 dark:bg-slate-800 text-slate-300 dark:text-slate-600'} group-hover:bg-blue-600 group-hover:text-white`}>
+                      <User size={18} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[14px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight group-hover:text-blue-600 transition-colors">
+                        {user.full_name}
+                      </span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={`text-[8px] font-black uppercase tracking-widest ${user.role?.toLowerCase() === UserRole.ADMIN ? 'text-purple-500' : 'text-blue-500'}`}>{user.role}</span>
+                        {user.id === currentUser?.id && <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">• Eu</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-slate-200 dark:text-slate-700 group-hover:text-blue-500 transition-all" />
+                </div>
+              ))}
+          </div>
+        </>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-1 animate-in fade-in zoom-in-95 duration-500">
+           {users.filter(u => u.role !== UserRole.BACKOFFICE).map(user => {
+              const status = getLocationStatus(user.last_location_update);
+              return (
+                <div key={user.id} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl flex flex-col relative overflow-hidden group">
+                   <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity"><Navigation size={80} /></div>
+                   
+                   <div className="flex justify-between items-start mb-6">
+                      <div className="flex items-center gap-4">
+                         <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 shadow-inner group-hover:bg-indigo-600 group-hover:text-white transition-all"><User size={24} /></div>
+                         <div>
+                            <h3 className="text-base font-black text-slate-900 dark:text-white uppercase truncate max-w-[140px]">{user.full_name}</h3>
+                            <div className="flex items-center gap-1.5 mt-1">
+                               <div className={`w-2 h-2 rounded-full ${status.color} ${status.pulse ? 'animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]' : ''}`}></div>
+                               <span className={`text-[9px] font-black uppercase tracking-widest ${status.pulse ? 'text-emerald-500' : 'text-slate-400'}`}>{status.label}</span>
+                            </div>
+                         </div>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-100 dark:border-slate-700">
+                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{user.store}</span>
+                      </div>
+                   </div>
+
+                   <div className="mt-auto space-y-4">
+                      {user.last_lat && user.last_lng ? (
+                        <>
+                          <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/50">
+                             <div className="flex items-center gap-2 mb-2">
+                                <MapPin size={12} className="text-indigo-500" />
+                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Coordenadas de Check-in</span>
+                             </div>
+                             <p className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-400 uppercase tracking-tighter">LAT: {user.last_lat.toFixed(6)}</p>
+                             <p className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-400 uppercase tracking-tighter">LNG: {user.last_lng.toFixed(6)}</p>
+                          </div>
+                          <a 
+                            href={`https://www.google.com/maps/search/?api=1&query=${user.last_lat},${user.last_lng}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="w-full py-4 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 shadow-lg shadow-indigo-600/20 active:scale-95"
+                          >
+                             <ExternalLink size={14} /> LOCALIZAR TÉCNICO NO MAPA
+                          </a>
+                        </>
+                      ) : (
+                        <div className="py-10 text-center border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl bg-slate-50/30 dark:bg-slate-950/30">
+                           <MapPin size={24} className="mx-auto text-slate-200 dark:text-slate-800 mb-2" />
+                           <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Sem sinal de GPS recente</p>
+                        </div>
+                      )}
+                   </div>
+                </div>
+              );
+           })}
+        </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
@@ -171,7 +273,7 @@ const Users: React.FC = () => {
                   <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.1em]">{editingUser ? `FICHA TÉCNICA: ${editingUser.full_name}` : 'REGISTO DE NOVO TÉCNICO'}</h3>
                   <p className="text-[9px] font-black text-blue-500 uppercase flex items-center gap-1.5 mt-2 tracking-widest"><Sparkles size={12} /> GESTÃO DE PERFIL E AUSÊNCIAS</p>
                 </div>
-                <button type="button" onClick={() => setShowModal(false)} className="text-slate-300 hover:text-red-500 p-2 transition-colors"><X size={28}/></button>
+                <button type="button" onClick={() => setShowModal(false)} className="text-slate-400 hover:text-red-500 p-2 transition-colors"><X size={28}/></button>
               </div>
               <div className="overflow-y-auto p-10 space-y-10 no-scrollbar">
                 {formError && (<div className="bg-red-50 p-5 rounded-3xl flex items-center gap-4 text-red-600 animate-shake"><AlertCircle size={24} /><p className="text-[10px] font-black uppercase tracking-tight">{formError}</p></div>)}

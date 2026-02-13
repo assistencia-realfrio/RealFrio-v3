@@ -174,6 +174,9 @@ export interface ServiceOrder {
   store: string;
   timer_is_active?: boolean;
   timer_start_time?: string | null;
+  // Geolocalização de Check-in
+  checkin_lat?: number | null;
+  checkin_lng?: number | null;
 }
 
 export interface Profile {
@@ -181,7 +184,11 @@ export interface Profile {
   email: string;
   full_name: string;
   role: UserRole;
-  store: string; 
+  store: string;
+  // Localização em Tempo Real (Otimização de Atribuição)
+  last_lat?: number | null;
+  last_lng?: number | null;
+  last_location_update?: string | null;
 }
 
 export interface OSActivity {
