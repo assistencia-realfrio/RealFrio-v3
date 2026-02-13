@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, UserCog, Plus, X, User, 
   AlertCircle, Sparkles, Edit2, 
@@ -7,17 +7,22 @@ import {
   ChevronDown, Download, Upload,
   Check, MapPin, ChevronRight, Navigation,
   Clock, MonitorDot, Radio, Map as MapIcon,
-  List as ListIcon, ExternalLink
+  List as ListIcon, ExternalLink, LayoutGrid, Maximize,
+  RefreshCw
 } from 'lucide-react';
 import { Profile, UserRole, Vacation, VacationStatus } from '../types';
 import { mockData } from '../services/mockData';
 
+declare var L: any; // Leaflet Global
+
 const Users: React.FC = () => {
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [activeView, setActiveView] = useState<'list' | 'live'>('list');
+  const [liveSubView, setLiveSubView] = useState<'cards' | 'map'>('cards');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
@@ -27,6 +32,10 @@ const Users: React.FC = () => {
   const [editingVacationId, setEditingVacationId] = useState<string | null>(null);
   const [newVacation, setNewVacation] = useState({ start_date: '', end_date: '', notes: '', store: 'Todas' });
   const [formData, setFormData] = useState({ fullName: '', email: '', password: '', role: UserRole.TECNICO, store: 'Caldas da Rainha' });
+
+  const mapInstanceRef = useRef<any>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const markersRef = useRef<any>({});
 
   useEffect(() => {
     const loadSessionAndUsers = async () => {
@@ -42,35 +51,122 @@ const Users: React.FC = () => {
     };
     loadSessionAndUsers();
 
-    // Atualização automática dos dados da equipa a cada 30 segundos se estiver em modo LIVE
+    // Refresh mais rápido para monitorização live
     const interval = setInterval(() => {
       if (activeView === 'live') refreshUsersSilently();
-    }, 30000);
+    }, 15000); 
     
     return () => clearInterval(interval);
   }, [activeView]);
 
-  const refreshUsersSilently = async () => {
+  // Efeito para Gerir o Mapa Leaflet
+  useEffect(() => {
+    if (activeView === 'live' && liveSubView === 'map' && !loading) {
+      const timer = setTimeout(() => {
+        initMap();
+      }, 400);
+      return () => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.remove();
+          mapInstanceRef.current = null;
+        }
+        clearTimeout(timer);
+      };
+    }
+  }, [activeView, liveSubView, loading]);
+
+  const initMap = () => {
+    if (!mapContainerRef.current || mapInstanceRef.current) return;
+
     try {
-      const data = await mockData.getProfiles();
-      setUsers(data);
+      const techniciansWithLoc = users.filter(u => u.last_lat && u.last_lng);
+      
+      const center: [number, number] = techniciansWithLoc.length > 0 
+        ? [techniciansWithLoc[0].last_lat!, techniciansWithLoc[0].last_lng!] 
+        : [39.5, -8.5];
+
+      mapInstanceRef.current = L.map(mapContainerRef.current, {
+        zoomControl: false,
+        attributionControl: false
+      }).setView(center, 10);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstanceRef.current);
+      
+      const markerGroup = L.featureGroup();
+      markersRef.current = {};
+
+      techniciansWithLoc.forEach(user => {
+        const status = getLocationStatus(user.last_location_update);
+        const markerHtml = `
+          <div class="custom-marker-icon">
+            <div class="marker-pin" style="background-color: ${status.hex};"></div>
+          </div>
+        `;
+
+        const icon = L.divIcon({
+          html: markerHtml,
+          className: 'custom-div-icon',
+          iconSize: [30, 42],
+          iconAnchor: [15, 42]
+        });
+
+        const marker = L.marker([user.last_lat, user.last_lng], { icon })
+          .bindPopup(`
+            <div style="text-align: center; min-width: 120px;">
+              <p style="margin: 0 0 5px 0; font-weight: 900; color: #1e293b; font-size: 11px;">${user.full_name}</p>
+              <div style="display: inline-block; padding: 2px 8px; border-radius: 99px; background: ${status.hex}20; color: ${status.hex}; font-size: 8px; font-weight: 900;">${status.label.toUpperCase()}</div>
+              <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 8px; border-top: 1px solid #f1f5f9; pt: 4px;">LOJA: ${user.store.toUpperCase()}</p>
+            </div>
+          `);
+          
+        markersRef.current[user.id] = marker;
+        marker.addTo(markerGroup);
+      });
+
+      markerGroup.addTo(mapInstanceRef.current);
+
+      if (techniciansWithLoc.length > 0) {
+        mapInstanceRef.current.fitBounds(markerGroup.getBounds(), { padding: [50, 50] });
+      }
+
     } catch (e) {
-      console.warn("Silent refresh failed");
+      console.error("Erro Leaflet:", e);
     }
   };
 
-  useEffect(() => { if (editingUser) fetchUserVacations(); }, [editingUser]);
-
-  const fetchUserVacations = async () => {
-    if (!editingUser) return;
-    setVacationLoading(true);
+  const refreshUsersSilently = async () => {
+    setIsRefreshing(true);
     try {
-      const allVacations = await mockData.getVacations();
-      setUserVacations(allVacations.filter(v => v.user_id === editingUser.id).sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()));
-    } finally { setVacationLoading(false); }
+      const data = await mockData.getProfiles();
+      setUsers(data);
+      
+      // Se o mapa estiver aberto, atualizar posições sem re-renderizar tudo
+      if (mapInstanceRef.current && liveSubView === 'map') {
+        data.forEach(user => {
+          if (user.last_lat && user.last_lng && markersRef.current[user.id]) {
+            markersRef.current[user.id].setLatLng([user.last_lat, user.last_lng]);
+            // Atualizar cor do pin se necessário (via novo ícone se o status mudou)
+          }
+        });
+      }
+    } catch (e) {
+      console.warn("Silent refresh failed");
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 1000);
+    }
   };
 
-  const isAdmin = currentUser?.role?.toLowerCase() === UserRole.ADMIN;
+  const getLocationStatus = (lastUpdate?: string | null) => {
+    if (!lastUpdate) return { label: 'Sem GPS', color: 'bg-slate-400', hex: '#94a3b8', pulse: false };
+    const diff = Date.now() - new Date(lastUpdate).getTime();
+    const mins = diff / 60000;
+    
+    // Status mais sensível para feedback imediato
+    if (mins < 15) return { label: 'Online agora', color: 'bg-emerald-500', hex: '#10b981', pulse: true };
+    if (mins < 60) return { label: `Há ${Math.round(mins)} min`, color: 'bg-orange-500', hex: '#f97316', pulse: false };
+    if (mins < 1440) return { label: `Há ${Math.round(mins/60)}h`, color: 'bg-slate-500', hex: '#64748b', pulse: false };
+    return { label: 'Offline', color: 'bg-slate-300', hex: '#cbd5e1', pulse: false };
+  };
 
   const handleOpenModal = (user?: Profile) => {
     setFormError(null);
@@ -118,25 +214,35 @@ const Users: React.FC = () => {
     } finally { setVacationLoading(false); }
   };
 
-  const getLocationStatus = (lastUpdate?: string | null) => {
-    if (!lastUpdate) return { label: 'Sem GPS', color: 'bg-slate-400', pulse: false };
-    const diff = Date.now() - new Date(lastUpdate).getTime();
-    const mins = diff / 60000;
-    
-    if (mins < 15) return { label: 'Online agora', color: 'bg-emerald-500', pulse: true };
-    if (mins < 60) return { label: `Há ${Math.round(mins)} min`, color: 'bg-orange-500', pulse: false };
-    if (mins < 1440) return { label: `Há ${Math.round(mins/60)}h`, color: 'bg-slate-500', pulse: false };
-    return { label: 'Offline', color: 'bg-slate-300', pulse: false };
+  const fetchUserVacations = async () => {
+    if (!editingUser) return;
+    setVacationLoading(true);
+    try {
+      const allVacations = await mockData.getVacations();
+      setUserVacations(allVacations.filter(v => v.user_id === editingUser.id).sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()));
+    } finally { setVacationLoading(false); }
   };
+
+  const isAdmin = currentUser?.role?.toLowerCase() === UserRole.ADMIN;
 
   if (loading) return (<div className="h-full flex flex-col items-center justify-center py-20"><div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Equipa Técnica</h1>
-          <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] mt-0.5">Gestão e Monitorização</p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Equipa Técnica</h1>
+            <div className="flex items-center gap-2 mt-0.5">
+               <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em]">Gestão e Monitorização</p>
+               {activeView === 'live' && (
+                 <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 rounded-full border border-blue-100 dark:border-blue-800">
+                    <RefreshCw size={8} className={`text-blue-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    <span className="text-[7px] font-black text-blue-600 dark:text-blue-400 uppercase">Live 15s</span>
+                 </div>
+               )}
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-2">
            <div className="bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-100 dark:border-slate-800 flex shadow-sm">
@@ -145,14 +251,14 @@ const Users: React.FC = () => {
                 className={`p-2.5 rounded-xl flex items-center gap-2 transition-all ${activeView === 'list' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-blue-600'}`}
               >
                 <ListIcon size={16} />
-                <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Listagem</span>
+                <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Equipa</span>
               </button>
               <button 
                 onClick={() => setActiveView('live')}
                 className={`p-2.5 rounded-xl flex items-center gap-2 transition-all ${activeView === 'live' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600'}`}
               >
                 <Radio size={16} className={activeView === 'live' ? 'animate-pulse' : ''} />
-                <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Live GPS</span>
+                <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Radar Live</span>
               </button>
            </div>
            {isAdmin && (
@@ -209,59 +315,107 @@ const Users: React.FC = () => {
           </div>
         </>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-1 animate-in fade-in zoom-in-95 duration-500">
-           {users.filter(u => u.role !== UserRole.BACKOFFICE).map(user => {
-              const status = getLocationStatus(user.last_location_update);
-              return (
-                <div key={user.id} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl flex flex-col relative overflow-hidden group">
-                   <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity"><Navigation size={80} /></div>
-                   
-                   <div className="flex justify-between items-start mb-6">
-                      <div className="flex items-center gap-4">
-                         <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 shadow-inner group-hover:bg-indigo-600 group-hover:text-white transition-all"><User size={24} /></div>
-                         <div>
-                            <h3 className="text-base font-black text-slate-900 dark:text-white uppercase truncate max-w-[140px]">{user.full_name}</h3>
-                            <div className="flex items-center gap-1.5 mt-1">
-                               <div className={`w-2 h-2 rounded-full ${status.color} ${status.pulse ? 'animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]' : ''}`}></div>
-                               <span className={`text-[9px] font-black uppercase tracking-widest ${status.pulse ? 'text-emerald-500' : 'text-slate-400'}`}>{status.label}</span>
-                            </div>
-                         </div>
-                      </div>
-                      <div className="bg-slate-50 dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-100 dark:border-slate-700">
-                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{user.store}</span>
-                      </div>
-                   </div>
+        <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+           {/* SUB-VIEW SELECTOR PARA LIVE */}
+           <div className="flex justify-center px-1">
+              <div className="bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800 flex shadow-sm">
+                 <button 
+                  onClick={() => setLiveSubView('cards')}
+                  className={`px-6 py-2.5 rounded-xl flex items-center gap-2 transition-all ${liveSubView === 'cards' ? 'bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-black' : 'text-slate-400'}`}
+                 >
+                    <LayoutGrid size={16} />
+                    <span className="text-[9px] uppercase tracking-[0.1em]">Cartões</span>
+                 </button>
+                 <button 
+                  onClick={() => setLiveSubView('map')}
+                  className={`px-6 py-2.5 rounded-xl flex items-center gap-2 transition-all ${liveSubView === 'map' ? 'bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-black' : 'text-slate-400'}`}
+                 >
+                    <MapIcon size={16} />
+                    <span className="text-[9px] uppercase tracking-[0.1em]">Mapa Interativo</span>
+                 </button>
+              </div>
+           </div>
 
-                   <div className="mt-auto space-y-4">
-                      {user.last_lat && user.last_lng ? (
-                        <>
-                          <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/50">
-                             <div className="flex items-center gap-2 mb-2">
-                                <MapPin size={12} className="text-indigo-500" />
-                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Coordenadas de Check-in</span>
-                             </div>
-                             <p className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-400 uppercase tracking-tighter">LAT: {user.last_lat.toFixed(6)}</p>
-                             <p className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-400 uppercase tracking-tighter">LNG: {user.last_lng.toFixed(6)}</p>
-                          </div>
-                          <a 
-                            href={`https://www.google.com/maps/search/?api=1&query=${user.last_lat},${user.last_lng}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="w-full py-4 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 shadow-lg shadow-indigo-600/20 active:scale-95"
-                          >
-                             <ExternalLink size={14} /> LOCALIZAR TÉCNICO NO MAPA
-                          </a>
-                        </>
-                      ) : (
-                        <div className="py-10 text-center border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl bg-slate-50/30 dark:bg-slate-950/30">
-                           <MapPin size={24} className="mx-auto text-slate-200 dark:text-slate-800 mb-2" />
-                           <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Sem sinal de GPS recente</p>
+           {liveSubView === 'cards' ? (
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-1">
+                {users.filter(u => u.role !== UserRole.BACKOFFICE).map(user => {
+                    const status = getLocationStatus(user.last_location_update);
+                    return (
+                      <div key={user.id} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl flex flex-col relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity"><Navigation size={80} /></div>
+                        
+                        <div className="flex justify-between items-start mb-6">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 shadow-inner group-hover:bg-indigo-600 group-hover:text-white transition-all"><User size={24} /></div>
+                              <div>
+                                  <h3 className="text-base font-black text-slate-900 dark:text-white uppercase truncate max-w-[140px]">{user.full_name}</h3>
+                                  <div className="flex items-center gap-1.5 mt-1">
+                                    <div className={`w-2 h-2 rounded-full ${status.color} ${status.pulse ? 'animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]' : ''}`}></div>
+                                    <span className={`text-[9px] font-black uppercase tracking-widest ${status.pulse ? 'text-emerald-500' : 'text-slate-400'}`}>{status.label}</span>
+                                  </div>
+                              </div>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-100 dark:border-slate-700">
+                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{user.store}</span>
+                            </div>
                         </div>
-                      )}
+
+                        <div className="mt-auto space-y-4">
+                            {user.last_lat && user.last_lng ? (
+                              <>
+                                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/50">
+                                  <div className="flex items-center gap-2 mb-2">
+                                      <MapPin size={12} className="text-indigo-500" />
+                                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Coordenadas de Check-in</span>
+                                  </div>
+                                  <p className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-400 uppercase tracking-tighter">LAT: {user.last_lat.toFixed(6)}</p>
+                                  <p className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-400 uppercase tracking-tighter">LNG: {user.last_lng.toFixed(6)}</p>
+                                </div>
+                                <a 
+                                  href={`https://www.google.com/maps/search/?api=1&query=${user.last_lat},${user.last_lng}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="w-full py-4 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 shadow-lg shadow-indigo-600/20 active:scale-95"
+                                >
+                                  <ExternalLink size={14} /> LOCALIZAR TÉCNICO NO MAPA
+                                </a>
+                              </>
+                            ) : (
+                              <div className="py-10 text-center border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl bg-slate-50/30 dark:bg-slate-950/30">
+                                <MapPin size={24} className="mx-auto text-slate-200 dark:text-slate-800 mb-2" />
+                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Sem sinal de GPS recente</p>
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    );
+                })}
+             </div>
+           ) : (
+             <div className="px-1 h-[500px] sm:h-[600px] relative animate-in zoom-in-95 duration-500">
+                <div ref={mapContainerRef} className="w-full h-full rounded-[2.5rem] shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden bg-slate-100 dark:bg-slate-950"></div>
+                <div className="absolute top-4 left-4 z-[20] flex flex-col gap-2">
+                   <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-3 rounded-2xl shadow-lg border border-white/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MonitorDot size={12} className="text-indigo-500 animate-pulse" />
+                        <span className="text-[8px] font-black uppercase text-slate-400">Estado dos Canais</span>
+                      </div>
+                      <div className="space-y-1.5">
+                         <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500"></div><span className="text-[7px] font-black text-slate-500 uppercase">ATIVOS AGORA</span></div>
+                         <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500"></div><span className="text-[7px] font-black text-slate-500 uppercase">SINAL RECENTE</span></div>
+                         <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-slate-400"></div><span className="text-[7px] font-black text-slate-500 uppercase">DESLIGADOS</span></div>
+                      </div>
                    </div>
                 </div>
-              );
-           })}
+                <button 
+                  onClick={() => { if(mapInstanceRef.current) mapInstanceRef.current.setView([39.5, -8.5], 7); }}
+                  className="absolute bottom-6 right-6 z-[20] p-4 bg-white dark:bg-slate-900 text-indigo-600 rounded-full shadow-2xl border border-gray-100 dark:border-slate-800 active:scale-95 transition-all"
+                  title="Focar em Portugal"
+                >
+                  <Maximize size={24} />
+                </button>
+             </div>
+           )}
         </div>
       )}
 
@@ -284,7 +438,7 @@ const Users: React.FC = () => {
                         <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Loja *</label><select disabled={!isAdmin} value={formData.store} onChange={e => setFormData({...formData, store: e.target.value})} className="w-full px-6 py-4.5 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-black appearance-none dark:text-white outline-none"><option value="Caldas da Rainha">CALDAS DA RAINHA</option><option value="Porto de Mós">PORTO DE MÓS</option><option value="Todas">TODAS</option></select></div>
                         <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Cargo</label><select disabled={!isAdmin} value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as UserRole})} className="w-full px-6 py-4.5 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-black appearance-none dark:text-white outline-none"><option value={UserRole.TECNICO}>TÉCNICO</option><option value={UserRole.ADMIN}>ADMINISTRADOR</option></select></div>
                    </div>
-                   <button type="submit" disabled={isSubmitting} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] text-[11px] font-black uppercase tracking-[0.25em] shadow-2xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 mt-4">{editingUser ? 'GUARDAR ALTERAÇÕES' : 'CRIAR ACESSO'}</button>
+                   <button type="submit" disabled={isSubmitting} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] text-[11px] font-black uppercase tracking-[0.25em] shadow-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 mt-4">{editingUser ? 'GUARDAR ALTERAÇÕES' : 'CRIAR ACESSO'}</button>
                 </form>
                 {editingUser && (
                   <div className="space-y-8 animate-in fade-in duration-500">

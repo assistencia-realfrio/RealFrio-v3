@@ -7,7 +7,7 @@
   "display": "standalone",
   "background_color": "#020617",
   "theme_color": "#9d1c24",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "icons": [
     {
       "src": "/rf-icon-192-v5.png",

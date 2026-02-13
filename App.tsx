@@ -30,7 +30,6 @@ import { StoreProvider, useStore } from './contexts/StoreContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import StoreSelectionModal from './components/StoreSelectionModal';
 
-// Componente Wrapper para injetar comportamentos dependentes do contexto no App principal
 const AppContent: React.FC<{ 
   user: any; 
   onLogin: () => void; 
@@ -41,38 +40,52 @@ const AppContent: React.FC<{
 
   const handleLoginSuccess = () => {
     onLogin();
-    // Forçar a exibição do modal de seleção de loja logo após o login
     triggerSelectionModal();
   };
 
-  // PONTO 3: Otimização de Atribuição (Monitorização de Localização)
+  // PONTO 3: Otimização de Atribuição (Monitorização de Localização Live)
   useEffect(() => {
+    // Apenas Backoffice não reporta localização
     if (!user || user.role === UserRole.BACKOFFICE) return;
 
     const updateLiveLocation = () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            try {
-              await mockData.updateProfile(user.id, {
-                last_lat: position.coords.latitude,
-                last_lng: position.coords.longitude,
-                last_location_update: new Date().toISOString()
-              });
-              console.debug("Live location updated");
-            } catch (e) {
-              console.warn("Falha ao atualizar localização live");
-            }
-          },
-          (err) => console.warn("GPS Indisponível:", err.message),
-          { enableHighAccuracy: false, timeout: 10000 }
-        );
-      }
+      if (!navigator.geolocation) return;
+
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      };
+
+      const success = async (position: GeolocationPosition) => {
+        try {
+          await mockData.updateProfile(user.id, {
+            last_lat: position.coords.latitude,
+            last_lng: position.coords.longitude,
+            last_location_update: new Date().toISOString()
+          });
+          console.debug("📍 GPS: Localização atualizada com sucesso.");
+        } catch (e) {
+          console.warn("⚠️ Falha ao persistir localização na DB.");
+        }
+      };
+
+      const error = (err: GeolocationPositionError) => {
+        console.warn(`❌ GPS Erro (${err.code}): ${err.message}. A tentar fallback...`);
+        // Fallback: Tenta com precisão baixa (mais provável funcionar em interiores)
+        navigator.geolocation.getCurrentPosition(success, (err2) => {
+           console.error("🚫 Falha total no acesso ao GPS:", err2.message);
+        }, { enableHighAccuracy: false, timeout: 5000 });
+      };
+
+      navigator.geolocation.getCurrentPosition(success, error, options);
     };
 
-    // Atualiza a cada 10 minutos enquanto a app estiver aberta
+    // Executa imediatamente ao carregar
     updateLiveLocation();
-    const interval = setInterval(updateLiveLocation, 10 * 60 * 1000);
+    
+    // Atualiza a cada 3 minutos para garantir frescura dos dados sem drenar bateria excessiva
+    const interval = setInterval(updateLiveLocation, 3 * 60 * 1000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -80,13 +93,10 @@ const AppContent: React.FC<{
 
   return (
     <>
-      {/* Modal de Seleção de Loja (Apenas para utilizadores logados) */}
       {user && <StoreSelectionModal />}
 
       <Routes>
-        {/* Rota Pública para Clientes */}
         <Route path="/proposal/:id" element={<PublicQuoteView />} />
-
         <Route path="/login" element={!user ? <Login onLogin={handleLoginSuccess} /> : <Navigate to="/" />} />
         
         <Route path="/" element={user ? <Layout user={user} onLogout={onLogout}><Dashboard /></Layout> : <Navigate to="/login" />} />

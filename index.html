@@ -17,6 +17,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Real Frio">
 
+    <!-- Leaflet Maps CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -59,7 +62,17 @@
         letter-spacing: 0.1em !important;
         margin-top: 10px !important;
       }
+      
+      /* Estilos para o Mapa Global */
+      .leaflet-container { width: 100%; height: 100%; border-radius: 2rem; z-index: 10; }
+      .dark .leaflet-tile { filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3); }
+      .leaflet-popup-content-wrapper { border-radius: 1rem; padding: 5px; font-weight: 600; text-transform: uppercase; font-size: 10px; }
+      .custom-marker-icon { display: flex; align-items: center; justify-content: center; }
+      .marker-pin { width: 24px; height: 24px; border-radius: 50% 50% 50% 0; background: #3b82f6; position: absolute; transform: rotate(-45deg); left: 50%; top: 50%; margin: -12px 0 0 -12px; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+      .marker-pin::after { content: ''; width: 12px; height: 12px; margin: 4px 0 0 4px; background: #fff; position: absolute; border-radius: 50%; }
     </style>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script type="importmap">
 {
   "imports": {
