@@ -6,7 +6,7 @@ import {
   Loader2, MapPin, Palmtree, Plus, 
   Sparkles, X, Edit2, Download, Upload, FileSpreadsheet,
   Bell, BellOff, BellRing, Settings2, AlertTriangle,
-  SendHorizontal
+  SendHorizontal, RefreshCw
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { notificationService } from '../services/notificationService';
@@ -30,6 +30,7 @@ const Profile: React.FC = () => {
   // Estados de Notificações
   const [pushStatus, setPushStatus] = useState<'default' | 'granted' | 'denied' | 'unsupported'>('default');
   const [isSubscribing, setIsSubscribing] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
 
   useEffect(() => {
     const u = mockData.getSession();
@@ -56,25 +57,23 @@ const Profile: React.FC = () => {
       setPushStatus(Notification.permission as any);
 
       if (granted) {
-        // Tentar subscrever para Push real (Backgound)
         if ('serviceWorker' in navigator && 'PushManager' in window) {
           try {
             const registration = await navigator.serviceWorker.ready;
-            // Chave pública genérica para permitir a subscrição inicial
             const subscription = await registration.pushManager.subscribe({
               userVisibleOnly: true,
               applicationServerKey: 'BEl62vp9IH1w94S_7pQ3U656A74377F7A74377F7A74377F7A74377F7A74377F7A' 
             });
             await mockData.savePushSubscription(user.id, subscription);
           } catch (pushErr) {
-            console.warn("Push subscription falhou, mas notificações locais funcionarão:", pushErr);
+            console.warn("Push subscription opcional falhou:", pushErr);
           }
         }
         
-        setSuccess("Notificações ativadas!");
-        notificationService.notify(
-          "Sistema Ativo", 
-          `Olá ${user.full_name}, as notificações foram configuradas com sucesso.`
+        setSuccess("Alertas configurados!");
+        await notificationService.notify(
+          "Sistema Real Frio", 
+          `Configuração concluída com sucesso para ${user.full_name}.`
         );
       }
     } catch (err) {
@@ -86,17 +85,36 @@ const Profile: React.FC = () => {
   };
 
   const handleTestNotification = async () => {
-    if (Notification.permission !== 'granted') {
-       const granted = await notificationService.requestPermission();
-       if (!granted) return;
-    }
+    if (isTesting) return;
+    setIsTesting(true);
     
-    // Usar o serviço central para garantir que o teste reflete a realidade
-    await notificationService.notify(
-      "Teste de Alerta 🚨", 
-      "Se está a ver isto, o motor de avisos da Real Frio está a comunicar corretamente com o seu dispositivo.",
-      "/profile"
-    );
+    try {
+      // Forçar pedido se estiver em default
+      if (Notification.permission === 'default') {
+         const granted = await notificationService.requestPermission();
+         setPushStatus(Notification.permission as any);
+         if (!granted) {
+           setIsTesting(false);
+           return;
+         }
+      }
+      
+      const success = await notificationService.notify(
+        "Teste de Alerta 🚨", 
+        "O motor de avisos da Real Frio está operacional neste dispositivo.",
+        "/profile"
+      );
+      
+      if (success) {
+        setSuccess("Comando de teste enviado!");
+        setTimeout(() => setSuccess(null), 3000);
+      }
+    } catch (e) {
+      console.error("Erro no teste:", e);
+      setError("Falha ao disparar teste.");
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const fetchUserVacations = async (currentUser: any) => {
@@ -220,10 +238,11 @@ const Profile: React.FC = () => {
         {pushStatus === 'granted' && (
           <button 
             onClick={handleTestNotification}
-            className="w-full flex items-center justify-center gap-3 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-[9px] font-black uppercase tracking-widest border border-slate-100 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-[0.98]"
+            disabled={isTesting}
+            className="w-full flex items-center justify-center gap-3 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-[9px] font-black uppercase tracking-widest border border-slate-100 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-[0.98] disabled:opacity-50"
           >
-            <SendHorizontal size={14} />
-            Testar Sistema de Alertas
+            {isTesting ? <RefreshCw size={14} className="animate-spin" /> : <SendHorizontal size={14} />}
+            {isTesting ? 'A ENVIAR TESTE...' : 'Testar Sistema de Alertas'}
           </button>
         )}
         

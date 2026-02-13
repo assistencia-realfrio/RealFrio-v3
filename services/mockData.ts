@@ -83,7 +83,6 @@ export const mockData = {
     return true;
   },
 
-  // Restante das funções de mockData omitidas para brevidade, mantendo a estrutura original...
   // Quotes
   getQuotes: async () => {
     const { data, error } = await supabase
@@ -359,6 +358,17 @@ export const mockData = {
     const code = generateSmartCode('', os.store || 'Todas');
     const { data, error } = await supabase.from('service_orders').insert([{ ...os, code }]).select().single();
     if (error) throw error;
+
+    if (data) {
+      // REGISTAR ATIVIDADE DE CRIAÇÃO PARA FEED E LOG
+      const session = mockData.getSession();
+      await supabase.from('os_activities').insert([{
+        os_id: data.id,
+        user_name: session?.full_name || 'Sistema',
+        description: `ABRIU NOVA ORDEM DE SERVIÇO (ESTADO: POR INICIAR)`
+      }]);
+    }
+
     return data;
   },
   updateServiceOrder: async (id: string, updates: Partial<ServiceOrder>) => {

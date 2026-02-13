@@ -1,61 +1,77 @@
 
 export const notificationService = {
   /**
-   * Dispara uma notificação.
+   * Dispara uma notificação de forma resiliente.
    */
   notify: async (title: string, body: string, url: string = '/') => {
-    console.log(`[NotificationService] A tentar enviar: ${title}`);
+    console.log(`[NotificationService] Iniciando disparo: ${title}`);
 
     if (!("Notification" in window)) {
-      console.error("Este navegador não suporta notificações.");
-      return;
+      alert("Erro: Este navegador não suporta notificações de sistema.");
+      return false;
     }
 
     if (Notification.permission !== "granted") {
-      console.warn("Permissão de notificação não concedida. Estado atual:", Notification.permission);
-      return;
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        alert("Erro: Permissão de notificações negada. Ative-as nas definições do browser.");
+        return false;
+      }
     }
 
+    const options = {
+      body,
+      icon: '/rf-icon-192-v5.png',
+      badge: '/rf-favicon-v5.png',
+      vibrate: [200, 100, 200],
+      tag: 'rf-notification-' + Date.now(),
+      data: { url: window.location.origin + '/#' + url }
+    };
+
+    let success = false;
+
+    // 1. Tentar via Service Worker (Obrigatório para Mobile/PWA)
     try {
-      // 1. Tentar via Service Worker (Obrigatório para PWAs e Android/iOS em background)
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await navigator.serviceWorker.getRegistration();
       if (registration && registration.showNotification) {
-        console.log("[NotificationService] A usar Service Worker para exibir.");
-        await registration.showNotification(title, {
-          body,
-          icon: '/rf-icon-192-v5.png',
-          badge: '/rf-favicon-v5.png',
-          vibrate: [200, 100, 200],
-          data: { url: window.location.origin + '/#' + url }
-        } as any);
-        return;
+        await registration.showNotification(title, options);
+        console.log("[NotificationService] Disparado via SW.");
+        success = true;
       }
     } catch (swError) {
-      console.error("[NotificationService] Erro via Service Worker:", swError);
+      console.warn("[NotificationService] Erro no Service Worker:", swError);
     }
 
-    // 2. Fallback: Notificação nativa clássica (Apenas funciona com a tab aberta)
+    // 2. Fallback Nativo (Apenas funciona se a tab estiver aberta/foreground)
     try {
-      console.log("[NotificationService] A usar fallback nativo.");
-      new Notification(title, { 
-        body, 
-        icon: '/rf-icon-192-v5.png'
-      });
+      if (!success) {
+        new Notification(title, options);
+        console.log("[NotificationService] Disparado via API Nativa.");
+        success = true;
+      }
     } catch (e) {
-      console.error("[NotificationService] Falha total ao exibir notificação:", e);
+      console.error("[NotificationService] Falha total no disparo:", e);
     }
+
+    if (!success) {
+      alert("O sistema tentou enviar o alerta mas o seu dispositivo bloqueou a exibição.");
+    }
+
+    return success;
   },
 
+  /**
+   * Solicita permissão e garante que o SW está ativo
+   */
   requestPermission: async () => {
     if (!("Notification" in window)) return false;
     
     if (Notification.permission === "denied") {
-      alert("As notificações foram bloqueadas no seu navegador. Por favor, clique no cadeado junto ao endereço do site e permita as 'Notificações'.");
+      alert("As notificações foram bloqueadas. Clique no ícone do cadeado na barra de endereços para reativar.");
       return false;
     }
 
     const permission = await Notification.requestPermission();
-    console.log("[NotificationService] Resultado do pedido de permissão:", permission);
     return permission === "granted";
   }
 };
