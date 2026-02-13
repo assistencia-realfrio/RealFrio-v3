@@ -6,7 +6,7 @@ import {
   Loader2, MapPin, Palmtree, Plus, 
   Sparkles, X, Edit2, Download, Upload, FileSpreadsheet,
   Bell, BellOff, BellRing, Settings2, AlertTriangle,
-  SendHorizontal, RefreshCw
+  SendHorizontal, RefreshCw, Info
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { notificationService } from '../services/notificationService';
@@ -66,7 +66,7 @@ const Profile: React.FC = () => {
             });
             await mockData.savePushSubscription(user.id, subscription);
           } catch (pushErr) {
-            console.warn("Push subscription opcional falhou:", pushErr);
+            console.warn("Subscrição opcional não disponível:", pushErr);
           }
         }
         
@@ -77,7 +77,7 @@ const Profile: React.FC = () => {
         );
       }
     } catch (err) {
-      console.error("Falha ao configurar notificações:", err);
+      console.error("Falha ao configurar:", err);
       setError("Erro ao configurar notificações.");
     } finally {
       setIsSubscribing(false);
@@ -87,10 +87,10 @@ const Profile: React.FC = () => {
   const handleTestNotification = async () => {
     if (isTesting) return;
     setIsTesting(true);
+    setError(null);
     
     try {
-      // Forçar pedido se estiver em default
-      if (Notification.permission === 'default') {
+      if (Notification.permission !== 'granted') {
          const granted = await notificationService.requestPermission();
          setPushStatus(Notification.permission as any);
          if (!granted) {
@@ -99,19 +99,20 @@ const Profile: React.FC = () => {
          }
       }
       
-      const success = await notificationService.notify(
+      const ok = await notificationService.notify(
         "Teste de Alerta 🚨", 
-        "O motor de avisos da Real Frio está operacional neste dispositivo.",
+        "Se está a ver isto, o sistema está 100% operacional no seu Android.",
         "/profile"
       );
       
-      if (success) {
+      if (!ok) {
+        setError("O sistema não conseguiu disparar. Verifique se a app tem permissão de 'Janelas Flutuantes' nas definições do Android.");
+      } else {
         setSuccess("Comando de teste enviado!");
         setTimeout(() => setSuccess(null), 3000);
       }
     } catch (e) {
-      console.error("Erro no teste:", e);
-      setError("Falha ao disparar teste.");
+      setError("Falha técnica ao disparar.");
     } finally {
       setIsTesting(false);
     }
@@ -202,7 +203,7 @@ const Profile: React.FC = () => {
       </div>
 
       {/* FEEDBACKS */}
-      {error && (<div className="p-5 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-3xl flex items-center gap-4 text-red-600 dark:text-red-400 animate-shake mx-1"><AlertCircle size={22} /><p className="text-[10px] font-black uppercase tracking-widest">{error}</p></div>)}
+      {error && (<div className="p-5 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-3xl flex items-start gap-4 text-red-600 dark:text-red-400 animate-shake mx-1"><AlertCircle size={22} className="shrink-0 mt-0.5" /><p className="text-[10px] font-black uppercase tracking-widest leading-relaxed">{error}</p></div>)}
       {success && (<div className="p-5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/30 rounded-3xl flex items-center gap-4 text-emerald-600 dark:text-emerald-400 mx-1"><CheckCircle size={22} /><p className="text-[10px] font-black uppercase tracking-widest">{success}</p></div>)}
 
       {/* CENTRO DE NOTIFICAÇÕES */}
@@ -236,14 +237,41 @@ const Profile: React.FC = () => {
         </div>
         
         {pushStatus === 'granted' && (
-          <button 
-            onClick={handleTestNotification}
-            disabled={isTesting}
-            className="w-full flex items-center justify-center gap-3 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-[9px] font-black uppercase tracking-widest border border-slate-100 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-[0.98] disabled:opacity-50"
-          >
-            {isTesting ? <RefreshCw size={14} className="animate-spin" /> : <SendHorizontal size={14} />}
-            {isTesting ? 'A ENVIAR TESTE...' : 'Testar Sistema de Alertas'}
-          </button>
+          <div className="space-y-4">
+            <button 
+              onClick={handleTestNotification}
+              disabled={isTesting}
+              className="w-full flex items-center justify-center gap-3 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-[9px] font-black uppercase tracking-widest border border-slate-100 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              {isTesting ? <RefreshCw size={14} className="animate-spin" /> : <SendHorizontal size={14} />}
+              {isTesting ? 'A ENVIAR TESTE...' : 'Testar Sistema de Alertas'}
+            </button>
+
+            {/* Guia de Ajuda para Android */}
+            <div className="p-5 bg-blue-50/50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-900/30">
+               <div className="flex items-center gap-2 text-blue-600 mb-3">
+                  <Info size={14} />
+                  <h4 className="text-[10px] font-black uppercase tracking-widest">Ajuda para Android</h4>
+               </div>
+               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase leading-relaxed mb-3">
+                 Se o botão de teste falhar, o seu telemóvel pode estar a bloquear o motor da app. Siga estes passos:
+               </p>
+               <ol className="space-y-2">
+                  <li className="flex gap-2">
+                    <span className="text-blue-500 font-black">1.</span>
+                    <p className="text-[9px] text-slate-500 font-bold uppercase">Mantenha o ícone da app pressionado e clique em "Informações da Aplicação".</p>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-blue-500 font-black">2.</span>
+                    <p className="text-[9px] text-slate-500 font-bold uppercase">Em "Outras Permissões", ative "Janelas Flutuantes" e "Exibir no Ecrã de Bloqueio".</p>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-blue-500 font-black">3.</span>
+                    <p className="text-[9px] text-slate-500 font-bold uppercase">Verifique se o "Poupança de Bateria" não está a restringir a app.</p>
+                  </li>
+               </ol>
+            </div>
+          </div>
         )}
         
         {pushStatus === 'denied' && (
