@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'realfrio-tech-v4.0';
+const CACHE_NAME = 'realfrio-tech-v5.0';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -33,6 +33,28 @@ self.addEventListener('activate', (event) => {
     })
   );
   return self.clients.claim();
+});
+
+// ESCUTAR MENSAGENS DA INTERFACE (MAIN THREAD)
+// Essencial para contornar bloqueios em Android/Xiaomi
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+    const { title, body, url } = event.data;
+    
+    const options = {
+      body: body,
+      icon: '/rf-icon-192-v5.png',
+      badge: '/rf-favicon-v5.png',
+      vibrate: [200, 100, 200],
+      tag: 'rf-msg-' + Date.now(),
+      renotify: true,
+      data: { url: url || '/' }
+    };
+
+    event.waitUntil(
+      self.registration.showNotification(title, options)
+    );
+  }
 });
 
 // ESCUTAR NOTIFICAÇÕES PUSH REAIS (DE SERVIDOR)

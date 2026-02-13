@@ -4,53 +4,44 @@ export const notificationService = {
    * Dispara uma notificação de forma resiliente.
    */
   notify: async (title: string, body: string, url: string = '/') => {
-    console.log(`[NotificationService] Solicitação de alerta: ${title}`);
+    console.log(`[NotificationService] Intento: ${title}`);
 
-    if (!("Notification" in window)) {
-      console.warn("Navegador não suporta notificações.");
-      return false;
-    }
+    if (!("Notification" in window)) return false;
 
     if (Notification.permission !== "granted") {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") return false;
     }
 
-    const options = {
-      body,
-      icon: '/rf-icon-192-v5.png',
-      badge: '/rf-favicon-v5.png',
-      vibrate: [200, 100, 200],
-      tag: 'rf-alert-' + Math.random(),
-      renotify: true,
-      data: { url: window.location.origin + '/#' + url }
-    };
-
-    // detetar se é mobile (Android/iOS)
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
     try {
-      // 1. Tentar SEMPRE via Service Worker primeiro (O único método fiável em Android)
-      if ('serviceWorker' in navigator) {
-        const registration = await navigator.serviceWorker.ready;
-        if (registration && registration.showNotification) {
-          await registration.showNotification(title, options);
-          console.log("[NotificationService] Exibida com sucesso via Service Worker.");
-          return true;
-        }
-      }
-    } catch (swError) {
-      console.error("[NotificationService] Erro no Service Worker:", swError);
-    }
-
-    // 2. Fallback apenas para Desktop (ou se o SW falhar por algum motivo raro)
-    if (!isMobile) {
-      try {
-        new Notification(title, options);
+      // 1. Prioridade Máxima: Enviar para o Service Worker via Canal de Mensagens
+      // Este método é o mais robusto em Mobile/PWA porque o SW tem "privilégios" de sistema
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SHOW_NOTIFICATION',
+          title,
+          body,
+          url: window.location.origin + '/#' + url
+        });
+        console.log("[NotificationService] Comando enviado para o Service Worker.");
         return true;
-      } catch (e) {
-        console.error("[NotificationService] Erro na API Nativa:", e);
       }
+
+      // 2. Fallback: Se o controlador não estiver pronto, tentar via registro direto
+      const registration = await navigator.serviceWorker.ready;
+      if (registration && registration.showNotification) {
+        // Fix: Cast options to any because the 'vibrate' property is sometimes missing from standard NotificationOptions type definitions
+        await registration.showNotification(title, {
+          body,
+          icon: '/rf-icon-192-v5.png',
+          badge: '/rf-favicon-v5.png',
+          vibrate: [200, 100, 200],
+          data: { url: window.location.origin + '/#' + url }
+        } as any);
+        return true;
+      }
+    } catch (e) {
+      console.error("[NotificationService] Falha técnica no disparo:", e);
     }
 
     return false;
@@ -64,12 +55,12 @@ export const notificationService = {
     
     const permission = await Notification.requestPermission();
     
-    // Se permitir, registar imediatamente o Service Worker se ainda não estiver
     if (permission === "granted" && 'serviceWorker' in navigator) {
       try {
-        await navigator.serviceWorker.register('/sw.js?v=4.1');
+        await navigator.serviceWorker.register('/sw.js?v=5.0');
+        await navigator.serviceWorker.ready;
       } catch (e) {
-        console.error("Erro ao registar SW no pedido de permissão", e);
+        console.error("Erro no registro do SW:", e);
       }
     }
     

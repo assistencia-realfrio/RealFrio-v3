@@ -99,9 +99,10 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js?v=3.7')
+          // Atualizado para v5.0 para forçar cache refresh
+          navigator.serviceWorker.register('/sw.js?v=5.0')
             .then(registration => {
-              console.log('SW registered');
+              console.log('SW v5.0 Active');
             }).catch(err => {
               console.log('SW registration failed', err);
             });
