@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { 
   DatabaseZap, 
@@ -27,7 +28,9 @@ import {
   User,
   ArrowRight,
   Edit2,
-  Save
+  Save,
+  Copy,
+  TerminalSquare
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { mockData } from '../services/mockData';
@@ -100,11 +103,12 @@ const Maintenance: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isRepaired, setIsRepaired] = useState(false);
   
-  // Estados de Colapso (Todos iniciam fechados)
+  // Estados de Colapso
   const [expandedAudit, setExpandedAudit] = useState(false);
   const [expandedBackup, setExpandedBackup] = useState(false);
   const [expandedRepair, setExpandedRepair] = useState(false);
   const [expandedRestore, setExpandedRestore] = useState(false);
+  const [expandedSQL, setExpandedSQL] = useState(false);
 
   // Auditoria de Clientes
   const [auditResults, setAuditResults] = useState<{
@@ -288,7 +292,6 @@ const Maintenance: React.FC = () => {
       await mockData.updateClient(clientId, quickEditForm);
       setQuickEditId(null);
       setQuickEditForm({});
-      // Re-executar auditoria para atualizar lista
       await handleAuditClients();
     } catch (err: any) {
       setError("Erro ao guardar dados.");
@@ -409,6 +412,12 @@ const Maintenance: React.FC = () => {
     });
   };
 
+  const copySQL = () => {
+    const sql = `ALTER TABLE service_orders REPLICA IDENTITY FULL;\nALTER TABLE os_activities REPLICA IDENTITY FULL;`;
+    navigator.clipboard.writeText(sql);
+    alert("Comando SQL copiado!");
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
       <ConfirmDialog 
@@ -424,6 +433,47 @@ const Maintenance: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
+        {/* HELP: CONFIGURAÇÃO SUPABASE REALTIME */}
+        <div className="bg-slate-900 dark:bg-indigo-950 rounded-[2.5rem] shadow-xl border border-indigo-500/30 overflow-hidden flex flex-col transition-all md:col-span-2">
+          <button 
+            onClick={() => setExpandedSQL(!expandedSQL)}
+            className="w-full p-8 flex items-center justify-between hover:bg-slate-800 dark:hover:bg-indigo-900/50 transition-colors"
+          >
+            <div className="flex items-center gap-4 text-white">
+              <div className="w-12 h-12 bg-indigo-500/20 text-indigo-300 rounded-2xl flex items-center justify-center shadow-inner">
+                <TerminalSquare size={24} />
+              </div>
+              <div className="text-left">
+                <h3 className="text-lg font-black uppercase tracking-tight">Configurar Realtime (SQL)</h3>
+                <p className="text-[9px] font-bold text-indigo-300/60 uppercase tracking-widest">Para alertas e notificações</p>
+              </div>
+            </div>
+            {expandedSQL ? <ChevronUp size={20} className="text-indigo-400" /> : <ChevronDown size={20} className="text-indigo-400" />}
+          </button>
+          
+          {expandedSQL && (
+            <div className="px-8 pb-8 space-y-6 animate-in slide-in-from-top-2 duration-200">
+              <div className="p-4 bg-indigo-900/30 rounded-2xl border border-indigo-500/20">
+                <p className="text-xs text-indigo-200 font-medium uppercase leading-relaxed mb-4">
+                  Se não encontras a opção "Replica Identity" no painel, executa este comando no **SQL Editor** do Supabase para ativar as notificações em tempo real:
+                </p>
+                <div className="relative group">
+                  <pre className="bg-black/40 p-5 rounded-xl text-[10px] font-mono text-indigo-300 overflow-x-auto border border-white/5 lowercase-container" style={{textTransform: 'none'}}>
+                    {`ALTER TABLE service_orders REPLICA IDENTITY FULL;\nALTER TABLE os_activities REPLICA IDENTITY FULL;`}
+                  </pre>
+                  <button 
+                    onClick={copySQL}
+                    className="absolute top-3 right-3 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-all shadow-lg"
+                    title="Copiar SQL"
+                  >
+                    <Copy size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* AUDITORIA DE CLIENTES */}
         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-xl border border-blue-100 dark:border-blue-900/30 overflow-hidden flex flex-col transition-all md:col-span-2">
           <button 
@@ -668,7 +718,7 @@ const Maintenance: React.FC = () => {
                 disabled={loading}
                 className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95"
               >
-                {loading ? <RefreshCw className="animate-spin" size={18} /> : <Wrench size={18} />}
+                {loading ? <Loader2 className="animate-spin" size={18} /> : <Wrench size={18} />}
                 {loading ? 'A PROCESSAR...' : 'EXECUTAR DIAGNÓSTICO'}
               </button>
             </div>

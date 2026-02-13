@@ -85,15 +85,19 @@ const AppContent: React.FC<{
         if (payload.eventType === 'INSERT' && newData) {
           notificationService.notify(
             "🚨 NOVA ORDEM DE SERVIÇO",
-            `Uma nova intervenção foi registada no sistema: ${newData.code}`,
+            `Nova OS ${newData.code} registada.`,
             `/os/${newData.id}`
           );
-        } else if (payload.eventType === 'UPDATE' && newData && oldData) {
-          if (oldData.status !== newData.status) {
+        } else if (payload.eventType === 'UPDATE' && newData) {
+          // Robustez: Se oldData.status não existir (Replica Identity não está FULL), 
+          // ainda assim podemos notificar sobre qualquer alteração se a app estiver aberta.
+          const hasStatusChanged = oldData && oldData.status !== undefined ? oldData.status !== newData.status : true;
+          
+          if (hasStatusChanged) {
             const statusLabel = (newData.status as string).replace('_', ' ').toUpperCase();
             notificationService.notify(
-              "🔄 ATUALIZAÇÃO DE ESTADO",
-              `OS ${newData.code} alterada para ${statusLabel}.`,
+              "🔄 MUDANÇA DE ESTADO",
+              `OS ${newData.code} agora está: ${statusLabel}.`,
               `/os/${newData.id}`
             );
           }
@@ -108,12 +112,11 @@ const AppContent: React.FC<{
         const newData = payload.new as any;
         if (!newData) return;
 
-        const userName = newData.user_name || 'Alguém';
-        // Filtrar atividades automáticas ou do próprio utilizador para não ser chato
-        if (userName !== user.full_name) {
+        // Não notificar o próprio utilizador sobre as suas ações
+        if (newData.user_name !== user.full_name) {
           notificationService.notify(
-            "🛠️ ATIVIDADE TÉCNICA",
-            `${userName}: ${newData.description}`,
+            "🛠️ ATUALIZAÇÃO TÉCNICA",
+            `${newData.user_name}: ${newData.description}`,
             `/os/${newData.os_id}`
           );
         }

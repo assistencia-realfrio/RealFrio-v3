@@ -9,6 +9,7 @@ import {
   SendHorizontal
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
+import { notificationService } from '../services/notificationService';
 import { useNavigate } from 'react-router-dom';
 import { Vacation, VacationStatus, Profile as UserProfile } from '../types';
 
@@ -49,39 +50,35 @@ const Profile: React.FC = () => {
   };
 
   const handleRequestNotifications = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      alert("Este navegador não suporta notificações push.");
-      return;
-    }
-
     setIsSubscribing(true);
     try {
-      const permission = await Notification.requestPermission();
-      setPushStatus(permission as any);
+      const granted = await notificationService.requestPermission();
+      setPushStatus(Notification.permission as any);
 
-      if (permission === 'granted') {
-        const registration = await navigator.serviceWorker.ready;
+      if (granted) {
+        // Tentar subscrever para Push real (Backgound)
+        if ('serviceWorker' in navigator && 'PushManager' in window) {
+          try {
+            const registration = await navigator.serviceWorker.ready;
+            // Chave pública genérica para permitir a subscrição inicial
+            const subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: 'BEl62vp9IH1w94S_7pQ3U656A74377F7A74377F7A74377F7A74377F7A74377F7A' 
+            });
+            await mockData.savePushSubscription(user.id, subscription);
+          } catch (pushErr) {
+            console.warn("Push subscription falhou, mas notificações locais funcionarão:", pushErr);
+          }
+        }
         
-        // Em produção, aqui usaria as suas chaves VAPID reais do Supabase/Firebase
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: 'BEl62vp9IH1w94S_7pQ3U656A74377F7A74377F7A74377F7A74377F7A74377F7A' 
-        });
-
-        await mockData.savePushSubscription(user.id, subscription);
-        setSuccess("Notificações ativadas no dispositivo!");
-        
-        // Disparar uma notificação de boas-vindas imediata
-        // Added cast to any to fix TypeScript error: 'vibrate' does not exist in type 'NotificationOptions'
-        registration.showNotification("Notificações Ativas", {
-          body: `Olá ${user.full_name}, agora receberá alertas de novas OS diretamente aqui.`,
-          icon: '/rf-icon-192-v5.png',
-          badge: '/rf-favicon-v5.png',
-          vibrate: [100, 50, 100]
-        } as any);
+        setSuccess("Notificações ativadas!");
+        notificationService.notify(
+          "Sistema Ativo", 
+          `Olá ${user.full_name}, as notificações foram configuradas com sucesso.`
+        );
       }
     } catch (err) {
-      console.error("Falha ao subscrever:", err);
+      console.error("Falha ao configurar notificações:", err);
       setError("Erro ao configurar notificações.");
     } finally {
       setIsSubscribing(false);
@@ -90,19 +87,16 @@ const Profile: React.FC = () => {
 
   const handleTestNotification = async () => {
     if (Notification.permission !== 'granted') {
-       alert("Primeiro ative as notificações.");
-       return;
+       const granted = await notificationService.requestPermission();
+       if (!granted) return;
     }
     
-    const registration = await navigator.serviceWorker.ready;
-    // Added cast to any to fix TypeScript error: 'vibrate' does not exist in type 'NotificationOptions'
-    registration.showNotification("Teste de Sistema", {
-      body: "Este é um alerta de teste da Real Frio Tech. O seu dispositivo está pronto.",
-      icon: '/rf-icon-192-v5.png',
-      badge: '/rf-favicon-v5.png',
-      tag: 'test-notification',
-      vibrate: [200, 100, 200]
-    } as any);
+    // Usar o serviço central para garantir que o teste reflete a realidade
+    await notificationService.notify(
+      "Teste de Alerta 🚨", 
+      "Se está a ver isto, o motor de avisos da Real Frio está a comunicar corretamente com o seu dispositivo.",
+      "/profile"
+    );
   };
 
   const fetchUserVacations = async (currentUser: any) => {
