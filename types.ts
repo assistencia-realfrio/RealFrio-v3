@@ -36,6 +36,35 @@ export enum VacationStatus {
   REJEITADA = 'rejeitada'
 }
 
+export interface Vehicle {
+  id: string;
+  license_plate: string;
+  brand: string;
+  model: string;
+  year: number;
+  current_mileage: number;
+  next_revision_mileage?: number;
+  next_inspection_date?: string;
+  insurance_expiry_date?: string;
+  status: 'active' | 'maintenance' | 'inactive';
+  assigned_to?: string;
+  image_url?: string;
+}
+
+export interface MaintenanceRecord {
+  id: string;
+  vehicle_id: string;
+  type: 'revision' | 'inspection' | 'repair' | 'tires' | 'other';
+  date: string;
+  mileage: number;
+  description: string;
+  cost: number;
+  provider: string;
+  next_scheduled_date?: string;
+  status: 'scheduled' | 'completed' | 'canceled';
+  notes?: string;
+}
+
 export interface Client {
   id: string;
   name: string;

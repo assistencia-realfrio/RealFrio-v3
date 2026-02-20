@@ -27,6 +27,7 @@ import Inventory from './pages/Inventory';
 import Profile from './pages/Profile';
 import Users from './pages/Users';
 import Maintenance from './pages/Maintenance';
+import FleetManagement from './pages/FleetManagement';
 import { UserRole, OSStatus } from './types';
 import { StoreProvider, useStore } from './contexts/StoreContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -162,6 +163,7 @@ const AppContent: React.FC<{
         <Route path="/equipments/:id/edit" element={user ? <Layout user={user} onLogout={onLogout}><EditEquipment /></Layout> : <Navigate to="/login" />} />
         
         <Route path="/inventory" element={user ? <Layout user={user} onLogout={onLogout}><Inventory /></Layout> : <Navigate to="/login" />} />
+        <Route path="/fleet" element={user ? <Layout user={user} onLogout={onLogout}><FleetManagement /></Layout> : <Navigate to="/login" />} />
         <Route path="/users" element={user && user.role === UserRole.ADMIN ? <Layout user={user} onLogout={onLogout}><Users /></Layout> : <Navigate to="/" />} />
         <Route path="/maintenance" element={user && user.role === UserRole.ADMIN ? <Layout user={user} onLogout={onLogout}><Maintenance /></Layout> : <Navigate to="/" />} />
         <Route path="/profile" element={user ? <Layout user={user} onLogout={onLogout}><Profile /></Layout> : <Navigate to="/login" />} />

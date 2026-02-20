@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 // Added ChevronRight to the lucide-react imports
-import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, ChevronRight, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench, RefreshCw, Loader2, QrCode, Scan, Building2, Calculator, Info, CheckCircle2 } from 'lucide-react';
+import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, ChevronRight, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench, RefreshCw, Loader2, QrCode, Scan, Building2, Calculator, Info, CheckCircle2, Truck } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { UserRole, OSActivity, ServiceOrder, Client, Equipment, Establishment } from '../types';
 import { mockData } from '../services/mockData';
@@ -231,6 +231,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     { name: 'Orçamentos', path: '/quotes', icon: Calculator },
     { name: 'Clientes', path: '/clients', icon: UsersIcon },
     { name: 'Stock & Catálogo', path: '/inventory', icon: Package },
+    { name: 'Gestão de Frota', path: '/fleet', icon: Truck },
     ...(isAdmin ? [
       { name: 'Equipa', path: '/users', icon: UserCog }
     ] : []),

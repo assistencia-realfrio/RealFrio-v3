@@ -491,6 +491,49 @@ export const mockData = {
     if (error) throw error;
   },
 
+  // Fleet Management
+  getVehicles: async () => {
+    const { data, error } = await supabase.from('vehicles').select('*').order('brand');
+    if (error) throw error;
+    return data || [];
+  },
+  getVehicleById: async (id: string) => {
+    const { data, error } = await supabase.from('vehicles').select('*').eq('id', id).single();
+    if (error) throw error;
+    return data;
+  },
+  createVehicle: async (vehicle: any) => {
+    const { data, error } = await supabase.from('vehicles').insert([vehicle]).select().single();
+    if (error) throw error;
+    return data;
+  },
+  updateVehicle: async (id: string, updates: any) => {
+    const { error } = await supabase.from('vehicles').update(updates).eq('id', id);
+    if (error) throw error;
+  },
+  deleteVehicle: async (id: string) => {
+    const { error } = await supabase.from('vehicles').delete().eq('id', id);
+    if (error) throw error;
+  },
+  getMaintenanceRecords: async (vehicleId: string) => {
+    const { data, error } = await supabase.from('maintenance_records').select('*').eq('vehicle_id', vehicleId).order('date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+  createMaintenanceRecord: async (record: any) => {
+    const { data, error } = await supabase.from('maintenance_records').insert([record]).select().single();
+    if (error) throw error;
+    return data;
+  },
+  updateMaintenanceRecord: async (id: string, updates: any) => {
+    const { error } = await supabase.from('maintenance_records').update(updates).eq('id', id);
+    if (error) throw error;
+  },
+  deleteMaintenanceRecord: async (id: string) => {
+    const { error } = await supabase.from('maintenance_records').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   // Profiles
   getProfiles: async () => {
     const { data, error } = await supabase.from('profiles').select('*').order('full_name');
