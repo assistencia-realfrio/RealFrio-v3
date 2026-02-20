@@ -179,9 +179,14 @@ function App() {
 
   useEffect(() => {
     const checkSession = () => {
-      const sessionUser = mockData.getSession();
-      if (sessionUser) setUser(sessionUser);
-      setLoading(false);
+      try {
+        const sessionUser = mockData.getSession();
+        if (sessionUser) setUser(sessionUser);
+      } catch (e) {
+        console.error("Erro ao carregar sessão:", e);
+      } finally {
+        setLoading(false);
+      }
     };
     checkSession();
   }, []);

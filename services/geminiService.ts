@@ -9,7 +9,8 @@ export const generateOSReportSummary = async (
 ): Promise<string> => {
   try {
     // Correctly initialize GoogleGenAI as per coding guidelines using the environment variable API_KEY
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = "";
+    const ai = new GoogleGenAI({ apiKey });
     
     // Prompt otimizado para PT-PT e contexto técnico da Real Frio
     const prompt = `

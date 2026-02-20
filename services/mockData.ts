@@ -570,7 +570,7 @@ export const mockData = {
 
   // Maintenance
   exportFullSystemData: async () => {
-    const tables = ['clients', 'establishments', 'equipments', 'service_orders', 'parts_used', 'os_photos', 'os_notes', 'os_activities', 'catalog', 'vacations', 'profiles', 'time_entries', 'quotes', 'quote_items'];
+    const tables = ['clients', 'establishments', 'equipments', 'service_orders', 'parts_used', 'os_photos', 'os_notes', 'os_activities', 'catalog', 'vacations', 'profiles', 'time_entries', 'quotes', 'quote_items', 'vehicles', 'maintenance_records'];
     const backup: any = { date: new Date().toISOString(), data: {} };
     for (const table of tables) {
       const { data } = await supabase.from(table).select('*');
@@ -579,7 +579,7 @@ export const mockData = {
     return backup;
   },
   importFullSystemData: async (backup: any, progressCallback?: (msg: string) => void) => {
-    const tables = ['clients', 'establishments', 'equipments', 'service_orders', 'parts_used', 'os_photos', 'os_notes', 'os_activities', 'catalog', 'vacations', 'profiles', 'time_entries', 'quotes', 'quote_items'];
+    const tables = ['clients', 'establishments', 'equipments', 'service_orders', 'parts_used', 'os_photos', 'os_notes', 'os_activities', 'catalog', 'vacations', 'profiles', 'time_entries', 'quotes', 'quote_items', 'vehicles', 'maintenance_records'];
     for (const table of tables) {
       progressCallback?.(`A apagar tabela ${table}...`);
       await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');

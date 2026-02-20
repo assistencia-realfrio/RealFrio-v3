@@ -60,3 +60,12 @@ CREATE POLICY "Permitir acesso total a utilizadores autenticados (Veículos)" ON
 
 CREATE POLICY "Permitir acesso total a utilizadores autenticados (Manutenção)" ON public.maintenance_records
     FOR ALL USING (auth.role() = 'authenticated');
+
+-- Dar permissões explícitas às tabelas (Necessário para evitar 401 em alguns ambientes)
+GRANT ALL ON TABLE public.vehicles TO authenticated;
+GRANT ALL ON TABLE public.vehicles TO service_role;
+GRANT ALL ON TABLE public.vehicles TO anon;
+
+GRANT ALL ON TABLE public.maintenance_records TO authenticated;
+GRANT ALL ON TABLE public.maintenance_records TO service_role;
+GRANT ALL ON TABLE public.maintenance_records TO anon;
