@@ -283,13 +283,13 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         </div>
       </div>
 
-      {sidebarOpen && <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />}
+      {sidebarOpen && <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm xl:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      <aside className={`fixed inset-y-0 left-0 z-[80] w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none lg:relative lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-[80] w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out shadow-2xl xl:shadow-none xl:relative xl:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between h-20 px-6 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
             <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity"><BrandLogo variant={theme === 'dark' ? 'light' : 'dark'} size="sm" /></Link>
-            <button className="lg:hidden text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors p-2" onClick={() => setSidebarOpen(false)}><X size={22} /></button>
+            <button className="xl:hidden text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors p-2" onClick={() => setSidebarOpen(false)}><X size={22} /></button>
           </div>
           <div className="px-4 py-6 bg-white dark:bg-slate-900">
              <div className="flex items-center text-slate-400 dark:text-slate-500 mb-3 text-[10px] uppercase font-medium tracking-[0.2em] px-2"><MapPin size={12} className="mr-2 text-blue-500" /> Loja Ativa</div>
@@ -325,7 +325,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         <header className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 transition-colors duration-300 z-50 flex-shrink-0">
           <div className="flex items-center h-20 px-4 md:px-8 relative">
-            <button onClick={() => setSidebarOpen(true)} className="p-3 -ml-2 text-slate-600 dark:text-slate-400 lg:hidden hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full transition-all active:scale-90" aria-label="Abrir menu"><Menu size={26} /></button>
+            <button onClick={() => setSidebarOpen(true)} className="p-3 -ml-2 text-slate-600 dark:text-slate-400 xl:hidden hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full transition-all active:scale-90" aria-label="Abrir menu"><Menu size={26} /></button>
             <div className="absolute left-1/2 -translate-x-1/2"><Link to="/" className="flex items-center hover:opacity-80 transition-opacity"><BrandLogo variant={theme === 'dark' ? 'light' : 'dark'} size="sm" className="!items-center" /></Link></div>
             <div className="flex-1 flex justify-end items-center gap-1.5 sm:gap-2.5">
                <div className="relative" ref={searchRef}>

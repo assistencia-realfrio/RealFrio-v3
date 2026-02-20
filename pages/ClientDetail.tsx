@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
@@ -5,7 +6,7 @@ import {
   Edit2, X, Save, ArrowLeft, ChevronRight, ChevronDown,
   Plus, Building2, FileText, ExternalLink, Filter, Trash2, Eye,
   Cloud, AlertTriangle, ShieldAlert, Calculator, Coins,
-  ChevronUp
+  ChevronUp, Hash
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { Client, Establishment, Equipment, ServiceOrder, Quote, QuoteStatus } from '../types';
@@ -328,6 +329,16 @@ const ClientDetail: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="flex items-center gap-4 p-4.5 sm:p-5">
+                  <div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500 flex-shrink-0">
+                    <Hash size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">NIF (Número de Contribuinte)</p>
+                    <p className="text-[13px] font-black text-slate-900 dark:text-slate-100 uppercase truncate leading-none font-mono">{client.nif || '---'}</p>
+                  </div>
+                </div>
+
                 <a href={`tel:${client.phone}`} className="flex items-center gap-4 p-4.5 sm:p-5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all group">
                   <div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500 flex-shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-all">
                     <Phone size={20} />
@@ -625,10 +636,14 @@ const ClientDetail: React.FC = () => {
                   <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold text-slate-800 dark:text-slate-200 outline-none" value={editForm.billing_name} onChange={e => setEditForm({...editForm, billing_name: e.target.value})} />
                 </div>
                 <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">NIF (Contribuinte)</label>
+                  <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-black text-slate-800 dark:text-slate-200 outline-none" value={editForm.nif || ''} onChange={e => setEditForm({...editForm, nif: e.target.value})} />
+                </div>
+                <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Telefone Sede</label>
                   <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold text-slate-800 dark:text-slate-200 outline-none" value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} />
                 </div>
-                <div>
+                <div className="md:col-span-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Email Faturação</label>
                   <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold text-slate-800 dark:text-slate-200 outline-none lowercase-container" style={{textTransform: 'none'}} value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} />
                 </div>

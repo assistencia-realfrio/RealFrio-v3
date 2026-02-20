@@ -496,6 +496,27 @@ export const ServiceOrderDetail: React.FC = () => {
     } catch (e: any) { setErrorMessage("ERRO AO REABRIR OS."); } finally { setActionLoading(false); }
   };
 
+  const getBase64ImageFromURL = (url: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.setAttribute('crossOrigin', 'anonymous');
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/png"));
+        } else {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  };
+
   const generateTechnicalTag = async () => {
     if (!os) return;
     setIsExportingPDF(true);
@@ -518,12 +539,24 @@ export const ServiceOrderDetail: React.FC = () => {
       const pageWidth = doc.internal.pageSize.width;
       const margin = 10;
       
+      // Tentar carregar logótipos
+      const logoWide = await getBase64ImageFromURL('/logo.png');
+      const logoSquare = await getBase64ImageFromURL('/rf-apple-v5.png');
+
       // Borda da etiqueta
       doc.setLineWidth(1.2); 
       doc.rect(margin, margin, pageWidth - (margin * 2), 175);
       
-      doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(80, 80, 80);
-      doc.text("REAL FRIO - IDENTIFICAÇÃO TÉCNICA", pageWidth / 2, margin + 10, { align: "center" });
+      if (logoWide) {
+        doc.addImage(logoWide, 'PNG', margin + 2, margin + 2, 50, 12);
+      } else if (logoSquare) {
+        doc.addImage(logoSquare, 'PNG', margin + 5, margin + 5, 15, 15);
+        doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(80, 80, 80);
+        doc.text("REAL FRIO - IDENTIFICAÇÃO TÉCNICA", pageWidth / 2, margin + 10, { align: "center" });
+      } else {
+        doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(80, 80, 80);
+        doc.text("REAL FRIO - IDENTIFICAÇÃO TÉCNICA", pageWidth / 2, margin + 10, { align: "center" });
+      }
 
       // --- SECÇÃO OS (TOPO) ---
       const rightColX = pageWidth - margin - 42; // Coluna direita para QR codes
@@ -531,7 +564,7 @@ export const ServiceOrderDetail: React.FC = () => {
       // QR 2: ORDEM DE SERVIÇO (Topo Direito)
       if (qrOSDataUrl) {
         doc.addImage(qrOSDataUrl, 'PNG', rightColX, margin + 15, 34, 34);
-        doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(0, 100, 200);
+        doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(0, 0, 0);
         doc.text("SCAN PARA ESTA OS", rightColX + 17, margin + 53, { align: "center" });
       }
 
@@ -607,10 +640,36 @@ export const ServiceOrderDetail: React.FC = () => {
     const pageWidth = doc.internal.pageSize.width;
     const margin = 10;
     const contentWidth = pageWidth - (margin * 2);
-    doc.setFillColor(15, 23, 42); doc.rect(0, 0, pageWidth, 28, 'F'); doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text("REAL FRIO", margin, 12); doc.setFontSize(7); doc.setFont("helvetica", "normal"); doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 18); doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(os.code, pageWidth - margin, 12, { align: 'right' }); doc.setFontSize(6); doc.setFont("helvetica", "normal"); doc.setTextColor(180, 180, 180); doc.text(`EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 18, { align: 'right' });
-    let currentY = 32; doc.setDrawColor(241, 245, 249); doc.setFillColor(252, 252, 253); doc.roundedRect(margin, currentY, contentWidth, 22, 1, 1, 'FD'); doc.setTextColor(15, 23, 42); doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.text("DADOS DO CLIENTE", margin + 3, currentY + 5); doc.text("EQUIPAMENTO", margin + (contentWidth / 2) + 3, currentY + 5); doc.setDrawColor(226, 232, 240); doc.line(margin + 3, currentY + 7, margin + (contentWidth / 2) - 3, currentY + 7); doc.line(margin + (contentWidth / 2) + 3, currentY + 7, margin + contentWidth - 3, currentY + 7); doc.setFont("helvetica", "normal"); doc.setFontSize(6.5); doc.setTextColor(71, 85, 105); doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 3, currentY + 11); doc.text(`FIRMA: ${os.client?.billing_name || '---'}`, margin + 3, currentY + 14.5, { maxWidth: (contentWidth / 2) - 8 }); doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 3, currentY + 18); doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 3, currentY + 11); doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 3, currentY + 14.5); doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 3, currentY + 18);
+    
+    // Tentar carregar logótipos
+    const logoWide = await getBase64ImageFromURL('/logo.png');
+    const logoSquare = await getBase64ImageFromURL('/rf-apple-v5.png');
+
+    if (logoWide) {
+      doc.addImage(logoWide, 'PNG', margin, 5, 50, 12);
+    } else if (logoSquare) {
+      doc.addImage(logoSquare, 'PNG', margin, 5, 18, 18);
+    }
+
+    doc.setFillColor(40, 40, 40); doc.rect(0, 0, pageWidth, 28, 'F'); doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont("helvetica", "bold"); 
+    
+    if (!logoWide) {
+      doc.text("REAL FRIO", margin + (logoSquare ? 22 : 0), 12); 
+    }
+    
+    doc.setFontSize(7); doc.setFont("helvetica", "normal"); 
+    
+    if (!logoWide) {
+      doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin + (logoSquare ? 22 : 0), 18); 
+    } else {
+      // Com logo wide, colocar o título mais à direita ou abaixo
+      doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 22);
+    }
+
+    doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(os.code, pageWidth - margin, 12, { align: 'right' }); doc.setFontSize(6); doc.setFont("helvetica", "normal"); doc.setTextColor(180, 180, 180); doc.text(`EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 18, { align: 'right' });
+    let currentY = 32; doc.setDrawColor(241, 245, 249); doc.setFillColor(252, 252, 253); doc.roundedRect(margin, currentY, contentWidth, 22, 1, 1, 'FD'); doc.setTextColor(40, 40, 40); doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.text("DADOS DO CLIENTE", margin + 3, currentY + 5); doc.text("EQUIPAMENTO", margin + (contentWidth / 2) + 3, currentY + 5); doc.setDrawColor(226, 232, 240); doc.line(margin + 3, currentY + 7, margin + (contentWidth / 2) - 3, currentY + 7); doc.line(margin + (contentWidth / 2) + 3, currentY + 7, margin + contentWidth - 3, currentY + 7); doc.setFont("helvetica", "normal"); doc.setFontSize(6.5); doc.setTextColor(71, 85, 105); doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 3, currentY + 11); doc.text(`FIRMA: ${os.client?.billing_name || '---'}`, margin + 3, currentY + 14.5, { maxWidth: (contentWidth / 2) - 8 }); doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 3, currentY + 18); doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 3, currentY + 11); doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 3, currentY + 14.5); doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 3, currentY + 18);
     currentY += 26; const narrativeFields = [ { label: "DESCRIÇÃO DO PEDIDO / AVARIA:", value: os.description || 'N/A' }, { label: "CAUSA DA AVARIA:", value: os.anomaly_detected || 'N/A' }, { label: "TRABALHO EFETUADO E RESOLUÇÃO:", value: os.resolution_notes || 'N/A' } ];
-    narrativeFields.forEach(field => { doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(15, 23, 42); doc.text(field.label, margin, currentY); currentY += 3; doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(51, 65, 85); const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth); doc.text(splitText, margin, currentY); currentY += (splitText.length * 4) + 3; if (currentY > 275) { doc.addPage(); currentY = 15; } });
+    narrativeFields.forEach(field => { doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(40, 40, 40); doc.text(field.label, margin, currentY); currentY += 3; doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(51, 65, 85); const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth); doc.text(splitText, margin, currentY); currentY += (splitText.length * 4) + 3; if (currentY > 275) { doc.addPage(); currentY = 15; } });
     if (partsUsed.length > 0) { doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(15, 23, 42); doc.text("MATERIAL APLICADO:", margin, currentY); currentY += 2; autoTable(doc, { startY: currentY, margin: { left: margin, right: margin }, theme: 'plain', head: [['ARTIGO / DESIGNAÇÃO', 'REFERÊNCIA', 'QTD']], body: partsUsed.map(p => [p.name.toUpperCase(), p.reference.toUpperCase(), `${p.quantity.toLocaleString('pt-PT')} UN`]), headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontSize: 6, fontStyle: 'bold', halign: 'left' }, styles: { fontSize: 7, cellPadding: 1, textColor: [51, 65, 85], lineWidth: 0.05, lineColor: [241, 245, 249] }, columnStyles: { 2: { halign: 'right' } } }); currentY = (doc as any).lastAutoTable.finalY + 8; }
     if (currentY > 250) { doc.addPage(); currentY = 15; } doc.setDrawColor(226, 232, 240); doc.line(margin, currentY, pageWidth - margin, currentY); currentY += 5; doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.text("VALIDAÇÃO E CONFORMIDADE", margin, currentY); currentY += 3; const sigBoxWidth = (contentWidth / 2) - 5; if (clientSignature) { try { doc.addImage(clientSignature, 'JPEG', margin, currentY, 40, 15, undefined, 'FAST'); } catch (e) {} } doc.setDrawColor(203, 213, 225); doc.line(margin, currentY + 16, margin + sigBoxWidth, currentY + 16); doc.setFontSize(5.5); doc.setFont("helvetica", "normal"); doc.setTextColor(148, 163, 184); doc.text("ASSINATURA CLIENTE", margin + (sigBoxWidth / 2), currentY + 20, { align: 'center' }); if (technicianSignature) { try { doc.addImage(technicianSignature, 'JPEG', margin + (contentWidth / 2) + 5, currentY, 40, 15, undefined, 'FAST'); } catch (e) {} } doc.line(margin + (contentWidth / 2) + 5, currentY + 16, margin + contentWidth, currentY + 16); doc.text("ASSINATURA TÉCNICO", margin + (contentWidth / 2) + 5 + (sigBoxWidth / 2), currentY + 20, { align: 'center' }); doc.setFontSize(5); doc.setTextColor(148, 163, 184); doc.text("Documento oficial Real Frio. Emitido via Plataforma Cloud Técnica.", pageWidth / 2, 290, { align: 'center' }); return doc;
   };

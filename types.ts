@@ -44,6 +44,7 @@ export interface Client {
   phone: string;
   email: string;
   billing_name: string; 
+  nif?: string;
   notes?: string;
   store: string;
   google_drive_link?: string;
@@ -114,6 +115,8 @@ export interface Quote {
   establishment_id?: string;
   equipment_id?: string;
   description: string;
+  detected_problem?: string;
+  cause?: string;
   status: QuoteStatus;
   total_amount: number;
   created_at: string;
@@ -174,7 +177,6 @@ export interface ServiceOrder {
   store: string;
   timer_is_active?: boolean;
   timer_start_time?: string | null;
-  // Geolocalização de Check-in
   checkin_lat?: number | null;
   checkin_lng?: number | null;
 }
@@ -185,7 +187,6 @@ export interface Profile {
   full_name: string;
   role: UserRole;
   store: string;
-  // Localização em Tempo Real (Otimização de Atribuição)
   last_lat?: number | null;
   last_lng?: number | null;
   last_location_update?: string | null;

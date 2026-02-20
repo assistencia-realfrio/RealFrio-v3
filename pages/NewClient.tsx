@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Save, ArrowLeft, Building, User, Phone, Mail, 
-  MapPin, ChevronDown, FileText, Info, Cloud
+  MapPin, ChevronDown, FileText, Info, Cloud, Hash
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { useStore } from '../contexts/StoreContext';
@@ -20,6 +20,7 @@ const NewClient: React.FC = () => {
     phone: '',
     email: '',
     billing_name: '', 
+    nif: '',
     notes: '',
     google_drive_link: '',
     store: currentStore === 'Todas' ? 'Caldas da Rainha' : currentStore as string
@@ -96,6 +97,21 @@ const NewClient: React.FC = () => {
             </div>
 
             <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">NIF (Contribuinte)</label>
+              <div className="relative">
+                <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                <input 
+                  type="text"
+                  name="nif"
+                  className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                  value={formData.nif}
+                  onChange={handleChange}
+                  placeholder="999 999 999"
+                />
+              </div>
+            </div>
+
+            <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Telemóvel / Telefone</label>
               <div className="relative">
                 <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
@@ -110,7 +126,7 @@ const NewClient: React.FC = () => {
               </div>
             </div>
 
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Email Principal</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />

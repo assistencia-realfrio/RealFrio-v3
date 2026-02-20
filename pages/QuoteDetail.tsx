@@ -5,7 +5,7 @@ import {
   ArrowLeft, Building2, MapPin, HardDrive, Printer, Loader2, 
   Edit2, Trash2, ShieldAlert, ExternalLink, ThumbsUp, ThumbsDown,
   ChevronDown, ChevronUp, CheckCircle2, ShieldCheck, Sparkles, Check,
-  Mail
+  Mail, ShieldCheck as InsuranceIcon, AlertTriangle, Stethoscope, FileText
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { Quote, QuoteStatus } from '../types';
@@ -21,11 +21,13 @@ const QuoteDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [isExportingInsurance, setIsExportingInsurance] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   
   const [expandedClient, setExpandedClient] = useState(false);
   const [expandedEquip, setExpandedEquip] = useState(false);
+  const [expandedTechnical, setExpandedTechnical] = useState(true);
 
   useEffect(() => { 
     if (id) fetchData(); 
@@ -94,45 +96,83 @@ const QuoteDetail: React.FC = () => {
     return `${baseUrl}/#/proposal/${id}`;
   };
 
-  const generatePDFBlob = async () => {
+  const getBase64ImageFromURL = (url: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.setAttribute('crossOrigin', 'anonymous');
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/png"));
+        } else {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  };
+
+  const generateStandardPDF = async () => {
     if (!quote) return null;
     const publicUrl = getPublicLink();
-    
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     const margin = 20; 
-    const brandColor = [157, 28, 36];
+    const brandColor = [0, 0, 0];
+
+    // Tentar carregar logótipos
+    const logoWide = await getBase64ImageFromURL('/logo.png');
+    const logoSquare = await getBase64ImageFromURL('/rf-apple-v5.png');
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
     doc.setTextColor(brandColor[0], brandColor[1], brandColor[2]);
-    doc.text("REAL FRIO, LDA", margin, 20);
-    
-    doc.setFontSize(8);
-    doc.setTextColor(80, 80, 80);
-    doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", margin, 25);
 
+    if (logoWide) {
+      // Logótipo Novo (Horizontal) - Não precisa de texto
+      doc.addImage(logoWide, 'PNG', 20, 10, 80, 20);
+    } else if (logoSquare) {
+      // Logótipo Antigo (Quadrado) - Precisa de texto ao lado
+      doc.addImage(logoSquare, 'PNG', 20, 10, 25, 25);
+      doc.text("REAL FRIO, LDA", 50, 20);
+      doc.setFontSize(8);
+      doc.setTextColor(80, 80, 80);
+      doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", 50, 25);
+    } else {
+      // Sem Logótipo - Apenas Texto
+      doc.text("REAL FRIO, LDA", margin, 20);
+      doc.setFontSize(8);
+      doc.setTextColor(80, 80, 80);
+      doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", margin, 25);
+    }
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
     doc.text(`ORÇAMENTO: ${quote.code}`, pageWidth - margin, 20, { align: "right" });
     doc.setFont("helvetica", "normal");
     doc.text(`Data: ${new Date(quote.created_at).toLocaleDateString('pt-PT')}`, pageWidth - margin, 25, { align: "right" });
-
     doc.setDrawColor(200, 200, 200);
     doc.line(margin, 30, pageWidth - margin, 30);
 
     let currentY = 42;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10);
     doc.text("DADOS DO CLIENTE", margin, currentY);
     doc.setFont("helvetica", "normal");
     doc.text((quote.client?.name || "---").toUpperCase(), margin, currentY + 7);
+    
     doc.setFontSize(8);
-    doc.text(`Local: ${quote.establishment?.name || 'SEDE / PRINCIPAL'}`, margin, currentY + 14);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`FIRMA: ${(quote.client?.billing_name || quote.client?.name || '---').toUpperCase()}`, margin, currentY + 13);
+    doc.text(`NIF: ${quote.client?.nif || '---'}`, margin, currentY + 18);
+    doc.text(`LOCAL: ${quote.establishment?.name || 'SEDE / PRINCIPAL'}`, margin, currentY + 23);
 
     const col2X = pageWidth / 2 + 10;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10);
     doc.text("EQUIPAMENTO / ATIVO", col2X, currentY);
     doc.setFont("helvetica", "normal");
     doc.text((quote.equipment?.type || "NÃO ESPECIFICADO").toUpperCase(), col2X, currentY + 7);
@@ -140,10 +180,9 @@ const QuoteDetail: React.FC = () => {
     doc.text(`Marca/Mod: ${quote.equipment?.brand || '---'} / ${quote.equipment?.model || '---'}`, col2X, currentY + 12);
     doc.text(`Nº Série: ${quote.equipment?.serial_number || '---'}`, col2X, currentY + 17);
 
-    currentY += 32;
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    const introText = "Depois de examinadas todas as peças, detetadas as respetivas avarias, resultou o orçamento para reparação das suas máquinas que importa em:";
+    currentY += 40;
+    doc.setFontSize(10); doc.setTextColor(0, 0, 0);
+    const introText = "Após análise técnica pormenorizada ao equipamento acima identificado, apresenta-se o seguinte orçamento detalhado:";
     const splitIntro = doc.splitTextToSize(introText, pageWidth - (margin * 2));
     doc.text(splitIntro, margin, currentY);
 
@@ -162,134 +201,194 @@ const QuoteDetail: React.FC = () => {
       head: [['REF', 'DESIGNAÇÃO', 'QTD', 'P. UNIT (LÍQUIDO)', 'TOTAL (LÍQUIDO)']],
       body: tableBody,
       theme: 'grid',
-      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+      headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
       styles: { fontSize: 8, cellPadding: 3 },
       columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right', fontStyle: 'bold' } }
     });
 
     let finalY = (doc as any).lastAutoTable.finalY + 10;
     const subtotal = quote.items?.reduce((acc, i) => acc + (i.quantity * i.unit_price), 0) || 0;
-    
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
-    doc.text("TOTAL (VALOR LÍQUIDO):", pageWidth - margin - 65, finalY, { align: "right" });
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 0, 0);
+    doc.text("TOTAL LÍQUIDO:", pageWidth - margin - 65, finalY, { align: "right" });
     doc.text(`${subtotal.toFixed(2)} €`, pageWidth - margin, finalY, { align: "right" });
-    
-    doc.setFontSize(9);
-    doc.setTextColor(brandColor[0], brandColor[1], brandColor[2]);
+    doc.setFontSize(9); doc.setTextColor(brandColor[0], brandColor[1], brandColor[2]);
     doc.text("* Aos valores apresentados acresce o IVA de 23%.", pageWidth - margin, finalY + 8, { align: "right" });
 
     finalY += 22;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(60, 60, 60);
-    const disclaimerText = "Mais referimos que o presente orçamento serve apenas para estimativa, podendo ter uma variação, para mais ou para menos, no máximo de 10%. Para qualquer esclarecimento suplementar, utilize os contactos habituais. Pedimos-lhe que nos envie a resposta com a brevidade possível. Decorridos 30 dias, caso nos responda por escrito, consideramos este orçamento sem efeito.";
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(60, 60, 60);
+    const disclaimerText = "Validade do orçamento: 30 dias. Os valores podem sofrer um ajuste de até 10% em caso de deteção de avarias ocultas durante a reparação.";
     const splitDisclaimer = doc.splitTextToSize(disclaimerText, pageWidth - (margin * 2));
     doc.text(splitDisclaimer, margin, finalY);
 
-    finalY += 25;
+    finalY += 20;
     const qrDataUrl = await QRCode.toDataURL(publicUrl, { margin: 1, width: 100 });
-    doc.addImage(qrDataUrl, 'PNG', margin, finalY, 30, 30);
-    
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text("Digitalize para Aprovação Online", margin + 32, finalY + 12);
-    doc.setFontSize(6);
-    doc.text(publicUrl, margin + 32, finalY + 18, { maxWidth: 100 });
+    doc.addImage(qrDataUrl, 'PNG', margin, finalY, 25, 25);
+    doc.setFontSize(7); doc.setTextColor(100, 100, 100);
+    doc.text("Digitalize para Aprovação Online", margin + 28, finalY + 10);
+    doc.text(publicUrl, margin + 28, finalY + 15, { maxWidth: 120 });
 
     return doc;
   };
 
-  const generatePDF = async () => {
+  const generateInsurancePDF = async () => {
     if (!quote) return;
-    setIsExportingPDF(true); 
+    setIsExportingInsurance(true);
     try {
-      const doc = await generatePDFBlob();
-      if (doc) doc.save(`ORCAMENTO_${quote.code}.pdf`);
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.width;
+      const margin = 20;
+      const primaryColor: [number, number, number] = [0, 0, 0]; // Preto
+      const slateColor: [number, number, number] = [40, 40, 40]; // Cinza Escuro para tabelas
+
+      // Tentar carregar logótipos
+      const logoWide = await getBase64ImageFromURL('/logo.png');
+      const logoSquare = await getBase64ImageFromURL('/rf-apple-v5.png');
+
+      // --- 1. CABEÇALHO DA EMPRESA ---
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+
+      if (logoWide) {
+        doc.addImage(logoWide, 'PNG', 20, 15, 70, 18);
+      } else if (logoSquare) {
+        doc.addImage(logoSquare, 'PNG', 20, 15, 25, 25);
+        doc.text("REAL FRIO, LDA", 50, 25);
+        doc.setFontSize(9);
+        doc.setTextColor(80, 80, 80);
+        doc.setFont("helvetica", "normal");
+        doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", 50, 31);
+      } else {
+        doc.text("REAL FRIO, LDA", margin, 25);
+        doc.setFontSize(9);
+        doc.setTextColor(80, 80, 80);
+        doc.setFont("helvetica", "normal");
+        doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", margin, 31);
+      }
+      
+      doc.setFontSize(10);
+      doc.setTextColor(slateColor[0], slateColor[1], slateColor[2]);
+      doc.setFont("helvetica", "bold");
+      doc.text("RELATÓRIO TÉCNICO DE PERITAGEM", pageWidth - margin, 25, { align: "right" });
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text(`REF: ${quote.code}`, pageWidth - margin, 30, { align: "right" });
+      doc.text(`EMISSÃO: ${new Date().toLocaleDateString('pt-PT')}`, pageWidth - margin, 34, { align: "right" });
+
+      doc.setDrawColor(230, 230, 230);
+      doc.line(margin, 40, pageWidth - margin, 40);
+
+      let currentY = 50;
+      
+      // --- 2. IDENTIFICAÇÃO DO SINISTRO / ATIVO ---
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(margin, currentY, pageWidth - (margin * 2), 42, 3, 3, 'F');
+      
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(slateColor[0], slateColor[1], slateColor[2]);
+      doc.text("DADOS DO CLIENTE E EQUIPAMENTO", margin + 5, currentY + 8);
+      
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(60, 60, 60);
+      doc.text(`CLIENTE: ${(quote.client?.name || '---').toUpperCase()}`, margin + 5, currentY + 16);
+      doc.text(`FIRMA: ${(quote.client?.billing_name || quote.client?.name || '---').toUpperCase()}`, margin + 5, currentY + 22);
+      doc.text(`NIF: ${quote.client?.nif || '---'}`, margin + 5, currentY + 28);
+      doc.text(`LOCALIZAÇÃO: ${(quote.establishment?.name || '---').toUpperCase()}`, margin + 5, currentY + 34);
+      
+      const equipText = `${quote.equipment?.type || 'S/ TIPO'} - ${quote.equipment?.brand || 'S/ MARCA'} (${quote.equipment?.model || 'S/ MODELO'})`.toUpperCase();
+      doc.text(`ATIVO: ${equipText}`, margin + 5, currentY + 40);
+      doc.text(`Nº SÉRIE: ${quote.equipment?.serial_number || '---'}`, pageWidth - margin - 5, currentY + 40, { align: "right" });
+
+      currentY += 52;
+
+      // --- 3. PARECER TÉCNICO ---
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text("1. DIAGNÓSTICO E PROBLEMA DETETADO", margin, currentY);
+      
+      currentY += 6;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(40, 40, 40);
+      const probText = (quote.detected_problem || "Equipamento em falha técnica. Requer intervenção para substituição de componentes danificados conforme listagem abaixo.").toUpperCase();
+      const splitProb = doc.splitTextToSize(probText, pageWidth - (margin * 2));
+      doc.text(splitProb, margin, currentY);
+      
+      currentY += (splitProb.length * 5) + 10;
+
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text("2. CAUSA PROVÁVEL DO INCIDENTE", margin, currentY);
+      
+      currentY += 6;
+      doc.setFont("helvetica", "normal");
+      const causeText = (quote.cause || "Danos resultantes de anomalia externa ou desgaste mecânico acelerado.").toUpperCase();
+      const splitCause = doc.splitTextToSize(causeText, pageWidth - (margin * 2));
+      doc.text(splitCause, margin, currentY);
+
+      currentY += (splitCause.length * 5) + 15;
+
+      // --- 4. DETALHAMENTO DE PEÇAS E VALORES ---
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text("3. COMPONENTES NECESSÁRIOS E ESTIMATIVA DE REPARAÇÃO", margin, currentY);
+      
+      currentY += 5;
+      
+      const tableBody = (quote.items || []).map(i => [
+        i.name.toUpperCase(),
+        `${i.quantity} UN`,
+        `${i.unit_price.toFixed(2)} €`,
+        `${(i.quantity * i.unit_price).toFixed(2)} €`
+      ]);
+
+      autoTable(doc, {
+        startY: currentY,
+        margin: { left: margin, right: margin },
+        head: [['DESIGNAÇÃO TÉCNICA', 'QTD', 'VALOR UNIT.', 'TOTAL']],
+        body: tableBody,
+        theme: 'striped',
+        headStyles: { fillColor: slateColor, textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 3 },
+        columnStyles: { 1: { halign: 'center' }, 2: { halign: 'right' }, 3: { halign: 'right', fontStyle: 'bold' } }
+      });
+
+      let finalY = (doc as any).lastAutoTable.finalY + 10;
+      
+      const subtotal = quote.items?.reduce((acc, i) => acc + (i.quantity * i.unit_price), 0) || 0;
+      
+      doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(slateColor[0], slateColor[1], slateColor[2]);
+      doc.text("VALOR TOTAL LÍQUIDO ESTIMADO:", pageWidth - margin - 85, finalY, { align: "right" });
+      doc.text(`${subtotal.toFixed(2)} €`, pageWidth - margin, finalY, { align: "right" });
+      
+      doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+      doc.setFont("helvetica", "normal");
+      doc.text("* Valores líquidos sujeitos a IVA à taxa legal em vigor.", pageWidth - margin, finalY + 6, { align: "right" });
+
+      // --- 5. RODAPÉ ---
+      doc.setFontSize(7);
+      doc.text("Este documento é um parecer técnico emitido pela Real Frio, Lda para instrução de processos de sinistro junto de seguradoras.", pageWidth / 2, 285, { align: "center" });
+
+      doc.save(`RELATORIO_PERITAGEM_${quote.code}.pdf`);
     } catch (e) {
       console.error(e);
-      alert("Erro ao gerar PDF.");
+      alert("Erro ao gerar relatório de peritagem.");
     } finally {
-      setIsExportingPDF(false);
+      setIsExportingInsurance(false);
     }
   };
 
-  const handleSendEmail = async () => {
-    if (!quote) return;
-    const clientEmail = quote.client?.email?.trim();
-    if (!clientEmail) {
-      alert("ATENÇÃO: CLIENTE SEM EMAIL REGISTADO. DEVERÁ INSERIR MANUALMENTE.");
-    }
-    
+  const handleDownloadStandard = async () => {
     setIsExportingPDF(true);
     try {
-      // Geramos o PDF para o utilizador o ter disponível para anexar
-      const doc = await generatePDFBlob();
-      if (doc) doc.save(`ORCAMENTO_${quote.code}.pdf`);
-      
-      const subject = `ORÇAMENTO TÉCNICO - ${quote.code} - REAL FRIO`;
-      const publicLink = getPublicLink();
-      const body = `Exmos. Srs.\n\nEnviamos em anexo o orçamento técnico relativo à assistência solicitada para o equipamento ${quote.equipment?.type || 'em epígrafe'}.\n\nPoderá também consultar o detalhe, anexos técnicos e aprovar a proposta digitalmente através do seguinte link seguro:\n${publicLink}\n\nFicamos a aguardar a vossa resposta.\n\nCom os melhores cumprimentos,\nEquipa Técnica Real Frio`;
-      
-      window.location.href = `mailto:${clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    } catch (err) {
-      alert("Erro ao preparar e-mail.");
+      const doc = await generateStandardPDF();
+      if (doc) doc.save(`ORCAMENTO_${quote?.code}.pdf`);
     } finally {
       setIsExportingPDF(false);
     }
   };
 
-  const netValue = useMemo(() => {
-    if (!quote) return 0;
-    return quote.total_amount / 1.23;
-  }, [quote]);
+  if (loading) return <div className="h-full flex justify-center items-center py-40"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
+  if (!quote) return <div className="p-10 text-center uppercase font-black text-slate-300">Orçamento não encontrado</div>;
 
-  if (loading) return (
-    <div className="h-full flex justify-center items-center py-40">
-      <Loader2 className="animate-spin text-blue-600" size={32} />
-    </div>
-  );
-
-  if (!quote) return (
-    <div className="p-10 text-center uppercase font-black text-slate-300">
-      Orçamento não encontrado
-    </div>
-  );
+  const netValue = quote.total_amount / 1.23;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20 px-2 animate-in slide-in-from-bottom-2 duration-500">
-      {/* TOAST SUCESSO VALIDAÇÃO */}
-      {showSuccessToast && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[500] animate-in slide-in-from-top-10 duration-500">
-           <div className="bg-emerald-600 text-white px-8 py-4 rounded-3xl shadow-2xl flex items-center gap-3 border border-emerald-500/50">
-              <CheckCircle2 size={24} />
-              <p className="text-xs font-black uppercase tracking-widest">Orçamento Validado com Sucesso!</p>
-           </div>
-        </div>
-      )}
-
-      {quote.status === QuoteStatus.AGUARDA_VALIDACAO && (
-        <div className="bg-indigo-600 text-white p-6 rounded-[2.5rem] shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in zoom-in-95 duration-500">
-          <div className="flex items-center gap-4 text-center sm:text-left">
-            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
-               <Sparkles className="text-white" size={24} />
-            </div>
-            <div>
-               <h3 className="font-black uppercase tracking-tight text-lg leading-tight">Aprovação Recente</h3>
-               <p className="text-[10px] font-bold text-indigo-100 uppercase tracking-widest mt-1">Este orçamento foi aceite pelo cliente e aguarda validação interna.</p>
-            </div>
-          </div>
-          <button 
-            onClick={handleVerify}
-            disabled={actionLoading}
-            className="bg-white text-indigo-600 px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-all shadow-lg active:scale-95 disabled:opacity-50 whitespace-nowrap min-w-[200px]"
-          >
-            {actionLoading ? <Loader2 className="animate-spin mx-auto" size={16} /> : 'CONFIRMAR RECEÇÃO'}
-          </button>
-        </div>
-      )}
-
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <button onClick={() => navigate('/quotes')} className="p-3 bg-white dark:bg-slate-900 text-slate-500 rounded-2xl shadow-sm border dark:border-slate-800 transition-all hover:bg-slate-50 active:scale-95">
@@ -299,10 +398,10 @@ const QuoteDetail: React.FC = () => {
             <button onClick={() => navigate(`/quotes/${id}/edit`)} className="p-3.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl shadow-md border dark:border-slate-700 hover:bg-blue-50 transition-all">
               <Edit2 size={20}/>
             </button>
-            <button onClick={handleSendEmail} disabled={isExportingPDF} className="p-3.5 bg-white dark:bg-slate-800 text-emerald-600 rounded-2xl shadow-md border dark:border-slate-700 hover:bg-emerald-50 disabled:opacity-50 transition-all" title="Enviar Orçamento">
-              {isExportingPDF ? <Loader2 className="animate-spin" size={20} /> : <Mail size={20}/>}
+            <button onClick={generateInsurancePDF} disabled={isExportingInsurance} className="p-3.5 bg-indigo-600 text-white rounded-2xl shadow-md border border-indigo-500 hover:bg-indigo-700 disabled:opacity-50 transition-all" title="Gerar Relatório de Seguro">
+              {isExportingInsurance ? <Loader2 className="animate-spin" size={20} /> : <InsuranceIcon size={20}/>}
             </button>
-            <button onClick={generatePDF} disabled={isExportingPDF} className="p-3.5 bg-white dark:bg-slate-800 text-blue-600 rounded-2xl shadow-md border dark:border-slate-700 hover:bg-blue-50 disabled:opacity-50 transition-all">
+            <button onClick={handleDownloadStandard} disabled={isExportingPDF} className="p-3.5 bg-white dark:bg-slate-800 text-blue-600 rounded-2xl shadow-md border dark:border-slate-700 hover:bg-blue-50 disabled:opacity-50 transition-all">
               {isExportingPDF ? <Loader2 className="animate-spin" size={20} /> : <Printer size={20}/>}
             </button>
             <button onClick={() => setShowDeleteModal(true)} className="p-3.5 bg-white dark:bg-slate-800 text-rose-500 rounded-2xl shadow-md border dark:border-slate-700 hover:bg-rose-50 transition-all">
@@ -313,7 +412,7 @@ const QuoteDetail: React.FC = () => {
         
         <div className="px-1">
            <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight">
-             Proposta {quote.code}
+             Cotação {quote.code}
            </h1>
            <div className="flex items-center gap-2 mt-1">
              <span className={`text-[10px] font-black uppercase tracking-widest ${
@@ -322,14 +421,6 @@ const QuoteDetail: React.FC = () => {
              }`}>
                {quote.status}
              </span>
-             {quote.status === QuoteStatus.ACEITE && (
-               <>
-                 <span className="w-1 h-1 rounded-full bg-slate-200 dark:bg-slate-800"></span>
-                 <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 uppercase tracking-widest">
-                   <ShieldCheck size={10} /> Validado
-                 </span>
-               </>
-             )}
              <span className="w-1 h-1 rounded-full bg-slate-200 dark:bg-slate-800"></span>
              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Real Frio Tech</span>
            </div>
@@ -389,6 +480,42 @@ const QuoteDetail: React.FC = () => {
         </div>
       </div>
 
+      {/* PERITAGEM TÉCNICA */}
+      <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-all">
+          <button onClick={() => setExpandedTechnical(!expandedTechnical)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+            <div className="flex items-center gap-3 text-left min-w-0">
+              <Stethoscope className="text-orange-500 flex-shrink-0" size={20} />
+              <div className="min-w-0">
+                <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1">Peritagem Técnica</h3>
+                <p className="text-xs font-black text-slate-900 dark:text-white uppercase truncate">Problema & Causa</p>
+              </div>
+            </div>
+            <div>{expandedTechnical ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}</div>
+          </button>
+          {expandedTechnical && (
+            <div className="px-6 pb-6 space-y-4 animate-in slide-in-from-top-2 duration-300">
+               <div className="bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl space-y-6">
+                  <div>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                       Problema Detetado
+                    </p>
+                    <p className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase leading-relaxed">
+                       {quote.detected_problem || "NÃO REGISTADO NA FICHA TÉCNICA."}
+                    </p>
+                  </div>
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                       Causa Provável
+                    </p>
+                    <p className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase leading-relaxed">
+                       {quote.cause || "NÃO REGISTADA NA FICHA TÉCNICA."}
+                    </p>
+                  </div>
+               </div>
+            </div>
+          )}
+      </div>
+
       <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
          <div className="p-8 border-b dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
             <h3 className="text-sm font-black dark:text-white uppercase tracking-widest">Detalhamento S/ IVA</h3>
@@ -420,22 +547,6 @@ const QuoteDetail: React.FC = () => {
             <button onClick={() => handleUpdateStatus(QuoteStatus.REJEITADO)} disabled={actionLoading || quote.status === QuoteStatus.REJEITADO} className="flex items-center justify-center gap-2 py-4 bg-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 active:scale-95 transition-all disabled:opacity-50">
               <ThumbsDown size={16} /> Rejeitar
             </button>
-          </div>
-          <div className="mt-6 p-4 bg-white/5 rounded-xl border border-white/10">
-             <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-2"><ExternalLink size={10} /> Link Público de Aprovação</p>
-             <div className="flex flex-col gap-3">
-               <div className="flex items-center justify-between gap-2 bg-black/30 p-2 rounded-lg">
-                  <span className="text-[8px] text-slate-400 truncate flex-1 font-mono">{getPublicLink()}</span>
-                  <button onClick={() => { navigator.clipboard.writeText(getPublicLink()); alert("Link copiado!"); }} className="text-[8px] font-bold text-white uppercase bg-white/10 px-2 py-1 rounded hover:bg-white/20">Copiar</button>
-               </div>
-               <button 
-                onClick={handleSendEmail}
-                disabled={isExportingPDF}
-                className="w-full py-3 bg-white/10 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-white/20 transition-all flex items-center justify-center gap-2"
-               >
-                 <Mail size={14} /> ENVIAR POR E-MAIL AO CLIENTE
-               </button>
-             </div>
           </div>
       </div>
 
