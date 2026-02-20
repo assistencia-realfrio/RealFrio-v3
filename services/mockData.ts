@@ -504,12 +504,18 @@ export const mockData = {
   },
   createVehicle: async (vehicle: any) => {
     const { data, error } = await supabase.from('vehicles').insert([vehicle]).select().single();
-    if (error) throw error;
+    if (error) {
+      console.error("Erro Supabase (createVehicle):", error);
+      throw error;
+    }
     return data;
   },
   updateVehicle: async (id: string, updates: any) => {
     const { error } = await supabase.from('vehicles').update(updates).eq('id', id);
-    if (error) throw error;
+    if (error) {
+      console.error("Erro Supabase (updateVehicle):", error);
+      throw error;
+    }
   },
   deleteVehicle: async (id: string) => {
     const { error } = await supabase.from('vehicles').delete().eq('id', id);
