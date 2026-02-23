@@ -13,6 +13,8 @@ const FleetManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
+  const [allMaintenance, setAllMaintenance] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'fleet' | 'schedule'>('fleet');
   
   // Modals
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
@@ -21,6 +23,7 @@ const FleetManagement: React.FC = () => {
 
   useEffect(() => {
     fetchVehicles();
+    fetchAllMaintenance();
   }, []);
 
   useEffect(() => {
@@ -38,6 +41,15 @@ const FleetManagement: React.FC = () => {
       console.error("Erro ao carregar veículos:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAllMaintenance = async () => {
+    try {
+      const data = await mockData.getAllMaintenanceRecords();
+      setAllMaintenance(data);
+    } catch (error) {
+      console.error("Erro ao carregar agenda:", error);
     }
   };
 
@@ -113,11 +125,17 @@ const FleetManagement: React.FC = () => {
            current_mileage: recordData.mileage,
            next_revision_mileage: nextRev
          });
-         fetchVehicles(); // Atualizar lista principal
+      }
+
+      // Se o status for agendado ou se for para oficina, podemos querer mudar o status do veículo
+      if (recordData.status === 'scheduled') {
+        // Opcional: mudar status do veículo para oficina se a data for hoje?
       }
 
       setIsMaintenanceModalOpen(false);
-      fetchMaintenanceRecords(selectedVehicle.id);
+      fetchVehicles();
+      fetchAllMaintenance();
+      if (selectedVehicle) fetchMaintenanceRecords(selectedVehicle.id);
     } catch (error) {
       alert("Erro ao guardar registo.");
     }
@@ -129,6 +147,7 @@ const FleetManagement: React.FC = () => {
       await mockData.deleteVehicle(id);
       if (selectedVehicle?.id === id) setSelectedVehicle(null);
       fetchVehicles();
+      fetchAllMaintenance();
     } catch (error) {
       alert("Erro ao apagar veículo.");
     }
@@ -139,6 +158,16 @@ const FleetManagement: React.FC = () => {
     v.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
     v.model.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const stats = {
+    total: vehicles.length,
+    inWorkshop: vehicles.filter(v => v.status === 'maintenance').length,
+    scheduled: allMaintenance.filter(m => m.status === 'scheduled').length,
+    alerts: vehicles.filter(v => 
+      (v.next_revision_mileage && v.current_mileage >= v.next_revision_mileage - 1000) ||
+      (v.next_inspection_date && new Date(v.next_inspection_date) <= new Date(Date.now() + 15 * 24 * 60 * 60 * 1000))
+    ).length
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
@@ -169,168 +198,306 @@ const FleetManagement: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Lista de Veículos */}
-        <div className="lg:col-span-1 space-y-4">
-          {filteredVehicles.map(vehicle => (
-            <div 
-              key={vehicle.id}
-              onClick={() => setSelectedVehicle(vehicle)}
-              className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border transition-all cursor-pointer group ${selectedVehicle?.id === vehicle.id ? 'border-blue-500 ring-1 ring-blue-500 shadow-lg' : 'border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700'}`}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
-                    <Car size={20} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 dark:text-white uppercase">{vehicle.license_plate}</h3>
-                    <p className="text-xs text-slate-500 font-medium uppercase">{vehicle.brand} {vehicle.model}</p>
-                  </div>
-                </div>
-                <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider ${
-                  vehicle.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 
-                  vehicle.status === 'maintenance' ? 'bg-amber-100 text-amber-700' : 
-                  'bg-slate-100 text-slate-500'
-                }`}>
-                  {vehicle.status === 'active' ? 'Ativo' : vehicle.status === 'maintenance' ? 'Oficina' : 'Inativo'}
-                </span>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
-                  <span className="block text-[9px] text-slate-400 uppercase font-bold">Quilometragem</span>
-                  <span className="font-mono font-medium text-slate-700 dark:text-slate-300">{vehicle.current_mileage.toLocaleString()} km</span>
-                </div>
-                <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
-                  <span className="block text-[9px] text-slate-400 uppercase font-bold">Próx. Revisão</span>
-                  <span className={`font-mono font-medium ${vehicle.next_revision_mileage && vehicle.current_mileage >= vehicle.next_revision_mileage ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
-                    {vehicle.next_revision_mileage?.toLocaleString() || '---'} km
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-          {filteredVehicles.length === 0 && (
-            <div className="text-center py-12 text-slate-400">
-              <Truck size={48} className="mx-auto mb-3 opacity-20" />
-              <p className="text-xs uppercase font-bold tracking-widest">Nenhuma viatura encontrada</p>
-            </div>
-          )}
+      {/* Stats Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Frota</p>
+          <div className="flex items-center justify-between">
+            <span className="text-2xl font-black text-slate-900 dark:text-white">{stats.total}</span>
+            <Car className="text-slate-200 dark:text-slate-800" size={24} />
+          </div>
         </div>
-
-        {/* Detalhes e Histórico */}
-        <div className="lg:col-span-2">
-          {selectedVehicle ? (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl">
-              {/* Header Detalhes */}
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex justify-between items-start">
-                <div>
-                   <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-1">{selectedVehicle.brand} {selectedVehicle.model}</h2>
-                   <div className="flex items-center gap-3">
-                     <span className="text-sm font-mono font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-700 dark:text-slate-200">{selectedVehicle.license_plate}</span>
-                     <span className="text-xs text-slate-500 font-medium uppercase">Ano: {selectedVehicle.year}</span>
-                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => { setEditingVehicle(selectedVehicle); setIsVehicleModalOpen(true); }} className="p-2 text-slate-400 hover:text-blue-500 transition-colors"><Edit2 size={18} /></button>
-                  <button onClick={() => handleDeleteVehicle(selectedVehicle.id)} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
-                </div>
-              </div>
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 border-b border-slate-100 dark:border-slate-800">
-                 <div className="space-y-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inspeção</p>
-                    <div className="flex items-center gap-2">
-                       <Calendar size={14} className="text-blue-500" />
-                       <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{selectedVehicle.next_inspection_date ? new Date(selectedVehicle.next_inspection_date).toLocaleDateString() : '---'}</span>
-                    </div>
-                 </div>
-                 <div className="space-y-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seguro</p>
-                    <div className="flex items-center gap-2">
-                       <FileText size={14} className="text-emerald-500" />
-                       <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{selectedVehicle.insurance_expiry_date ? new Date(selectedVehicle.insurance_expiry_date).toLocaleDateString() : '---'}</span>
-                    </div>
-                 </div>
-                 <div className="space-y-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Condutor</p>
-                    <div className="flex items-center gap-2">
-                       <Truck size={14} className="text-amber-500" />
-                       <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{selectedVehicle.assigned_to || 'Não atribuído'}</span>
-                    </div>
-                 </div>
-                 <div className="space-y-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado</p>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                      selectedVehicle.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {selectedVehicle.status === 'active' ? 'Operacional' : 'Em Manutenção'}
-                    </span>
-                 </div>
-              </div>
-
-              {/* Maintenance History */}
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
-                    <Wrench size={16} className="text-slate-400" /> Histórico de Manutenção
-                  </h3>
-                  <button 
-                    onClick={() => setIsMaintenanceModalOpen(true)}
-                    className="text-[10px] font-bold uppercase bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
-                  >
-                    + Adicionar Registo
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {maintenanceRecords.length === 0 ? (
-                    <div className="text-center py-8 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">
-                      <p className="text-xs text-slate-400 font-medium uppercase">Sem registos de manutenção</p>
-                    </div>
-                  ) : (
-                    maintenanceRecords.map(record => (
-                      <div key={record.id} className="flex gap-4 p-4 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          record.type === 'revision' ? 'bg-blue-100 text-blue-600' :
-                          record.type === 'repair' ? 'bg-red-100 text-red-600' :
-                          record.type === 'inspection' ? 'bg-purple-100 text-purple-600' :
-                          'bg-slate-200 text-slate-600'
-                        }`}>
-                          {record.type === 'revision' ? <RefreshCw size={18} /> : 
-                           record.type === 'repair' ? <Wrench size={18} /> :
-                           record.type === 'inspection' ? <FileText size={18} /> : <AlertTriangle size={18} />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-start">
-                            <h4 className="font-bold text-slate-900 dark:text-white uppercase text-sm">{record.description}</h4>
-                            <span className="text-xs font-mono font-medium text-slate-500">{new Date(record.date).toLocaleDateString()}</span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1 uppercase">{record.provider} • {record.mileage.toLocaleString()} km</p>
-                          {record.notes && <p className="text-xs text-slate-400 mt-2 italic">"{record.notes}"</p>}
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-slate-900 dark:text-white">{record.cost.toFixed(2)}€</p>
-                          <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
-                            record.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                          }`}>{record.status === 'completed' ? 'Concluído' : 'Agendado'}</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-700 p-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
-              <Truck size={64} className="mb-4 opacity-50" />
-              <p className="text-sm font-bold uppercase tracking-widest">Selecione uma viatura para ver detalhes</p>
-            </div>
-          )}
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+          <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">Na Oficina</p>
+          <div className="flex items-center justify-between">
+            <span className="text-2xl font-black text-amber-600">{stats.inWorkshop}</span>
+            <Wrench className="text-amber-100 dark:text-amber-900/30" size={24} />
+          </div>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+          <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Agendamentos</p>
+          <div className="flex items-center justify-between">
+            <span className="text-2xl font-black text-blue-600">{stats.scheduled}</span>
+            <Calendar className="text-blue-100 dark:text-blue-900/30" size={24} />
+          </div>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+          <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-1">Alertas</p>
+          <div className="flex items-center justify-between">
+            <span className="text-2xl font-black text-red-600">{stats.alerts}</span>
+            <AlertTriangle className="text-red-100 dark:text-red-900/30" size={24} />
+          </div>
         </div>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800/50 rounded-2xl w-fit">
+        <button 
+          onClick={() => setActiveTab('fleet')}
+          className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'fleet' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Frota
+        </button>
+        <button 
+          onClick={() => setActiveTab('schedule')}
+          className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'schedule' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Agenda & Oficina
+        </button>
+      </div>
+
+      {activeTab === 'fleet' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Lista de Veículos */}
+          <div className="lg:col-span-1 space-y-4">
+            {filteredVehicles.map(vehicle => (
+              <div 
+                key={vehicle.id}
+                onClick={() => setSelectedVehicle(vehicle)}
+                className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border transition-all cursor-pointer group ${selectedVehicle?.id === vehicle.id ? 'border-blue-500 ring-1 ring-blue-500 shadow-lg' : 'border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700'}`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                      <Car size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 dark:text-white uppercase">{vehicle.license_plate}</h3>
+                      <p className="text-xs text-slate-500 font-medium uppercase">{vehicle.brand} {vehicle.model}</p>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider ${
+                    vehicle.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 
+                    vehicle.status === 'maintenance' ? 'bg-amber-100 text-amber-700' : 
+                    'bg-slate-100 text-slate-500'
+                  }`}>
+                    {vehicle.status === 'active' ? 'Ativo' : vehicle.status === 'maintenance' ? 'Oficina' : 'Inativo'}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
+                    <span className="block text-[9px] text-slate-400 uppercase font-bold">Quilometragem</span>
+                    <span className="font-mono font-medium text-slate-700 dark:text-slate-300">{vehicle.current_mileage.toLocaleString()} km</span>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
+                    <span className="block text-[9px] text-slate-400 uppercase font-bold">Próx. Revisão</span>
+                    <span className={`font-mono font-medium ${vehicle.next_revision_mileage && vehicle.current_mileage >= vehicle.next_revision_mileage ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
+                      {vehicle.next_revision_mileage?.toLocaleString() || '---'} km
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {filteredVehicles.length === 0 && (
+              <div className="text-center py-12 text-slate-400">
+                <Truck size={48} className="mx-auto mb-3 opacity-20" />
+                <p className="text-xs uppercase font-bold tracking-widest">Nenhuma viatura encontrada</p>
+              </div>
+            )}
+          </div>
+
+          {/* Detalhes e Histórico */}
+          <div className="lg:col-span-2">
+            {selectedVehicle ? (
+              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl">
+                {/* Header Detalhes */}
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex justify-between items-start">
+                  <div>
+                     <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-1">{selectedVehicle.brand} {selectedVehicle.model}</h2>
+                     <div className="flex items-center gap-3">
+                       <span className="text-sm font-mono font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-700 dark:text-slate-200">{selectedVehicle.license_plate}</span>
+                       <span className="text-xs text-slate-500 font-medium uppercase">Ano: {selectedVehicle.year}</span>
+                     </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setEditingVehicle(selectedVehicle); setIsVehicleModalOpen(true); }} className="p-2 text-slate-400 hover:text-blue-500 transition-colors"><Edit2 size={18} /></button>
+                    <button onClick={() => handleDeleteVehicle(selectedVehicle.id)} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
+                  </div>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 border-b border-slate-100 dark:border-slate-800">
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inspeção</p>
+                      <div className="flex items-center gap-2">
+                         <Calendar size={14} className="text-blue-500" />
+                         <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{selectedVehicle.next_inspection_date ? new Date(selectedVehicle.next_inspection_date).toLocaleDateString() : '---'}</span>
+                      </div>
+                   </div>
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seguro</p>
+                      <div className="flex items-center gap-2">
+                         <FileText size={14} className="text-emerald-500" />
+                         <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{selectedVehicle.insurance_expiry_date ? new Date(selectedVehicle.insurance_expiry_date).toLocaleDateString() : '---'}</span>
+                      </div>
+                   </div>
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Condutor</p>
+                      <div className="flex items-center gap-2">
+                         <Truck size={14} className="text-amber-500" />
+                         <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{selectedVehicle.assigned_to || 'Não atribuído'}</span>
+                      </div>
+                   </div>
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado</p>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                        selectedVehicle.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {selectedVehicle.status === 'active' ? 'Operacional' : 'Em Manutenção'}
+                      </span>
+                   </div>
+                </div>
+
+                {/* Next Schedule Alert */}
+                {maintenanceRecords.find(r => r.status === 'scheduled') && (
+                  <div className="mx-6 mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Calendar size={16} className="text-blue-600" />
+                      <div>
+                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Próximo Agendamento</p>
+                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                          {maintenanceRecords.find(r => r.status === 'scheduled')?.description} - {new Date(maintenanceRecords.find(r => r.status === 'scheduled')!.date).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-0.5 rounded uppercase">Agendado</span>
+                  </div>
+                )}
+
+                {/* Maintenance History */}
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                      <Wrench size={16} className="text-slate-400" /> Histórico de Manutenção
+                    </h3>
+                    <button 
+                      onClick={() => setIsMaintenanceModalOpen(true)}
+                      className="text-[10px] font-bold uppercase bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                    >
+                      + Adicionar Registo
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {maintenanceRecords.length === 0 ? (
+                      <div className="text-center py-8 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">
+                        <p className="text-xs text-slate-400 font-medium uppercase">Sem registos de manutenção</p>
+                      </div>
+                    ) : (
+                      maintenanceRecords.map(record => (
+                        <div key={record.id} className="flex gap-4 p-4 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            record.type === 'revision' ? 'bg-blue-100 text-blue-600' :
+                            record.type === 'repair' ? 'bg-red-100 text-red-600' :
+                            record.type === 'inspection' ? 'bg-purple-100 text-purple-600' :
+                            'bg-slate-200 text-slate-600'
+                          }`}>
+                            {record.type === 'revision' ? <RefreshCw size={18} /> : 
+                             record.type === 'repair' ? <Wrench size={18} /> :
+                             record.type === 'inspection' ? <FileText size={18} /> : <AlertTriangle size={18} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-start">
+                              <h4 className="font-bold text-slate-900 dark:text-white uppercase text-sm">{record.description}</h4>
+                              <span className="text-xs font-mono font-medium text-slate-500">{new Date(record.date).toLocaleDateString()}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1 uppercase">{record.provider} • {record.mileage.toLocaleString()} km</p>
+                            {record.notes && <p className="text-xs text-slate-400 mt-2 italic">"{record.notes}"</p>}
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-slate-900 dark:text-white">{record.cost.toFixed(2)}€</p>
+                            <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                              record.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                            }`}>{record.status === 'completed' ? 'Concluído' : 'Agendado'}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-700 p-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
+                <Truck size={64} className="mb-4 opacity-50" />
+                <p className="text-sm font-bold uppercase tracking-widest">Selecione uma viatura para ver detalhes</p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {/* Agendamentos Próximos */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.2em] flex items-center gap-2">
+              <Calendar size={18} className="text-blue-500" /> Agendamentos Futuros
+            </h3>
+            <div className="space-y-3">
+              {allMaintenance.filter(m => m.status === 'scheduled').length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 text-center">
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Sem agendamentos previstos</p>
+                </div>
+              ) : (
+                allMaintenance.filter(m => m.status === 'scheduled').map(m => (
+                  <div key={m.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600">
+                        <Calendar size={20} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white uppercase text-sm">{m.description}</h4>
+                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-tight">
+                          {m.vehicles?.license_plate} • {m.vehicles?.brand} {m.vehicles?.model}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-blue-600">{new Date(m.date).toLocaleDateString()}</p>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase">{m.provider}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Viaturas na Oficina */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.2em] flex items-center gap-2">
+              <Wrench size={18} className="text-amber-500" /> Viaturas na Oficina
+            </h3>
+            <div className="space-y-3">
+              {vehicles.filter(v => v.status === 'maintenance').length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 text-center">
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Nenhuma viatura em reparação</p>
+                </div>
+              ) : (
+                vehicles.filter(v => v.status === 'maintenance').map(v => (
+                  <div key={v.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600">
+                        <Truck size={20} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white uppercase text-sm">{v.license_plate}</h4>
+                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-tight">
+                          {v.brand} {v.model} • {v.current_mileage.toLocaleString()} km
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => { setSelectedVehicle(v); setActiveTab('fleet'); }}
+                      className="p-2 text-slate-400 hover:text-blue-500 transition-colors"
+                    >
+                      <ChevronRight size={20} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Veículo */}
       {isVehicleModalOpen && (

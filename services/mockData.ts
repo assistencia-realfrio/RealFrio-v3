@@ -550,6 +550,14 @@ export const mockData = {
     if (error) throw error;
     return data || [];
   },
+  getAllMaintenanceRecords: async () => {
+    const { data, error } = await supabase
+      .from('maintenance_records')
+      .select('*, vehicles(license_plate, brand, model)')
+      .order('date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
   createMaintenanceRecord: async (record: any) => {
     const { data, error } = await supabase.from('maintenance_records').insert([record]).select().single();
     if (error) throw error;
