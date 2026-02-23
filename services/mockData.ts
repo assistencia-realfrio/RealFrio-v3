@@ -197,27 +197,34 @@ export const mockData = {
     // Parte não crítica: tentar registar atividade na OS vinculada
     try {
       if (quote && quote.client_id) {
+        console.log("Procurando OS vinculada para cliente:", quote.client_id);
         // Procurar a OS mais recente deste cliente que esteja em estado de orçamento
         // Usamos uma abordagem mais robusta para evitar o erro 406 do .single()
-        const { data: orders } = await supabase
+        const { data: orders, error: osError } = await supabase
           .from('service_orders')
-          .select('id')
+          .select('id, status')
           .eq('client_id', quote.client_id)
-          .or(`status.eq.para_orcamento,status.eq.orcamento_enviado,status.eq."para orcamento",status.eq."orcamento enviado"`)
+          .in('status', ['para_orcamento', 'orcamento_enviado', 'para orcamento', 'orcamento enviado'])
           .order('created_at', { ascending: false })
           .limit(1);
 
-        if (orders && orders.length > 0) {
+        if (osError) {
+          console.error("Erro ao procurar OS vinculada:", osError);
+        } else if (orders && orders.length > 0) {
           const linkedOS = orders[0];
-          await supabase.from('os_activities').insert([{
+          console.log("OS vinculada encontrada:", linkedOS.id);
+          const { error: actError } = await supabase.from('os_activities').insert([{
             os_id: linkedOS.id,
             description: `ORÇAMENTO ${quote.code} ASSINADO PELO CLIENTE (AGUARDA VALIDAÇÃO NO SISTEMA DE COTAÇÕES)`,
             user_name: 'CLIENTE (WEB)'
           }]);
+          if (actError) console.error("Erro ao inserir atividade na OS:", actError);
+        } else {
+          console.log("Nenhuma OS vinculada encontrada em estado de orçamento.");
         }
       }
     } catch (e) {
-      console.warn("Aviso: Não foi possível vincular atividade à OS:", e);
+      console.warn("Aviso: Erro inesperado ao vincular atividade à OS:", e);
     }
 
     return true;
@@ -243,7 +250,7 @@ export const mockData = {
           .from('service_orders')
           .select('id')
           .eq('client_id', quote.client_id)
-          .or(`status.eq.para_orcamento,status.eq.orcamento_enviado,status.eq."para orcamento",status.eq."orcamento enviado"`)
+          .in('status', ['para_orcamento', 'orcamento_enviado', 'para orcamento', 'orcamento enviado'])
           .order('created_at', { ascending: false })
           .limit(1);
 

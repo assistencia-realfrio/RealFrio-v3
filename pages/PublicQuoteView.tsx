@@ -117,13 +117,25 @@ const PublicQuoteView: React.FC = () => {
         {/* Content Body */}
         <div className="p-6 sm:p-12 space-y-10 flex-1">
           {isReadOnly && (
-            <div className={`p-6 rounded-[2rem] flex items-center gap-4 animate-in slide-in-from-top-4 ${quote.status === QuoteStatus.ACEITE ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${quote.status === QuoteStatus.ACEITE ? 'bg-white' : 'bg-white shadow-sm'}`}>
-                {quote.status === QuoteStatus.ACEITE ? <CheckCircle2 size={24} /> : <AlertTriangle size={24} />}
+            <div className={`p-6 rounded-[2rem] flex items-center gap-4 animate-in slide-in-from-top-4 ${
+              quote.status === QuoteStatus.ACEITE 
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                : quote.status === QuoteStatus.AGUARDA_VALIDACAO
+                ? 'bg-amber-50 text-amber-700 border border-amber-100'
+                : 'bg-red-50 text-red-700 border border-red-100'
+            }`}>
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-white shadow-sm`}>
+                {quote.status === QuoteStatus.ACEITE ? <CheckCircle2 size={24} className="text-emerald-600" /> : 
+                 quote.status === QuoteStatus.AGUARDA_VALIDACAO ? <Loader2 size={24} className="text-amber-600 animate-spin" /> :
+                 <AlertTriangle size={24} className="text-red-600" />}
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Estado da Proposta</p>
-                <p className="text-sm font-black uppercase">{quote.status === QuoteStatus.ACEITE ? 'PROPOSTA JÁ APROVADA' : 'ESTA PROPOSTA FOI REJEITADA'}</p>
+                <p className="text-sm font-black uppercase">
+                  {quote.status === QuoteStatus.ACEITE ? 'PROPOSTA JÁ APROVADA' : 
+                   quote.status === QuoteStatus.AGUARDA_VALIDACAO ? 'AGUARDA VALIDAÇÃO' : 
+                   'ESTA PROPOSTA FOI REJEITADA'}
+                </p>
               </div>
             </div>
           )}
