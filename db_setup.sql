@@ -79,3 +79,35 @@ GRANT ALL ON TABLE public.vehicles TO anon;
 GRANT ALL ON TABLE public.maintenance_records TO authenticated;
 GRANT ALL ON TABLE public.maintenance_records TO service_role;
 GRANT ALL ON TABLE public.maintenance_records TO anon;
+
+-- Garantir que o público pode ver e assinar orçamentos
+ALTER TABLE public.quotes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Permitir leitura pública de orçamentos" ON public.quotes;
+CREATE POLICY "Permitir leitura pública de orçamentos" ON public.quotes FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Permitir atualização pública de orçamentos" ON public.quotes;
+CREATE POLICY "Permitir atualização pública de orçamentos" ON public.quotes FOR UPDATE USING (true) WITH CHECK (true);
+
+-- Garantir que o público pode ver itens do orçamento
+ALTER TABLE public.quote_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Permitir leitura pública de itens de orçamento" ON public.quote_items;
+CREATE POLICY "Permitir leitura pública de itens de orçamento" ON public.quote_items FOR SELECT USING (true);
+
+-- Garantir que o público pode ver ordens de serviço (necessário para o vínculo de atividade)
+ALTER TABLE public.service_orders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Permitir leitura pública de ordens de serviço" ON public.service_orders;
+CREATE POLICY "Permitir leitura pública de ordens de serviço" ON public.service_orders FOR SELECT USING (true);
+
+-- Garantir que o público pode inserir atividades (necessário para o log de assinatura)
+ALTER TABLE public.os_activities ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Permitir inserção pública de atividades" ON public.os_activities;
+CREATE POLICY "Permitir inserção pública de atividades" ON public.os_activities FOR INSERT WITH CHECK (true);
+
+-- Dar permissões explícitas para anon
+GRANT ALL ON TABLE public.quotes TO anon;
+GRANT ALL ON TABLE public.quote_items TO anon;
+GRANT ALL ON TABLE public.service_orders TO anon;
+GRANT ALL ON TABLE public.os_activities TO anon;
+GRANT ALL ON TABLE public.clients TO anon;
+GRANT ALL ON TABLE public.establishments TO anon;
+GRANT ALL ON TABLE public.equipments TO anon;

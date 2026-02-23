@@ -189,20 +189,26 @@ export const mockData = {
       .select('code, client_id')
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error("Erro ao assinar proposta:", error);
+      throw error;
+    }
 
+    // Parte não crítica: tentar registar atividade na OS vinculada
     try {
-      if (quote) {
-        const { data: linkedOS } = await supabase
+      if (quote && quote.client_id) {
+        // Procurar a OS mais recente deste cliente que esteja em estado de orçamento
+        // Usamos uma abordagem mais robusta para evitar o erro 406 do .single()
+        const { data: orders } = await supabase
           .from('service_orders')
           .select('id')
           .eq('client_id', quote.client_id)
-          .or(`status.eq.${OSStatus.PARA_ORCAMENTO},status.eq.${OSStatus.ORCAMENTO_ENVIADO}`)
+          .or(`status.eq.para_orcamento,status.eq.orcamento_enviado,status.eq."para orcamento",status.eq."orcamento enviado"`)
           .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+          .limit(1);
 
-        if (linkedOS) {
+        if (orders && orders.length > 0) {
+          const linkedOS = orders[0];
           await supabase.from('os_activities').insert([{
             os_id: linkedOS.id,
             description: `ORÇAMENTO ${quote.code} ASSINADO PELO CLIENTE (AGUARDA VALIDAÇÃO NO SISTEMA DE COTAÇÕES)`,
@@ -210,7 +216,9 @@ export const mockData = {
           }]);
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Aviso: Não foi possível vincular atividade à OS:", e);
+    }
 
     return true;
   },
@@ -223,27 +231,36 @@ export const mockData = {
       .select('code, client_id')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Erro ao verificar proposta:", error);
+      throw error;
+    }
 
+    // Parte não crítica: atualizar OS vinculada
     try {
-      const { data: linkedOS } = await supabase
-        .from('service_orders')
-        .select('id')
-        .eq('client_id', quote.client_id)
-        .or(`status.eq.${OSStatus.PARA_ORCAMENTO},status.eq.${OSStatus.ORCAMENTO_ENVIADO}`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+      if (quote && quote.client_id) {
+        const { data: orders } = await supabase
+          .from('service_orders')
+          .select('id')
+          .eq('client_id', quote.client_id)
+          .or(`status.eq.para_orcamento,status.eq.orcamento_enviado,status.eq."para orcamento",status.eq."orcamento enviado"`)
+          .order('created_at', { ascending: false })
+          .limit(1);
 
-      if (linkedOS) {
-        const session = mockData.getSession();
-        await supabase.from('os_activities').insert([{
-          os_id: linkedOS.id,
-          description: `ORÇAMENTO ${quote.code} VALIDADO PELO BACKOFFICE (SISTEMA COTAÇÕES)`,
-          user_name: session?.full_name || 'Sistema'
-        }]);
+        if (orders && orders.length > 0) {
+          const linkedOS = orders[0];
+          const session = mockData.getSession();
+          
+          await supabase.from('os_activities').insert([{
+            os_id: linkedOS.id,
+            description: `ORÇAMENTO ${quote.code} VALIDADO PELO BACKOFFICE (SISTEMA COTAÇÕES)`,
+            user_name: session?.full_name || 'Sistema'
+          }]);
+        }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Aviso: Não foi possível atualizar OS vinculada:", e);
+    }
 
     return true;
   },
