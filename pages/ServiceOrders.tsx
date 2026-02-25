@@ -350,12 +350,22 @@ const ServiceOrders: React.FC = () => {
                           <span className="opacity-20">|</span>
                           <span>{os.equipment?.brand}</span>
                         </div>
-                        {os.call_before_going && (
-                          <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 mt-0.5">
-                            <Phone size={10} />
-                            <span className="text-[8px] font-black uppercase tracking-tight">Ligar antes de ir</span>
-                          </div>
-                        )}
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                          {os.scheduled_date && (
+                            <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                              <Calendar size={10} />
+                              <span className="text-[8px] font-black uppercase tracking-tight">
+                                {formatScheduledInfo(os.scheduled_date)}
+                              </span>
+                            </div>
+                          )}
+                          {os.call_before_going && (
+                            <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                              <Phone size={10} />
+                              <span className="text-[8px] font-black uppercase tracking-tight">Ligar antes de ir</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -411,9 +421,9 @@ const ServiceOrders: React.FC = () => {
                         </p>
                         
                         {os.scheduled_date && (
-                          <div className="flex items-center gap-2 text-slate-900 dark:text-slate-400 mt-1">
-                            <Calendar size={12} className={isTimerActive ? "text-red-500" : "text-blue-500"} />
-                            <span className="text-[10px] font-normal uppercase tracking-widest">
+                          <div className={`flex items-center gap-2 mt-1 p-2 rounded-xl border ${isToday(os.scheduled_date) ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800 text-blue-700 dark:text-blue-400' : 'text-slate-900 dark:text-slate-400 border-transparent'}`}>
+                            <Calendar size={12} className={isTimerActive ? "text-red-500" : (isToday(os.scheduled_date) ? "text-blue-600" : "text-blue-500")} />
+                            <span className={`text-[10px] uppercase tracking-widest ${isToday(os.scheduled_date) ? 'font-black' : 'font-normal'}`}>
                               Agendamento: {formatScheduledInfo(os.scheduled_date)}
                             </span>
                           </div>
