@@ -915,28 +915,28 @@ export const ServiceOrderDetail: React.FC = () => {
       </div>
 
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-        {os?.call_before_going && (
-          <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800/50 rounded-[1.5rem] p-5 flex items-center gap-4 animate-in slide-in-from-top-4 duration-500">
-            <div className="w-12 h-12 bg-amber-100 dark:bg-amber-800/40 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Phone size={24} className="animate-bounce" />
-            </div>
-            <div className="min-w-0">
-              <h4 className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-[0.2em] mb-0.5">Ligar antes de ir ao local</h4>
-              <p className="text-sm font-black text-slate-900 dark:text-white uppercase truncate">
-                {os.contact_name}
-              </p>
-              <a 
-                href={`tel:${os.contact_phone}`} 
-                className="text-lg font-black text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2 mt-1"
-              >
-                {os.contact_phone}
-              </a>
-            </div>
-          </div>
-        )}
-
         {activeTab === 'info' && (
           <div className="space-y-3">
+            {os?.call_before_going && (
+              <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800/50 rounded-[1.5rem] p-5 flex items-center gap-4 animate-in slide-in-from-top-4 duration-500">
+                <div className="w-12 h-12 bg-amber-100 dark:bg-amber-800/40 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Phone size={24} className="animate-bounce" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-[0.2em] mb-0.5">Ligar antes de ir ao local</h4>
+                  <p className="text-sm font-black text-slate-900 dark:text-white uppercase truncate">
+                    {os.contact_name}
+                  </p>
+                  <a 
+                    href={`tel:${os.contact_phone}`} 
+                    className="text-lg font-black text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2 mt-1"
+                  >
+                    {os.contact_phone}
+                  </a>
+                </div>
+              </div>
+            )}
+
             {/* CARD DE ORÇAMENTO NO TOPO DA FICHA */}
             {quoteTotals.hasValues && (os?.status === OSStatus.PARA_ORCAMENTO || os?.status === OSStatus.ORCAMENTO_ENVIADO) && (
               <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-100 dark:border-blue-900/40 p-6 animate-in zoom-in-95 duration-500 overflow-hidden relative group">
