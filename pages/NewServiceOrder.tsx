@@ -42,6 +42,9 @@ const NewServiceOrder: React.FC = () => {
     scheduled_date: '',
     scheduled_time: '',
     is_warranty: false,
+    call_before_going: false,
+    contact_name: '',
+    contact_phone: '',
     store: currentStore === 'Todas' ? 'Caldas da Rainha' : currentStore
   });
 
@@ -182,6 +185,9 @@ const NewServiceOrder: React.FC = () => {
         status: OSStatus.POR_INICIAR,
         scheduled_date: finalScheduledDate || undefined,
         is_warranty: formData.is_warranty,
+        call_before_going: formData.call_before_going,
+        contact_name: formData.contact_name.toUpperCase(),
+        contact_phone: formData.contact_phone,
         store: formData.store
       });
       navigate('/os');
@@ -405,6 +411,44 @@ const NewServiceOrder: React.FC = () => {
                 <CheckCircle2 size={14} />
               </div>
               <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">Equipamento em Garantia</span>
+           </div>
+
+           <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border-2 border-transparent hover:border-blue-500/20 transition-all cursor-pointer" onClick={() => setFormData({...formData, call_before_going: !formData.call_before_going})}>
+                <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${formData.call_before_going ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-transparent'}`}>
+                  <CheckCircle2 size={14} />
+                </div>
+                <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">Ligar antes de ir ao local</span>
+              </div>
+
+              {formData.call_before_going && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-200">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Nome do Contacto</label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                      <input 
+                        type="text" value={formData.contact_name} 
+                        onChange={e => setFormData({...formData, contact_name: e.target.value})}
+                        className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase"
+                        placeholder="NOME DA PESSOA..."
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Telefone / Telemóvel</label>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                      <input 
+                        type="tel" value={formData.contact_phone} 
+                        onChange={e => setFormData({...formData, contact_phone: e.target.value})}
+                        className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase"
+                        placeholder="912 345 678..."
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
            </div>
 
            <div className="pt-4">

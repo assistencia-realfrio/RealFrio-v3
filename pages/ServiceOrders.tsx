@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { HardDrive, Filter, MapPin, ChevronDown, RefreshCw, Calendar, LayoutList, StretchHorizontal, ShieldAlert, X, Timer, ThumbsDown as CancelIcon, Loader2 } from 'lucide-react';
+import { HardDrive, Filter, MapPin, ChevronDown, RefreshCw, Calendar, LayoutList, StretchHorizontal, ShieldAlert, X, Timer, ThumbsDown as CancelIcon, Loader2, Phone } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { ServiceOrder, OSStatus } from '../types';
 import { useStore } from '../contexts/StoreContext';
@@ -350,6 +350,12 @@ const ServiceOrders: React.FC = () => {
                           <span className="opacity-20">|</span>
                           <span>{os.equipment?.brand}</span>
                         </div>
+                        {os.call_before_going && (
+                          <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 mt-0.5">
+                            <Phone size={10} />
+                            <span className="text-[8px] font-black uppercase tracking-tight">Ligar antes de ir</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -409,6 +415,15 @@ const ServiceOrders: React.FC = () => {
                             <Calendar size={12} className={isTimerActive ? "text-red-500" : "text-blue-500"} />
                             <span className="text-[10px] font-normal uppercase tracking-widest">
                               Agendamento: {formatScheduledInfo(os.scheduled_date)}
+                            </span>
+                          </div>
+                        )}
+
+                        {os.call_before_going && (
+                          <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 mt-1">
+                            <Phone size={12} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">
+                              Ligar antes de ir: {os.contact_name} ({os.contact_phone})
                             </span>
                           </div>
                         )}

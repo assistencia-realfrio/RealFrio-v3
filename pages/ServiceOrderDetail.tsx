@@ -155,6 +155,9 @@ export const ServiceOrderDetail: React.FC = () => {
   const [technicianSignature, setTechnicianSignature] = useState<string | null>(null);
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
+  const [callBeforeGoing, setCallBeforeGoing] = useState(false);
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
   const [loading, setLoading] = useState(true);
   
   const [dragActiveType, setDragActiveType] = useState<string | null>(null);
@@ -197,6 +200,7 @@ export const ServiceOrderDetail: React.FC = () => {
   const [expandedEquip, setExpandedEquip] = useState(false);
   const [expandedWarranty, setExpandedWarranty] = useState(false);
   const [expandedPlanning, setExpandedPlanning] = useState(false);
+  const [expandedCallBeforeGoing, setExpandedCallBeforeGoing] = useState(false);
   const [expandedLog, setExpandedLog] = useState(false);
 
   // Estados para Upload Seletivo
@@ -239,9 +243,12 @@ export const ServiceOrderDetail: React.FC = () => {
       currentClientSig !== originalClientSig ||
       currentTechSig !== originalTechSig ||
       isWarranty !== (!!os.is_warranty) ||
-      currentWarrantyInfoStr !== originalWarrantyInfoStr
+      currentWarrantyInfoStr !== originalWarrantyInfoStr ||
+      callBeforeGoing !== (!!os.call_before_going) ||
+      contactName !== (os.contact_name || '') ||
+      contactPhone !== (os.contact_phone || '')
     );
-  }, [os, description, anomaly, resolutionNotes, observations, scheduledDate, scheduledTime, clientSignature, technicianSignature, isWarranty, warrantyInfo]);
+  }, [os, description, anomaly, resolutionNotes, observations, scheduledDate, scheduledTime, clientSignature, technicianSignature, isWarranty, warrantyInfo, callBeforeGoing, contactName, contactPhone]);
 
   useEffect(() => { fetchOSDetails(); }, [id]);
 
@@ -384,6 +391,9 @@ export const ServiceOrderDetail: React.FC = () => {
           setTechnicianSignature(osData.technician_signature && osData.technician_signature.trim() !== '' ? osData.technician_signature : null);
           setIsWarranty(!!osData.is_warranty);
           setWarrantyInfo(osData.warranty_info || {});
+          setCallBeforeGoing(!!osData.call_before_going);
+          setContactName(osData.contact_name || '');
+          setContactPhone(osData.contact_phone || '');
           if (osData.scheduled_date) {
             const parts = osData.scheduled_date.split(/[T ]/);
             setScheduledDate(parts[0] || '');
@@ -467,8 +477,25 @@ export const ServiceOrderDetail: React.FC = () => {
       if (clientSignature !== (os.client_signature || null)) changes.push("ASSINATURA CLIENTE");
       if (technicianSignature !== (os.technician_signature || null)) changes.push("ASSINATURA TÉCNICO");
       if (isWarranty !== !!os.is_warranty) changes.push(isWarranty ? "ATIVOU GARANTIA" : "DESATIVOU GARANTIA");
+      if (callBeforeGoing !== !!os.call_before_going) changes.push(callBeforeGoing ? "ATIVOU LIGAR ANTES" : "DESATIVOU LIGAR ANTES");
+      if (contactName !== (os.contact_name || '')) changes.push("NOME CONTACTO");
+      if (contactPhone !== (os.contact_phone || '')) changes.push("TELEFONE CONTACTO");
+
       const finalScheduled = scheduledDate ? `${scheduledDate}T${scheduledTime || '00:00'}:00` : null;
-      await mockData.updateServiceOrder(id, { description, anomaly_detected: anomaly, resolution_notes: resolutionNotes, observations, client_signature: clientSignature, technician_signature: technicianSignature, scheduled_date: finalScheduled as any, is_warranty: isWarranty, warranty_info: warrantyInfo });
+      await mockData.updateServiceOrder(id, { 
+        description, 
+        anomaly_detected: anomaly, 
+        resolution_notes: resolutionNotes, 
+        observations, 
+        client_signature: clientSignature, 
+        technician_signature: technicianSignature, 
+        scheduled_date: finalScheduled as any, 
+        is_warranty: isWarranty, 
+        warranty_info: warrantyInfo,
+        call_before_going: callBeforeGoing,
+        contact_name: contactName,
+        contact_phone: contactPhone
+      });
       if (changes.length > 0) { await mockData.addOSActivity(id, { description: `ATUALIZOU: ${changes.join(', ')}` }); }
       setShowValidationErrors(false);
       fetchOSDetails(true); 
@@ -888,6 +915,26 @@ export const ServiceOrderDetail: React.FC = () => {
       </div>
 
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+        {os?.call_before_going && (
+          <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800/50 rounded-[1.5rem] p-5 flex items-center gap-4 animate-in slide-in-from-top-4 duration-500">
+            <div className="w-12 h-12 bg-amber-100 dark:bg-amber-800/40 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
+              <Phone size={24} className="animate-bounce" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-[0.2em] mb-0.5">Ligar antes de ir ao local</h4>
+              <p className="text-sm font-black text-slate-900 dark:text-white uppercase truncate">
+                {os.contact_name}
+              </p>
+              <a 
+                href={`tel:${os.contact_phone}`} 
+                className="text-lg font-black text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2 mt-1"
+              >
+                {os.contact_phone}
+              </a>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'info' && (
           <div className="space-y-3">
             {/* CARD DE ORÇAMENTO NO TOPO DA FICHA */}
@@ -1169,6 +1216,62 @@ export const ServiceOrderDetail: React.FC = () => {
                        <div><label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Data</label><input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" /></div>
                        <div><label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Hora</label><input type="time" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" /></div>
                     </div>
+                 </div>
+               )}
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
+               <button onClick={() => setExpandedCallBeforeGoing(!expandedCallBeforeGoing)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                 <div className="flex items-center gap-3">
+                   <Phone size={18} className={callBeforeGoing ? "text-amber-500" : "text-slate-400"} />
+                   <div className="text-left">
+                     <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Aviso de Contacto</h3>
+                     <p className={`text-[11px] font-bold uppercase tracking-tight mt-0.5 ${callBeforeGoing ? "text-amber-600" : "text-slate-400"}`}>
+                       {callBeforeGoing ? "Ligar antes de ir" : "Sem aviso de contacto"}
+                     </p>
+                   </div>
+                 </div>
+                 {expandedCallBeforeGoing ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
+               </button>
+               {expandedCallBeforeGoing && (
+                 <div className="px-6 pb-6 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl">
+                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ligar antes de ir ao local</span>
+                       <button 
+                         onClick={() => setCallBeforeGoing(!callBeforeGoing)}
+                         disabled={os?.status === OSStatus.CONCLUIDA}
+                         className={`w-12 h-6 rounded-full transition-all relative ${callBeforeGoing ? 'bg-amber-500' : 'bg-slate-200 dark:bg-slate-800'}`}
+                       >
+                         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${callBeforeGoing ? 'left-7' : 'left-1'}`} />
+                       </button>
+                    </div>
+
+                    {callBeforeGoing && (
+                      <div className="space-y-3 pt-2 animate-in zoom-in-95">
+                        <div>
+                          <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Nome do Contacto</label>
+                          <input 
+                            type="text" 
+                            value={contactName} 
+                            onChange={e => setContactName(e.target.value.toUpperCase())}
+                            disabled={os?.status === OSStatus.CONCLUIDA}
+                            className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                            placeholder="NOME DO CONTACTO"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Telefone / Telemóvel</label>
+                          <input 
+                            type="tel" 
+                            value={contactPhone} 
+                            onChange={e => setContactPhone(e.target.value)}
+                            disabled={os?.status === OSStatus.CONCLUIDA}
+                            className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                            placeholder="912 345 678"
+                          />
+                        </div>
+                      </div>
+                    )}
                  </div>
                )}
             </div>

@@ -111,3 +111,12 @@ GRANT ALL ON TABLE public.os_activities TO anon;
 GRANT ALL ON TABLE public.clients TO anon;
 GRANT ALL ON TABLE public.establishments TO anon;
 GRANT ALL ON TABLE public.equipments TO anon;
+
+-- Adicionar campos para "Ligar antes de ir" na tabela de ordens de serviço
+ALTER TABLE public.service_orders ADD COLUMN IF NOT EXISTS call_before_going BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.service_orders ADD COLUMN IF NOT EXISTS contact_name TEXT;
+ALTER TABLE public.service_orders ADD COLUMN IF NOT EXISTS contact_phone TEXT;
+
+COMMENT ON COLUMN public.service_orders.call_before_going IS 'Indica se o técnico deve ligar ao cliente antes de se deslocar ao local';
+COMMENT ON COLUMN public.service_orders.contact_name IS 'Nome da pessoa a contactar antes da deslocação';
+COMMENT ON COLUMN public.service_orders.contact_phone IS 'Telefone/Telemóvel da pessoa a contactar';

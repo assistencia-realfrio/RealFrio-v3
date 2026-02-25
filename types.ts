@@ -190,6 +190,9 @@ export interface ServiceOrder {
   resolution_notes?: string;
   observations?: string;
   is_warranty?: boolean;
+  call_before_going?: boolean;
+  contact_name?: string;
+  contact_phone?: string;
   warranty_info?: {
     has_brand?: boolean;
     has_model?: boolean;
