@@ -44,14 +44,19 @@ const PublicQuoteView: React.FC = () => {
       setSuccessMode('accept');
 
       // Tentar notificação local se possível
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification("Proposta Aceite", {
-          body: `A proposta ${quote.code} foi enviada para processamento.`,
-          icon: '/rf-icon-192-v5.png'
-        });
+      try {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification("Proposta Aceite", {
+            body: `A proposta ${quote.code} foi enviada para processamento.`,
+            icon: '/rf-icon-192-v5.png'
+          });
+        }
+      } catch (err) {
+        console.warn("Erro ao mostrar notificação:", err);
       }
-    } catch (e) {
-      alert("Erro ao processar aceitação.");
+    } catch (e: any) {
+      console.error("Erro detalhado na aceitação:", e);
+      alert(`Erro ao processar aceitação: ${e.message || JSON.stringify(e)}`);
     } finally {
       setIsSubmitting(false);
     }

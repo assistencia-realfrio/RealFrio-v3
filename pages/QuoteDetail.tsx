@@ -223,8 +223,9 @@ const QuoteDetail: React.FC = () => {
     finalY += 20;
     const qrDataUrl = await QRCode.toDataURL(publicUrl, { margin: 1, width: 100 });
     doc.addImage(qrDataUrl, 'PNG', margin, finalY, 25, 25);
-    doc.setFontSize(7); doc.setTextColor(100, 100, 100);
-    doc.text("Digitalize para Aprovação Online", margin + 28, finalY + 10);
+    doc.setFontSize(10); doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
+    doc.text("Digitalize para Aprovação Online ou aceda ao link:", margin + 28, finalY + 8);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(60, 60, 60);
     doc.text(publicUrl, margin + 28, finalY + 15, { maxWidth: 120 });
 
     return doc;

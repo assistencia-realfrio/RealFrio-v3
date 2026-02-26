@@ -179,27 +179,30 @@ export const mockData = {
   },
 
   clientSignQuote: async (id: string, signature: string) => {
-    const { data: quote, error } = await supabase
+    // 1. Realizar o update primeiro
+    const { error: updateError } = await supabase
       .from('quotes')
       .update({ 
         status: QuoteStatus.AGUARDA_VALIDACAO, 
         client_signature: signature
       })
-      .eq('id', id)
-      .select('code, client_id')
-      .single();
+      .eq('id', id);
     
-    if (error) {
-      console.error("Erro ao assinar proposta:", error);
-      throw error;
+    if (updateError) {
+      console.error("Erro ao atualizar estado da proposta:", updateError);
+      throw updateError;
     }
 
-    // Parte não crítica: tentar registar atividade na OS vinculada
+    // 2. Tentar obter dados para o log de atividade (opcional)
     try {
+      const { data: quote } = await supabase
+        .from('quotes')
+        .select('code, client_id')
+        .eq('id', id)
+        .single();
+
       if (quote && quote.client_id) {
         console.log("Procurando OS vinculada para cliente:", quote.client_id);
-        // Procurar a OS mais recente deste cliente que esteja em estado de orçamento
-        // Usamos uma abordagem mais robusta para evitar o erro 406 do .single()
         const { data: orders, error: osError } = await supabase
           .from('service_orders')
           .select('id, status')
@@ -208,23 +211,17 @@ export const mockData = {
           .order('created_at', { ascending: false })
           .limit(1);
 
-        if (osError) {
-          console.error("Erro ao procurar OS vinculada:", osError);
-        } else if (orders && orders.length > 0) {
+        if (!osError && orders && orders.length > 0) {
           const linkedOS = orders[0];
-          console.log("OS vinculada encontrada:", linkedOS.id);
-          const { error: actError } = await supabase.from('os_activities').insert([{
+          await supabase.from('os_activities').insert([{
             os_id: linkedOS.id,
             description: `ORÇAMENTO ${quote.code} ASSINADO PELO CLIENTE (AGUARDA VALIDAÇÃO NO SISTEMA DE COTAÇÕES)`,
             user_name: 'CLIENTE (WEB)'
           }]);
-          if (actError) console.error("Erro ao inserir atividade na OS:", actError);
-        } else {
-          console.log("Nenhuma OS vinculada encontrada em estado de orçamento.");
         }
       }
     } catch (e) {
-      console.warn("Aviso: Erro inesperado ao vincular atividade à OS:", e);
+      console.warn("Aviso: Erro não crítico ao registar atividade:", e);
     }
 
     return true;

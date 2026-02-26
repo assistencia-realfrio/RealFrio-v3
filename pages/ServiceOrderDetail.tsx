@@ -182,7 +182,9 @@ export const ServiceOrderDetail: React.FC = () => {
   const [partToDelete, setPartToDelete] = useState<PartUsed | null>(null);
   const [partToEditQuantity, setPartToEditQuantity] = useState<PartUsed | null>(null);
   const [partQuantityStr, setPartQuantityStr] = useState<string>("1");
+  const [partPriceStr, setPartPriceStr] = useState<string>("0");
   const [tempQuantityStr, setTempQuantityStr] = useState<string>("1");
+  const [tempPriceStr, setTempPriceStr] = useState<string>("0");
 
   const [photoToDelete, setPhotoToDelete] = useState<OSPhoto | null>(null);
   const [selectedPhotoForView, setSelectedPhotoForView] = useState<OSPhoto | null>(null);
@@ -410,7 +412,7 @@ export const ServiceOrderDetail: React.FC = () => {
     const subtotal = partsUsed.reduce((acc, p) => acc + (p.quantity * (p.unit_price || 0)), 0);
     const iva = subtotal * 0.23;
     const total = subtotal + iva;
-    return { subtotal, iva, total, hasValues: subtotal > 0 };
+    return { subtotal, iva, total, hasValues: partsUsed.length > 0 };
   }, [partsUsed]);
 
   const handleUpdateStatus = async (newStatus: OSStatus) => {
@@ -729,11 +731,78 @@ export const ServiceOrderDetail: React.FC = () => {
 
   const handleDeletePhoto = async () => { if (!photoToDelete) return; setActionLoading(true); try { await mockData.deleteOSPhoto(photoToDelete.id); await mockData.addOSActivity(id!, { description: `REMOVEU FOTO: ${photoToDelete.type.toUpperCase()}` }); setShowDeletePhotoModal(false); setPhotoToDelete(null); fetchOSDetails(false); } finally { setActionLoading(false); } };
 
-  const handleAddPart = async () => { if (!id || !selectedPartId) return; const part = catalog.find(p => p.id === selectedPartId); if (!part) return; setActionLoading(true); try { const numericQuantity = parseFloat(partQuantityStr.replace(',', '.')); await mockData.addOSPart(id, { part_id: part.id, name: part.name, reference: part.reference, quantity: numericQuantity }); await mockData.addOSActivity(id, { description: `APLICOU MATERIAL: ${numericQuantity.toLocaleString('pt-PT')}x ${part.name}` }); setShowPartModal(false); setSelectedPartId(''); setPartQuantityStr("1"); setPartSearchTerm(''); fetchOSDetails(false); } finally { setActionLoading(false); } };
+  const handleAddPart = async () => { 
+    if (!id || !selectedPartId) return; 
+    const part = catalog.find(p => p.id === selectedPartId); 
+    if (!part) return; 
+    setActionLoading(true); 
+    try { 
+      const numericQuantity = parseFloat(partQuantityStr.replace(',', '.')); 
+      const numericPrice = parseFloat(partPriceStr.replace(',', '.'));
+      await mockData.addOSPart(id, { 
+        part_id: part.id, 
+        name: part.name, 
+        reference: part.reference, 
+        quantity: numericQuantity,
+        unit_price: numericPrice
+      }); 
+      await mockData.addOSActivity(id, { description: `APLICOU MATERIAL: ${numericQuantity.toLocaleString('pt-PT')}x ${part.name}` }); 
+      setShowPartModal(false); 
+      setSelectedPartId(''); 
+      setPartQuantityStr("1"); 
+      setPartPriceStr("0");
+      setPartSearchTerm(''); 
+      fetchOSDetails(false); 
+    } finally { 
+      setActionLoading(false); 
+    } 
+  };
 
-  const handleCreateAndAddPart = async () => { if (!id || !newPartForm.name) return; setActionLoading(true); try { const ref = newPartForm.reference.trim() || Math.floor(1000000 + Math.random() * 9000000).toString(); const qty = parseFloat(partQuantityStr.replace(',', '.')); const created = await mockData.addCatalogItem({ name: newPartForm.name.toUpperCase(), reference: ref, stock: 0 }); await mockData.addOSPart(id, { part_id: created.id, name: created.name, reference: created.reference, quantity: qty }); await mockData.addOSActivity(id, { description: `CRIOU E APLICOU: ${qty.toLocaleString('pt-PT')}x ${created.name}` }); setShowPartModal(false); setIsCreatingNewPart(false); setNewPartForm({ name: '', reference: '' }); fetchOSDetails(false); mockData.getCatalog().then(setCatalog); } finally { setActionLoading(false); } };
+  const handleCreateAndAddPart = async () => { 
+    if (!id || !newPartForm.name) return; 
+    setActionLoading(true); 
+    try { 
+      const ref = newPartForm.reference.trim() || Math.floor(1000000 + Math.random() * 9000000).toString(); 
+      const qty = parseFloat(partQuantityStr.replace(',', '.')); 
+      const price = parseFloat(partPriceStr.replace(',', '.'));
+      const created = await mockData.addCatalogItem({ name: newPartForm.name.toUpperCase(), reference: ref, stock: 0 }); 
+      await mockData.addOSPart(id, { 
+        part_id: created.id, 
+        name: created.name, 
+        reference: created.reference, 
+        quantity: qty,
+        unit_price: price
+      }); 
+      await mockData.addOSActivity(id, { description: `CRIOU E APLICOU: ${qty.toLocaleString('pt-PT')}x ${created.name}` }); 
+      setShowPartModal(false); 
+      setIsCreatingNewPart(false); 
+      setNewPartForm({ name: '', reference: '' }); 
+      setPartPriceStr("0");
+      fetchOSDetails(false); 
+      mockData.getCatalog().then(setCatalog); 
+    } finally { 
+      setActionLoading(false); 
+    } 
+  };
 
-  const handleUpdatePartQuantity = async (partUsedId: string, newQuantityStr: string) => { const numericQuantity = parseFloat(newQuantityStr.replace(',', '.')); if (isNaN(numericQuantity) || numericQuantity < 0 || !id) return; setActionLoading(true); try { const part = partsUsed.find(p => p.id === partUsedId); await mockData.updateOSPart(partUsedId, { quantity: numericQuantity }); await mockData.addOSActivity(id, { description: `AJUSTOU QTD MATERIAL (${part?.name}): PARA ${numericQuantity.toLocaleString('pt-PT')}` }); setShowEditQuantityModal(false); fetchOSDetails(false); } finally { setActionLoading(false); } };
+  const handleUpdatePartQuantity = async (partUsedId: string, newQuantityStr: string, newPriceStr: string) => { 
+    const numericQuantity = parseFloat(newQuantityStr.replace(',', '.')); 
+    const numericPrice = parseFloat(newPriceStr.replace(',', '.'));
+    if (isNaN(numericQuantity) || numericQuantity < 0 || !id) return; 
+    setActionLoading(true); 
+    try { 
+      const part = partsUsed.find(p => p.id === partUsedId); 
+      await mockData.updateOSPart(partUsedId, { 
+        quantity: numericQuantity,
+        unit_price: numericPrice
+      }); 
+      await mockData.addOSActivity(id, { description: `AJUSTOU MATERIAL (${part?.name}): QTD ${numericQuantity.toLocaleString('pt-PT')}, PREÇO ${numericPrice.toFixed(2)}€` }); 
+      setShowEditQuantityModal(false); 
+      fetchOSDetails(false); 
+    } finally { 
+      setActionLoading(false); 
+    } 
+  };
 
   const handleDeletePart = async () => { if (!partToDelete) return; setActionLoading(true); try { await mockData.removeOSPart(partToDelete.id); await mockData.addOSActivity(id!, { description: `REMOVEU MATERIAL: ${partToDelete.name}` }); setShowDeletePartModal(false); setPartToDelete(null); fetchOSDetails(false); } finally { setActionLoading(false); } };
 
@@ -1323,7 +1392,19 @@ export const ServiceOrderDetail: React.FC = () => {
                   <div className="flex items-center gap-3"><Package size={18} className="text-slate-400" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Material Aplicado</h3></div>
                   <div className="flex items-center gap-2">
                     {quoteTotals.hasValues && (
-                       <button onClick={() => navigate('/quotes/new', { state: { osId: os?.id } })} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 transition-all">
+                       <button 
+                         onClick={() => navigate('/quotes/new', { 
+                           state: { 
+                             osId: os?.id,
+                             partsUsed: partsUsed,
+                             clientId: os?.client_id,
+                             establishmentId: os?.establishment_id,
+                             equipmentId: os?.equipment_id,
+                             description: os?.description
+                           } 
+                         })} 
+                         className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 transition-all"
+                       >
                          <Calculator size={14} /> Orçamento
                        </button>
                     )}
@@ -1339,7 +1420,12 @@ export const ServiceOrderDetail: React.FC = () => {
                           <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mt-0.5">REF: {part.reference} • <span className="text-blue-600 dark:text-blue-400 font-black">{part.quantity.toLocaleString('pt-PT', { maximumFractionDigits: 3 })} UN</span> {part.unit_price ? `• ${part.unit_price.toFixed(2)}€/un` : ''}</p>
                        </div>
                        <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-200/60 dark:border-slate-700 shadow-sm flex-shrink-0">
-                          <button onClick={() => { setPartToEditQuantity(part); setTempQuantityStr(part.quantity.toString().replace('.', ',')); setShowEditQuantityModal(true); }} disabled={os?.status === OSStatus.CONCLUIDA} className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"><Edit2 size={14} /></button>
+                          <button onClick={() => { 
+                            setPartToEditQuantity(part); 
+                            setTempQuantityStr(part.quantity.toString().replace('.', ',')); 
+                            setTempPriceStr((part.unit_price || 0).toString().replace('.', ','));
+                            setShowEditQuantityModal(true); 
+                          }} disabled={os?.status === OSStatus.CONCLUIDA} className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"><Edit2 size={14} /></button>
                           <div className="w-px h-3 bg-slate-100 dark:bg-slate-700"></div>
                           <button onClick={() => { setPartToDelete(part); setShowDeletePartModal(true); }} disabled={os?.status === OSStatus.CONCLUIDA} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
                        </div>
@@ -1533,11 +1619,18 @@ export const ServiceOrderDetail: React.FC = () => {
                   <button onClick={() => setIsCreatingNewPart(false)} className="w-full py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:underline text-center"> Voltar para Pesquisa no Catálogo </button>
                 </div>
               )}
-              <div className="pt-4 border-t border-slate-50 dark:border-slate-800">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Quantidade a Aplicar</label>
-                <div className="flex items-center gap-4">
-                   <input type="text" inputMode="decimal" className="flex-1 px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-lg font-black dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 text-center" value={partQuantityStr} onChange={(e) => setPartQuantityStr(e.target.value)} />
-                   <span className="text-xs font-black text-slate-400 uppercase">UN</span>
+              <div className="pt-4 border-t border-slate-50 dark:border-slate-800 grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Quantidade</label>
+                  <div className="flex items-center gap-2">
+                    <input type="text" inputMode="decimal" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-lg font-black dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 text-center" value={partQuantityStr} onChange={(e) => setPartQuantityStr(e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Preço Unitário (€)</label>
+                  <div className="flex items-center gap-2">
+                    <input type="text" inputMode="decimal" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-lg font-black dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 text-center" value={partPriceStr} onChange={(e) => setPartPriceStr(e.target.value)} />
+                  </div>
                 </div>
               </div>
               <button onClick={isCreatingNewPart ? handleCreateAndAddPart : handleAddPart} disabled={actionLoading || (!selectedPartId && !newPartForm.name)} className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50">{actionLoading ? <RefreshCw className="animate-spin mx-auto" /> : 'CONFIRMAR ADIÇÃO'}</button>
@@ -1559,11 +1652,17 @@ export const ServiceOrderDetail: React.FC = () => {
                    <p className="text-xs font-black text-slate-900 dark:text-white uppercase truncate">{partToEditQuantity.name}</p>
                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">REF: {partToEditQuantity.reference}</p>
                 </div>
-                <div>
-                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 text-center">Nova Quantidade</label>
-                   <input autoFocus type="text" inputMode="decimal" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-2xl font-black text-blue-600 dark:text-blue-400 outline-none focus:ring-4 focus:ring-blue-500/10 text-center" value={tempQuantityStr} onChange={(e) => setTempQuantityStr(e.target.value)} />
+                <div className="grid grid-cols-2 gap-4">
+                   <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 text-center">Quantidade</label>
+                      <input autoFocus type="text" inputMode="decimal" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-2xl font-black text-blue-600 dark:text-blue-400 outline-none focus:ring-4 focus:ring-blue-500/10 text-center" value={tempQuantityStr} onChange={(e) => setTempQuantityStr(e.target.value)} />
+                   </div>
+                   <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 text-center">Preço (€)</label>
+                      <input type="text" inputMode="decimal" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-2xl font-black text-blue-600 dark:text-blue-400 outline-none focus:ring-4 focus:ring-blue-500/10 text-center" value={tempPriceStr} onChange={(e) => setTempPriceStr(e.target.value)} />
+                   </div>
                 </div>
-                <button onClick={() => handleUpdatePartQuantity(partToEditQuantity.id, tempQuantityStr)} disabled={actionLoading} className="w-full bg-blue-600 text-white py-5 rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 transition-all">{actionLoading ? <RefreshCw className="animate-spin mx-auto" /> : 'GUARDAR ALTERAÇÃO'}</button>
+                <button onClick={() => handleUpdatePartQuantity(partToEditQuantity.id, tempQuantityStr, tempPriceStr)} disabled={actionLoading} className="w-full bg-blue-600 text-white py-5 rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 transition-all">{actionLoading ? <RefreshCw className="animate-spin mx-auto" /> : 'GUARDAR ALTERAÇÃO'}</button>
              </div>
           </div>
         </div>

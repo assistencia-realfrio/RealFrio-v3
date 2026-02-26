@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { 
   Save, ArrowLeft, Calculator, Search, Plus, X, Building2, Trash2, Coins, Loader2,
   HardDrive, ChevronDown, User, MapPin, Info, Check, AlertCircle, Edit2, AlertTriangle,
@@ -14,6 +14,7 @@ import { normalizeString } from '../utils';
 const NewQuote: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentStore } = useStore();
   const isEditMode = !!id;
   
@@ -60,7 +61,31 @@ const NewQuote: React.FC = () => {
 
   useEffect(() => {
     fetchBaseData();
-    if (isEditMode) loadQuoteData();
+    if (isEditMode) {
+      loadQuoteData();
+    } else if (location.state) {
+      const state = location.state as any;
+      if (state.clientId) {
+        setFormData(prev => ({
+          ...prev,
+          client_id: state.clientId,
+          establishment_id: state.establishmentId || '',
+          equipment_id: state.equipmentId || '',
+          description: state.description || ''
+        }));
+      }
+      if (state.partsUsed && Array.isArray(state.partsUsed)) {
+        const initialItems = state.partsUsed.map((p: any) => ({
+          id: Math.random().toString(36).substr(2, 9),
+          name: p.name,
+          reference: p.reference,
+          quantity: p.quantity,
+          unit_price: p.unit_price || 0,
+          is_labor: p.name.toUpperCase().includes('MÃO DE OBRA') || p.name.toUpperCase().includes('DESLOCAÇÃO')
+        }));
+        setItems(initialItems);
+      }
+    }
     
     const handleClick = (e: MouseEvent) => {
       if (mainRef.current && !mainRef.current.contains(e.target as Node)) setIsMainListOpen(false);
@@ -88,6 +113,13 @@ const NewQuote: React.FC = () => {
       });
     }
   }, [formData.establishment_id]);
+
+  useEffect(() => {
+    if (formData.client_id && clients.length > 0 && !mainSearch) {
+      const client = clients.find(c => c.id === formData.client_id);
+      if (client) setMainSearch(client.name);
+    }
+  }, [formData.client_id, clients]);
 
   const fetchBaseData = async () => {
     setLoading(true);

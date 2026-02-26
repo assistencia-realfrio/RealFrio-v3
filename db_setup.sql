@@ -120,3 +120,7 @@ ALTER TABLE public.service_orders ADD COLUMN IF NOT EXISTS contact_phone TEXT;
 COMMENT ON COLUMN public.service_orders.call_before_going IS 'Indica se o técnico deve ligar ao cliente antes de se deslocar ao local';
 COMMENT ON COLUMN public.service_orders.contact_name IS 'Nome da pessoa a contactar antes da deslocação';
 COMMENT ON COLUMN public.service_orders.contact_phone IS 'Telefone/Telemóvel da pessoa a contactar';
+
+-- Adicionar campo unit_price à tabela de materiais aplicados (parts_used)
+ALTER TABLE public.parts_used ADD COLUMN IF NOT EXISTS unit_price DECIMAL(10, 2) DEFAULT 0;
+COMMENT ON COLUMN public.parts_used.unit_price IS 'Preço unitário do material aplicado na Ordem de Serviço';
