@@ -106,6 +106,7 @@ const Profile: React.FC = () => {
   };
 
   const handleDisableNotifications = async () => {
+    if (isSubscribing) return;
     setIsSubscribing(true);
     try {
       if ('serviceWorker' in navigator) {
@@ -118,7 +119,6 @@ const Profile: React.FC = () => {
       
       await mockData.savePushSubscription(user.id, null);
       
-      // Atualizar sessão local
       const updatedUser = { ...user, push_subscription: null };
       setUser(updatedUser);
       localStorage.setItem('rf_active_session_v3', JSON.stringify(updatedUser));
@@ -126,11 +126,27 @@ const Profile: React.FC = () => {
       setSuccess("Notificações desligadas.");
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      console.error("Erro ao desativar:", err);
-      setError("Falha ao desligar notificações.");
+      setError("Falha ao desligar.");
     } finally {
       setIsSubscribing(false);
     }
+  };
+
+  const handleResetNotifications = async () => {
+    if (!confirm("Isto irá limpar as configurações de alertas e recarregar a app. Continuar?")) return;
+    
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (let reg of registrations) {
+        await reg.unregister();
+      }
+    }
+    
+    await mockData.savePushSubscription(user.id, null);
+    const updatedUser = { ...user, push_subscription: null };
+    localStorage.setItem('rf_active_session_v3', JSON.stringify(updatedUser));
+    
+    window.location.reload();
   };
 
   const handleTestNotification = async () => {
@@ -326,9 +342,17 @@ const Profile: React.FC = () => {
             </button>
 
             <div className="p-5 bg-blue-50/50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-900/30">
-               <div className="flex items-center gap-2 text-blue-600 mb-3">
-                  <Info size={14} />
-                  <h4 className="text-[10px] font-black uppercase tracking-widest">Dica Android</h4>
+               <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-blue-600">
+                    <Info size={14} />
+                    <h4 className="text-[10px] font-black uppercase tracking-widest">Dica Android</h4>
+                  </div>
+                  <button 
+                    onClick={handleResetNotifications}
+                    className="text-[8px] font-black text-blue-600 underline uppercase tracking-tighter"
+                  >
+                    Reiniciar Motor
+                  </button>
                </div>
                <p className="text-[9px] text-slate-500 dark:text-slate-400 font-bold uppercase leading-relaxed">
                  Se não receber o teste, verifique se a app tem permissão para "Janelas Flutuantes" e se o modo "Poupança de Bateria" está desativado.

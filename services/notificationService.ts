@@ -56,21 +56,26 @@ export const notificationService = {
   requestPermission: async () => {
     if (!("Notification" in window)) return false;
     
-    const permission = await Notification.requestPermission();
-    
-    if (permission === "granted" && 'serviceWorker' in navigator) {
-      try {
-        await navigator.serviceWorker.register('/sw.js?v=6.0');
-        const reg = await navigator.serviceWorker.ready;
-        // Se após o registro não houver controlador, forçamos um reload ou claim
-        if (!navigator.serviceWorker.controller) {
-           console.log("Service worker registrado mas não controla a página ainda.");
+    try {
+      const permission = await Notification.requestPermission();
+      
+      if (permission === "granted" && 'serviceWorker' in navigator) {
+        // Registrar com um timestamp para evitar cache agressivo no telemóvel
+        const registration = await navigator.serviceWorker.register(`/sw.js?v=${Date.now()}`);
+        await navigator.serviceWorker.ready;
+        
+        // Forçar o service worker a assumir o controlo se houver um novo
+        if (registration.active) {
+          registration.active.postMessage({ type: 'SKIP_WAITING' });
         }
-      } catch (e) {
-        console.error("Erro no registro do SW:", e);
+        
+        console.log("[NotificationService] Service Worker pronto e registado.");
       }
+      
+      return permission === "granted";
+    } catch (e) {
+      console.error("[NotificationService] Erro ao solicitar permissão:", e);
+      return false;
     }
-    
-    return permission === "granted";
   }
 };
