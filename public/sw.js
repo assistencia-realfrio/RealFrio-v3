@@ -1,23 +1,28 @@
 
-const CACHE_NAME = 'realfrio-tech-v7.0';
+const CACHE_NAME = 'realfrio-tech-v9.0'; // Versão incrementada para forçar atualização
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/rf-favicon-v5.png',
   '/rf-apple-v5.png',
   '/rf-icon-192-v5.png',
-  '/rf-icon-512-v5.png',
-  'https://cdn.tailwindcss.com',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap'
+  '/rf-icon-512-v5.png'
+  // Removidos assets externos (Tailwind/Fonts) da lista crítica para evitar falha na instalação
 ];
 
 self.addEventListener('install', (event) => {
+  // O skipWaiting garante que o novo SW ativa logo, sem esperar que feche as abas
+  self.skipWaiting();
+  
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      console.log('[SW] Caching critical assets');
+      return cache.addAll(ASSETS_TO_CACHE).catch(err => {
+        console.error('[SW] Critical cache failed:', err);
+        // Não relança o erro para permitir que o SW instale mesmo se o cache falhar
+      });
     })
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
