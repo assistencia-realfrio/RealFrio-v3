@@ -72,16 +72,21 @@ const Profile: React.FC = () => {
         if ('serviceWorker' in navigator && 'PushManager' in window) {
           try {
             const registration = await navigator.serviceWorker.ready;
-            // VAPID Key formatada corretamente (exemplo)
-            const publicKey = 'BEl62vp9IH1w94S_7pQ3U656A74377F7A74377F7A74377F7A74377F7A74377F7A';
+            // Tenta obter chave do ambiente ou usa uma chave de teste (que falhará se não for válida)
+            const vapidKey = (import.meta as any).env.VITE_VAPID_PUBLIC_KEY;
             
-            const realSub = await registration.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: publicKey 
-            });
-            if (realSub) subscription = realSub as any;
+            if (vapidKey) {
+              const applicationServerKey = notificationService.urlBase64ToUint8Array(vapidKey);
+              const realSub = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey
+              });
+              if (realSub) subscription = realSub as any;
+            } else {
+              console.warn("VITE_VAPID_PUBLIC_KEY não definida. Notificações Push remotas não funcionarão.");
+            }
           } catch (pushErr) {
-            console.warn("Subscrição Push (VAPID) não disponível, usando modo local:", pushErr);
+            console.warn("Subscrição Push (VAPID) falhou, usando modo local:", pushErr);
           }
         }
         

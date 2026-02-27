@@ -222,6 +222,7 @@ export interface Profile {
   last_lat?: number | null;
   last_lng?: number | null;
   last_location_update?: string | null;
+  push_subscription?: any;
 }
 
 export interface OSActivity {
