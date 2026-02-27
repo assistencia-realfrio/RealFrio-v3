@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   DatabaseZap, 
   Upload, 
@@ -30,10 +30,16 @@ import {
   Edit2,
   Save,
   Copy,
-  TerminalSquare
+  TerminalSquare,
+  Wifi,
+  WifiOff,
+  BellRing,
+  Bell
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { mockData } from '../services/mockData';
+import { supabase } from '../supabaseClient';
+import { notificationService } from '../services/notificationService';
 import { Client } from '../types';
 
 interface ConfirmDialogProps {
@@ -112,6 +118,35 @@ const Maintenance: React.FC = () => {
   const [expandedRepair, setExpandedRepair] = useState(false);
   const [expandedRestore, setExpandedRestore] = useState(false);
   const [expandedSQL, setExpandedSQL] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState<'checking' | 'connected' | 'error'>('checking');
+  const [pushPermission, setPushPermission] = useState<string>('default');
+
+  useEffect(() => {
+    // Verificar Permissões
+    if ('Notification' in window) {
+      setPushPermission(Notification.permission);
+    }
+
+    // Testar Conexão Realtime
+    const testChannel = supabase.channel('realtime-test')
+      .on('system', { event: 'subscribe' }, () => {
+        setRealtimeStatus('connected');
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setRealtimeStatus('error');
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(testChannel);
+    };
+  }, []);
+
+  const handleRequestPush = async () => {
+    const granted = await notificationService.requestPermission();
+    setPushPermission(granted ? 'granted' : 'denied');
+  };
 
   // Auditoria de Clientes
   const [auditResults, setAuditResults] = useState<{
@@ -454,40 +489,98 @@ const Maintenance: React.FC = () => {
         
         {/* HELP: CONFIGURAÇÃO SUPABASE REALTIME */}
         <div className="bg-slate-900 dark:bg-indigo-950 rounded-[2.5rem] shadow-xl border border-indigo-500/30 overflow-hidden flex flex-col transition-all md:col-span-2">
-          <button 
-            onClick={() => setExpandedSQL(!expandedSQL)}
-            className="w-full p-8 flex items-center justify-between hover:bg-slate-800 dark:hover:bg-indigo-900/50 transition-colors"
-          >
-            <div className="flex items-center gap-4 text-white">
-              <div className="w-12 h-12 bg-indigo-500/20 text-indigo-300 rounded-2xl flex items-center justify-center shadow-inner">
-                <TerminalSquare size={24} />
+          <div className="flex flex-col sm:flex-row">
+            <button 
+              onClick={() => setExpandedSQL(!expandedSQL)}
+              className="flex-1 p-8 flex items-center justify-between hover:bg-slate-800 dark:hover:bg-indigo-900/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-4 text-white">
+                <div className="w-12 h-12 bg-indigo-500/20 text-indigo-300 rounded-2xl flex items-center justify-center shadow-inner">
+                  <TerminalSquare size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black uppercase tracking-tight">Configurar Realtime (SQL)</h3>
+                  <p className="text-[9px] font-bold text-indigo-300/60 uppercase tracking-widest">Para alertas e notificações</p>
+                </div>
               </div>
-              <div className="text-left">
-                <h3 className="text-lg font-black uppercase tracking-tight">Configurar Realtime (SQL)</h3>
-                <p className="text-[9px] font-bold text-indigo-300/60 uppercase tracking-widest">Para alertas e notificações</p>
+              {expandedSQL ? <ChevronUp size={20} className="text-indigo-400" /> : <ChevronDown size={20} className="text-indigo-400" />}
+            </button>
+            
+            <div className="px-8 py-4 sm:py-0 sm:border-l border-white/5 flex flex-col justify-center gap-2 bg-black/20">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${realtimeStatus === 'connected' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : realtimeStatus === 'error' ? 'bg-red-500' : 'bg-slate-500 animate-pulse'}`}></div>
+                <span className="text-[8px] font-black text-white uppercase tracking-widest">
+                  {realtimeStatus === 'connected' ? 'Canal Ativo' : realtimeStatus === 'error' ? 'Erro Conexão' : 'A Verificar...'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${pushPermission === 'granted' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-orange-500'}`}></div>
+                <span className="text-[8px] font-black text-white uppercase tracking-widest">
+                  {pushPermission === 'granted' ? 'Push Ativo' : 'Push Inativo'}
+                </span>
               </div>
             </div>
-            {expandedSQL ? <ChevronUp size={20} className="text-indigo-400" /> : <ChevronDown size={20} className="text-indigo-400" />}
-          </button>
+          </div>
           
           {expandedSQL && (
             <div className="px-8 pb-8 space-y-6 animate-in slide-in-from-top-2 duration-200">
-              <div className="p-4 bg-indigo-900/30 rounded-2xl border border-indigo-500/20">
-                <p className="text-xs text-indigo-200 font-medium uppercase leading-relaxed mb-4">
-                  Se não encontras a opção "Replica Identity" no painel, executa este comando no **SQL Editor** do Supabase para ativar as notificações em tempo real:
-                </p>
-                <div className="relative group">
-                  <pre className="bg-black/40 p-5 rounded-xl text-[10px] font-mono text-indigo-300 overflow-x-auto border border-white/5 lowercase-container" style={{textTransform: 'none'}}>
-                    {`ALTER TABLE service_orders REPLICA IDENTITY FULL;\nALTER TABLE os_activities REPLICA IDENTITY FULL;`}
-                  </pre>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="p-5 bg-indigo-900/30 rounded-2xl border border-indigo-500/20 space-y-4">
+                  <div className="flex items-center gap-2 text-indigo-300 mb-1">
+                    <Wifi size={14} />
+                    <h4 className="text-[10px] font-black uppercase tracking-widest">Passo 2: Dashboard Supabase</h4>
+                  </div>
+                  <p className="text-[10px] text-indigo-200/70 font-bold uppercase leading-relaxed">
+                    Aceda ao seu painel Supabase em <span className="text-white">Database {"->"} Publications</span>, selecione **supabase_realtime** e ative as tabelas:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-2 py-1 bg-indigo-500/20 rounded text-[9px] font-black text-indigo-200 border border-indigo-500/30 uppercase">service_orders</span>
+                    <span className="px-2 py-1 bg-indigo-500/20 rounded text-[9px] font-black text-indigo-200 border border-indigo-500/30 uppercase">os_activities</span>
+                  </div>
+                </div>
+
+                <div className="p-5 bg-indigo-900/30 rounded-2xl border border-indigo-500/20 space-y-4">
+                  <div className="flex items-center gap-2 text-indigo-300 mb-1">
+                    <BellRing size={14} />
+                    <h4 className="text-[10px] font-black uppercase tracking-widest">Passo 3: Permissão Browser</h4>
+                  </div>
+                  <p className="text-[10px] text-indigo-200/70 font-bold uppercase leading-relaxed">
+                    O dispositivo precisa de autorização para exibir alertas visuais.
+                  </p>
+                  {pushPermission !== 'granted' ? (
+                    <button 
+                      onClick={handleRequestPush}
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg"
+                    >
+                      <Bell size={14} />
+                      ATIVAR NESTE DISPOSITIVO
+                    </button>
+                  ) : (
+                    <div className="w-full py-3 bg-emerald-500/20 text-emerald-400 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-2 border border-emerald-500/30">
+                      <CheckCircle2 size={14} />
+                      PERMISSÃO CONCEDIDA
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-5 bg-black/40 rounded-2xl border border-white/5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-indigo-300">
+                    <Terminal size={14} />
+                    <h4 className="text-[10px] font-black uppercase tracking-widest">Passo 1: SQL Editor (Replica Identity)</h4>
+                  </div>
                   <button 
                     onClick={copySQL}
-                    className="absolute top-3 right-3 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-all shadow-lg"
+                    className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-all shadow-lg"
                     title="Copiar SQL"
                   >
-                    <Copy size={14} />
+                    <Copy size={12} />
                   </button>
                 </div>
+                <pre className="text-[9px] font-mono text-indigo-300/80 overflow-x-auto lowercase-container" style={{textTransform: 'none'}}>
+                  {`ALTER TABLE service_orders REPLICA IDENTITY FULL;\nALTER TABLE os_activities REPLICA IDENTITY FULL;`}
+                </pre>
               </div>
             </div>
           )}
