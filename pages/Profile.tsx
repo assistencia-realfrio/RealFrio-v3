@@ -56,10 +56,16 @@ const Profile: React.FC = () => {
     setError(null);
     
     try {
-      const granted = await notificationService.requestPermission();
+      const result = await notificationService.requestPermission();
       setPushStatus(Notification.permission as any);
 
-      if (granted) {
+      if (result.granted) {
+        if (result.error) {
+          // Permissão dada, mas erro no Service Worker (ex: Vercel MIME type)
+          setError(result.error);
+          return;
+        }
+
         let subscription = { manual_enabled: true, timestamp: new Date().toISOString() };
         
         // Tentar subscrição real de Push (opcional, pode falhar em alguns browsers/ambientes)
@@ -95,7 +101,7 @@ const Profile: React.FC = () => {
           "/profile"
         );
       } else {
-        setError("Permissão negada. Verifique as definições do seu navegador.");
+        setError(result.error || "Permissão negada. Verifique as definições do seu navegador.");
       }
     } catch (err) {
       console.error("Falha ao configurar:", err);

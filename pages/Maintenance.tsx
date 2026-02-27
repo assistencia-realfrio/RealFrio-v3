@@ -154,8 +154,8 @@ const Maintenance: React.FC = () => {
   };
 
   const handleRequestPush = async () => {
-    const granted = await notificationService.requestPermission();
-    setPushPermission(granted ? 'granted' : 'denied');
+    const result = await notificationService.requestPermission();
+    setPushPermission(result.granted && !result.error ? 'granted' : 'denied');
   };
 
   // Auditoria de Clientes

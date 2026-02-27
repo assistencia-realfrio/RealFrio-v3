@@ -53,29 +53,43 @@ export const notificationService = {
   /**
    * Solicita permissão e garante que o SW está ativo
    */
-  requestPermission: async () => {
-    if (!("Notification" in window)) return false;
+  requestPermission: async (): Promise<{ granted: boolean, error?: string }> => {
+    if (!("Notification" in window)) {
+      return { granted: false, error: "O seu navegador não suporta notificações." };
+    }
     
     try {
       const permission = await Notification.requestPermission();
       
-      if (permission === "granted" && 'serviceWorker' in navigator) {
-        // Registrar com um timestamp para evitar cache agressivo no telemóvel
-        const registration = await navigator.serviceWorker.register(`/sw.js?v=${Date.now()}`);
-        await navigator.serviceWorker.ready;
-        
-        // Forçar o service worker a assumir o controlo se houver um novo
-        if (registration.active) {
-          registration.active.postMessage({ type: 'SKIP_WAITING' });
+      if (permission !== "granted") {
+        return { granted: false, error: "Permissão bloqueada nas definições do navegador." };
+      }
+
+      if ('serviceWorker' in navigator) {
+        try {
+          // Registrar com um timestamp para evitar cache agressivo no telemóvel
+          const registration = await navigator.serviceWorker.register(`/sw.js?v=${Date.now()}`);
+          await navigator.serviceWorker.ready;
+          
+          // Forçar o service worker a assumir o controlo se houver um novo
+          if (registration.active) {
+            registration.active.postMessage({ type: 'SKIP_WAITING' });
+          }
+          
+          console.log("[NotificationService] Service Worker pronto e registado.");
+        } catch (swError: any) {
+          console.error("[NotificationService] Erro ao registar Service Worker:", swError);
+          return { 
+            granted: true, 
+            error: "Permissão concedida, mas o motor falhou ao iniciar: " + (swError.message || "Erro desconhecido.") 
+          };
         }
-        
-        console.log("[NotificationService] Service Worker pronto e registado.");
       }
       
-      return permission === "granted";
-    } catch (e) {
-      console.error("[NotificationService] Erro ao solicitar permissão:", e);
-      return false;
+      return { granted: true };
+    } catch (e: any) {
+      console.error("[NotificationService] Erro geral ao solicitar permissão:", e);
+      return { granted: false, error: "Erro interno: " + (e.message || "Desconhecido") };
     }
   }
 };
