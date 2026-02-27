@@ -32,6 +32,7 @@ import { UserRole, OSStatus } from './types';
 import { StoreProvider, useStore } from './contexts/StoreContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import StoreSelectionModal from './components/StoreSelectionModal';
+import PermissionRequestModal from './components/PermissionRequestModal';
 
 const AppContent: React.FC<{ 
   user: any; 
@@ -40,6 +41,29 @@ const AppContent: React.FC<{
   loading: boolean 
 }> = ({ user, onLogin, onLogout, loading }) => {
   const { triggerSelectionModal } = useStore();
+  const [showPermissions, setShowPermissions] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      // Check if permissions are already granted or if we should ask
+      const checkInitialPermissions = async () => {
+        const notif = "Notification" in window && Notification.permission === 'granted';
+        let loc = false;
+        try {
+          const locPerm = await navigator.permissions.query({ name: 'geolocation' });
+          loc = locPerm.state === 'granted';
+        } catch (e) {}
+        
+        // If any important permission is missing, show modal
+        if (!notif || !loc) {
+          setShowPermissions(true);
+        }
+      };
+      
+      // Delay slightly to not conflict with other modals
+      setTimeout(checkInitialPermissions, 1000);
+    }
+  }, [user]);
 
   const handleLoginSuccess = () => {
     onLogin();
@@ -135,6 +159,7 @@ const AppContent: React.FC<{
   return (
     <>
       {user && <StoreSelectionModal />}
+      {user && showPermissions && <PermissionRequestModal onClose={() => setShowPermissions(false)} />}
 
       <Routes>
         <Route path="/proposal/:id" element={<PublicQuoteView />} />
