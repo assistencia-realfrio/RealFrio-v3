@@ -20,6 +20,7 @@ const FleetManagement: React.FC = () => {
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [editingMaintenance, setEditingMaintenance] = useState<MaintenanceRecord | null>(null);
 
   useEffect(() => {
     fetchVehicles();
@@ -99,40 +100,47 @@ const FleetManagement: React.FC = () => {
 
   const handleSaveMaintenance = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!selectedVehicle) return;
-
     const formData = new FormData(e.currentTarget);
+    const vehicleId = editingMaintenance ? editingMaintenance.vehicle_id : selectedVehicle?.id;
+    if (!vehicleId) return;
+
     const recordData = {
-      vehicle_id: selectedVehicle.id,
+      vehicle_id: vehicleId,
       type: formData.get('type') as any,
-      date: formData.get('date') as string,
-      mileage: parseInt(formData.get('mileage') as string),
-      description: formData.get('description') as string,
-      cost: parseFloat(formData.get('cost') as string),
-      provider: formData.get('provider') as string,
-      next_scheduled_date: formData.get('next_scheduled_date') as string,
+      date: formData.get('date') as string || new Date().toISOString().split('T')[0],
+      mileage: parseInt(formData.get('mileage') as string) || 0,
+      description: (formData.get('description') as string || '').toUpperCase(),
+      cost: parseFloat(formData.get('cost') as string) || 0,
+      provider: (formData.get('provider') as string || '').toUpperCase(),
+      next_scheduled_date: formData.get('next_scheduled_date') as string || null,
       status: formData.get('status') as any,
-      notes: formData.get('notes') as string,
+      notes: (formData.get('notes') as string || '').toUpperCase(),
     };
 
     try {
-      await mockData.createMaintenanceRecord(recordData);
-      
-      // Se for revisão, atualizar quilometragem do veículo e próxima revisão
-      if (recordData.type === 'revision' && recordData.status === 'completed') {
-         const nextRev = recordData.mileage + 15000; // Exemplo: +15000km
-         await mockData.updateVehicle(selectedVehicle.id, {
-           current_mileage: recordData.mileage,
-           next_revision_mileage: nextRev
-         });
+      if (editingMaintenance) {
+        await mockData.updateMaintenanceRecord(editingMaintenance.id, recordData);
+      } else {
+        await mockData.createMaintenanceRecord(recordData);
       }
-
-      // Se o status for agendado ou se for para oficina, podemos querer mudar o status do veículo
-      if (recordData.status === 'scheduled') {
-        // Opcional: mudar status do veículo para oficina se a data for hoje?
+      
+      // Se for revisão e estiver concluída, atualizar quilometragem do veículo e próxima revisão
+      if (recordData.type === 'revision' && recordData.status === 'completed') {
+         const nextRev = recordData.mileage + 15000;
+         await mockData.updateVehicle(vehicleId, {
+           current_mileage: recordData.mileage,
+           next_revision_mileage: nextRev,
+           status: 'active'
+         });
+      } else if (recordData.status === 'completed') {
+        const v = vehicles.find(v => v.id === vehicleId);
+        if (v && v.status === 'maintenance') {
+          await mockData.updateVehicle(vehicleId, { status: 'active' });
+        }
       }
 
       setIsMaintenanceModalOpen(false);
+      setEditingMaintenance(null);
       fetchVehicles();
       fetchAllMaintenance();
       if (selectedVehicle) fetchMaintenanceRecords(selectedVehicle.id);
@@ -141,6 +149,30 @@ const FleetManagement: React.FC = () => {
     }
   };
 
+  const handleCompleteMaintenance = (record: MaintenanceRecord) => {
+    setEditingMaintenance({ ...record, status: 'completed' });
+    setIsMaintenanceModalOpen(true);
+  };
+
+  const handleReleaseFromWorkshop = async (vehicle: Vehicle) => {
+    if (!window.confirm(`Deseja marcar a reparação da viatura ${vehicle.license_plate} como concluída?`)) return;
+    try {
+      // Encontrar a manutenção pendente mais recente para este veículo
+      const pendingMaintenance = allMaintenance
+        .filter(m => m.vehicle_id === vehicle.id && m.status === 'scheduled')
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+      if (pendingMaintenance) {
+        await handleCompleteMaintenance(pendingMaintenance);
+      } else {
+        // Se não houver manutenção registada, apenas muda o status do veículo
+        await mockData.updateVehicle(vehicle.id, { status: 'active' });
+        fetchVehicles();
+      }
+    } catch (error) {
+      alert("Erro ao libertar viatura da oficina.");
+    }
+  };
   const handleDeleteVehicle = async (id: string) => {
     if (!window.confirm("Tem a certeza?")) return;
     try {
@@ -361,7 +393,16 @@ const FleetManagement: React.FC = () => {
                         </p>
                       </div>
                     </div>
-                    <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-0.5 rounded uppercase">Agendado</span>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleCompleteMaintenance(maintenanceRecords.find(r => r.status === 'scheduled')!)}
+                        className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        title="Concluir Agora"
+                      >
+                        <CheckCircle2 size={14} />
+                      </button>
+                      <span className="text-[10px] font-black bg-blue-100 text-blue-600 px-2 py-0.5 rounded uppercase">Agendado</span>
+                    </div>
                   </div>
                 )}
 
@@ -372,7 +413,7 @@ const FleetManagement: React.FC = () => {
                       <Wrench size={16} className="text-slate-400" /> Histórico de Manutenção
                     </h3>
                     <button 
-                      onClick={() => setIsMaintenanceModalOpen(true)}
+                      onClick={() => { setEditingMaintenance(null); setIsMaintenanceModalOpen(true); }}
                       className="text-[10px] font-bold uppercase bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
                     >
                       + Adicionar Registo
@@ -386,28 +427,39 @@ const FleetManagement: React.FC = () => {
                       </div>
                     ) : (
                       maintenanceRecords.map(record => (
-                        <div key={record.id} className="flex gap-4 p-4 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            record.type === 'revision' ? 'bg-blue-100 text-blue-600' :
-                            record.type === 'repair' ? 'bg-red-100 text-red-600' :
-                            record.type === 'inspection' ? 'bg-purple-100 text-purple-600' :
-                            'bg-slate-200 text-slate-600'
-                          }`}>
-                            {record.type === 'revision' ? <RefreshCw size={18} /> : 
-                             record.type === 'repair' ? <Wrench size={18} /> :
-                             record.type === 'inspection' ? <FileText size={18} /> : <AlertTriangle size={18} />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-start">
-                              <h4 className="font-bold text-slate-900 dark:text-white uppercase text-sm">{record.description}</h4>
-                              <span className="text-xs font-mono font-medium text-slate-500">{new Date(record.date).toLocaleDateString()}</span>
+                        <div key={record.id} className="group relative flex flex-col sm:flex-row gap-4 p-4 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 transition-all">
+                          <div className="flex items-start gap-4 flex-1">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                              record.type === 'revision' ? 'bg-blue-100 text-blue-600' :
+                              record.type === 'repair' ? 'bg-red-100 text-red-600' :
+                              record.type === 'inspection' ? 'bg-purple-100 text-purple-600' :
+                              'bg-slate-200 text-slate-600'
+                            }`}>
+                              {record.type === 'revision' ? <RefreshCw size={18} /> : 
+                               record.type === 'repair' ? <Wrench size={18} /> :
+                               record.type === 'inspection' ? <FileText size={18} /> : <AlertTriangle size={18} />}
                             </div>
-                            <p className="text-xs text-slate-500 mt-1 uppercase">{record.provider} • {record.mileage.toLocaleString()} km</p>
-                            {record.notes && <p className="text-xs text-slate-400 mt-2 italic">"{record.notes}"</p>}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap justify-between items-start gap-2">
+                                <h4 className="font-bold text-slate-900 dark:text-white uppercase text-sm">{record.description}</h4>
+                                <span className="text-xs font-mono font-medium text-slate-500">{new Date(record.date).toLocaleDateString()}</span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1 uppercase">{record.provider} • {record.mileage.toLocaleString()} km</p>
+                              {record.notes && <p className="text-xs text-slate-400 mt-2 italic">"{record.notes}"</p>}
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="font-bold text-slate-900 dark:text-white">{record.cost.toFixed(2)}€</p>
-                            <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                          
+                          <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-200 dark:border-slate-800">
+                            <div className="flex items-center gap-3">
+                              <p className="font-bold text-slate-900 dark:text-white">{record.cost.toFixed(2)}€</p>
+                              <div className="flex items-center gap-1">
+                                {record.status === 'scheduled' && (
+                                  <button onClick={() => handleCompleteMaintenance(record)} className="p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors" title="Concluir"><CheckCircle2 size={16} /></button>
+                                )}
+                                <button onClick={() => { setEditingMaintenance(record); setIsMaintenanceModalOpen(true); }} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Editar"><Edit2 size={16} /></button>
+                              </div>
+                            </div>
+                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
                               record.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                             }`}>{record.status === 'completed' ? 'Concluído' : 'Agendado'}</span>
                           </div>
@@ -439,9 +491,9 @@ const FleetManagement: React.FC = () => {
                 </div>
               ) : (
                 allMaintenance.filter(m => m.status === 'scheduled').map(m => (
-                  <div key={m.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600">
+                  <div key={m.id} className="group bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between hover:border-blue-200 transition-all gap-4">
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 flex-shrink-0">
                         <Calendar size={20} />
                       </div>
                       <div>
@@ -451,9 +503,15 @@ const FleetManagement: React.FC = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-black text-blue-600">{new Date(m.date).toLocaleDateString()}</p>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase">{m.provider}</p>
+                    <div className="flex items-center justify-between w-full sm:w-auto gap-4 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => handleCompleteMaintenance(m)} className="p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors" title="Concluir"><CheckCircle2 size={18} /></button>
+                        <button onClick={() => { setEditingMaintenance(m); setIsMaintenanceModalOpen(true); }} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Editar"><Edit2 size={18} /></button>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-black text-blue-600">{new Date(m.date).toLocaleDateString()}</p>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase">{m.provider}</p>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -473,9 +531,9 @@ const FleetManagement: React.FC = () => {
                 </div>
               ) : (
                 vehicles.filter(v => v.status === 'maintenance').map(v => (
-                  <div key={v.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600">
+                  <div key={v.id} className="group bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between hover:border-blue-200 transition-all gap-4">
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 flex-shrink-0">
                         <Truck size={20} />
                       </div>
                       <div>
@@ -485,12 +543,17 @@ const FleetManagement: React.FC = () => {
                         </p>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => { setSelectedVehicle(v); setActiveTab('fleet'); }}
-                      className="p-2 text-slate-400 hover:text-blue-500 transition-colors"
-                    >
-                      <ChevronRight size={20} />
-                    </button>
+                    <div className="flex items-center justify-between w-full sm:w-auto gap-4 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => handleReleaseFromWorkshop(v)} className="p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors" title="Concluir Reparação"><CheckCircle2 size={18} /></button>
+                      </div>
+                      <button 
+                        onClick={() => { setSelectedVehicle(v); setActiveTab('fleet'); }}
+                        className="p-2 text-slate-400 hover:text-blue-500 transition-colors"
+                      >
+                        <ChevronRight size={20} />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
@@ -575,13 +638,15 @@ const FleetManagement: React.FC = () => {
         <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-              <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Registar Manutenção</h3>
-              <button onClick={() => setIsMaintenanceModalOpen(false)}><X size={20} className="text-slate-400" /></button>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                {editingMaintenance ? 'Editar Manutenção' : 'Registar Manutenção'}
+              </h3>
+              <button onClick={() => { setIsMaintenanceModalOpen(false); setEditingMaintenance(null); }}><X size={20} className="text-slate-400" /></button>
             </div>
             <form onSubmit={handleSaveMaintenance} className="p-6 space-y-4">
               <div>
                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tipo de Serviço</label>
-                 <select name="type" required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm">
+                 <select name="type" defaultValue={editingMaintenance?.type || 'revision'} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm">
                    <option value="revision">Revisão Periódica</option>
                    <option value="repair">Reparação / Avaria</option>
                    <option value="inspection">Inspeção Periódica (IPO)</option>
@@ -592,40 +657,40 @@ const FleetManagement: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Data</label>
-                  <input name="date" type="date" required defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm" />
+                  <input name="date" type="date" defaultValue={editingMaintenance?.date || new Date().toISOString().split('T')[0]} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Quilometragem</label>
-                  <input name="mileage" type="number" required defaultValue={selectedVehicle?.current_mileage} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm" />
+                  <input name="mileage" type="number" defaultValue={editingMaintenance?.mileage || selectedVehicle?.current_mileage} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm" />
                 </div>
               </div>
               <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Descrição</label>
-                  <input name="description" required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm" placeholder="Ex: Mudança de óleo e filtros" />
+                  <input name="description" defaultValue={editingMaintenance?.description} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm" placeholder="Ex: Mudança de óleo e filtros" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Custo (€)</label>
-                  <input name="cost" type="number" step="0.01" required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm" />
+                  <input name="cost" type="number" step="0.01" defaultValue={editingMaintenance?.cost} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Fornecedor</label>
-                  <input name="provider" required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm" placeholder="Oficina X" />
+                  <input name="provider" defaultValue={editingMaintenance?.provider} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm" placeholder="Oficina X" />
                 </div>
               </div>
               <div>
                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Estado</label>
-                 <select name="status" defaultValue="completed" className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm">
+                 <select name="status" defaultValue={editingMaintenance?.status || 'completed'} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm">
                    <option value="completed">Concluído</option>
                    <option value="scheduled">Agendado</option>
                  </select>
               </div>
               <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Notas Adicionais</label>
-                  <textarea name="notes" rows={3} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm" placeholder="Observações..." />
+                  <textarea name="notes" rows={3} defaultValue={editingMaintenance?.notes} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm" placeholder="Observações..." />
               </div>
               <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-colors">
-                Registar Manutenção
+                {editingMaintenance ? 'Atualizar Registo' : 'Registar Manutenção'}
               </button>
             </form>
           </div>

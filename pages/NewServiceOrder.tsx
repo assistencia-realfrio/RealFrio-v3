@@ -69,8 +69,10 @@ const NewServiceOrder: React.FC = () => {
     if (formData.client_id) {
       mockData.getEstablishmentsByClient(formData.client_id).then(ests => {
         setEstablishments(ests);
-        if (ests.length === 1 && !formData.establishment_id) {
+        if (ests.length === 1) {
            setFormData(prev => ({ ...prev, establishment_id: ests[0].id }));
+        } else {
+           setFormData(prev => ({ ...prev, establishment_id: '' }));
         }
       });
     } else {
@@ -276,7 +278,7 @@ const NewServiceOrder: React.FC = () => {
                      onChange={e => setFormData({...formData, establishment_id: e.target.value})}
                      className="w-full pl-12 pr-10 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white appearance-none outline-none focus:ring-4 focus:ring-blue-500/10 transition-all uppercase"
                    >
-                     <option value="">SEDE / PRINCIPAL</option>
+                     <option value="" disabled={establishments.length > 0}>{establishments.length === 0 ? 'SEDE / PRINCIPAL' : 'SELECCIONE UM LOCAL...'}</option>
                      {establishments.map(est => (
                        <option key={est.id} value={est.id}>{est.name.toUpperCase()}</option>
                      ))}

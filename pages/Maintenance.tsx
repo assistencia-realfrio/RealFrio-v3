@@ -93,6 +93,9 @@ interface AuditClient {
   email: string;
   address: string;
   google_drive_link: string;
+  nif: string;
+  store: string;
+  notes: string;
   missingFields: string[];
 }
 
@@ -119,6 +122,8 @@ const Maintenance: React.FC = () => {
     missingEmail: number;
     missingMaps: number;
     missingDrive: number;
+    missingNif: number;
+    missingStore: number;
     clients: AuditClient[];
   } | null>(null);
 
@@ -238,6 +243,8 @@ const Maintenance: React.FC = () => {
         missingEmail: 0,
         missingMaps: 0,
         missingDrive: 0,
+        missingNif: 0,
+        missingStore: 0,
         clients: [] as AuditClient[]
       };
 
@@ -248,6 +255,8 @@ const Maintenance: React.FC = () => {
         if (!c.email || c.email === '---' || c.email.trim() === '') { stats.missingEmail++; missingFields.push("Email"); }
         if (!c.address || c.address === '---' || c.address.trim() === '') { stats.missingMaps++; missingFields.push("Morada"); }
         if (!c.google_drive_link || c.google_drive_link.trim() === '') { stats.missingDrive++; missingFields.push("Drive"); }
+        if (!c.nif || c.nif === '---' || c.nif.trim() === '') { stats.missingNif++; missingFields.push("NIF"); }
+        if (!c.store || c.store.trim() === '') { stats.missingStore++; missingFields.push("Loja"); }
         
         if (missingFields.length > 0) {
           stats.incompleteCount++;
@@ -259,6 +268,9 @@ const Maintenance: React.FC = () => {
             email: c.email || '',
             address: c.address || '',
             google_drive_link: c.google_drive_link || '',
+            nif: c.nif || '',
+            store: c.store || '',
+            notes: c.notes || '',
             missingFields
           });
         }
@@ -281,7 +293,10 @@ const Maintenance: React.FC = () => {
       phone: client.phone,
       email: client.email,
       address: client.address,
-      google_drive_link: client.google_drive_link
+      google_drive_link: client.google_drive_link,
+      nif: client.nif,
+      store: client.store,
+      notes: client.notes
     });
   };
 
@@ -344,7 +359,11 @@ const Maintenance: React.FC = () => {
                   'address': 'address',
                   'morada': 'address',
                   'google_drive_link': 'google_drive_link',
-                  'drive': 'google_drive_link'
+                  'drive': 'google_drive_link',
+                  'nif': 'nif',
+                  'contribuinte': 'nif',
+                  'store': 'store',
+                  'loja': 'store'
                 };
                 if (fieldMap[h]) updates[fieldMap[h]] = values[idx];
               });
@@ -504,12 +523,14 @@ const Maintenance: React.FC = () => {
                     <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-slate-400">Total Clientes:</span><span className="text-slate-900 dark:text-white">{auditResults.total}</span></div>
                     <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-red-500">Fichas Incompletas:</span><span className="text-red-600">{auditResults.incompleteCount}</span></div>
                     <div className="h-px bg-slate-100 dark:bg-slate-800 my-1"></div>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-x-4 gap-y-1">
                         <div className="text-[8px] font-bold text-slate-400 uppercase">Firma: {auditResults.missingBilling}</div>
                         <div className="text-[8px] font-bold text-slate-400 uppercase">Tel.: {auditResults.missingPhone}</div>
                         <div className="text-[8px] font-bold text-slate-400 uppercase">Email: {auditResults.missingEmail}</div>
                         <div className="text-[8px] font-bold text-slate-400 uppercase">Morada: {auditResults.missingMaps}</div>
                         <div className="text-[8px] font-bold text-slate-400 uppercase">Drive: {auditResults.missingDrive}</div>
+                        <div className="text-[8px] font-bold text-slate-400 uppercase">NIF: {auditResults.missingNif}</div>
+                        <div className="text-[8px] font-bold text-slate-400 uppercase">Loja: {auditResults.missingStore}</div>
                     </div>
                   </div>
 
@@ -560,69 +581,89 @@ const Maintenance: React.FC = () => {
                             {quickEditId === c.id && (
                               <div className="mt-4 pt-4 border-t border-slate-50 dark:border-slate-700 space-y-3 animate-in slide-in-from-top-2 duration-300">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                  {c.missingFields.includes("Firma") && (
-                                    <div>
-                                      <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Nome Faturação / Firma</label>
-                                      <input 
-                                        type="text" 
-                                        className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold uppercase outline-none focus:ring-2 focus:ring-blue-500/20"
-                                        value={quickEditForm.billing_name}
-                                        onChange={e => setQuickEditForm({...quickEditForm, billing_name: e.target.value})}
-                                      />
-                                    </div>
-                                  )}
-                                  {c.missingFields.includes("Telefone") && (
-                                    <div>
-                                      <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Telefone Sede</label>
-                                      <input 
-                                        type="tel" 
-                                        className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
-                                        value={quickEditForm.phone}
-                                        onChange={e => setQuickEditForm({...quickEditForm, phone: e.target.value})}
-                                      />
-                                    </div>
-                                  )}
-                                  {c.missingFields.includes("Email") && (
-                                    <div className="lowercase-container">
-                                      <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Email Faturação</label>
-                                      <input 
-                                        type="email" 
-                                        className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
-                                        value={quickEditForm.email}
-                                        onChange={e => setQuickEditForm({...quickEditForm, email: e.target.value})}
-                                      />
-                                    </div>
-                                  )}
-                                  {c.missingFields.includes("Drive") && (
-                                    <div>
-                                      <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Google Drive Cliente</label>
-                                      <input 
-                                        type="url" 
-                                        placeholder="https://drive.google.com/..."
-                                        className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
-                                        value={quickEditForm.google_drive_link}
-                                        onChange={e => setQuickEditForm({...quickEditForm, google_drive_link: e.target.value})}
-                                      />
-                                    </div>
-                                  )}
-                                  {c.missingFields.includes("Morada") && (
-                                    <div className="sm:col-span-2">
-                                      <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Morada Sede / Link Maps</label>
-                                      <input 
-                                        type="text" 
-                                        className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold uppercase outline-none focus:ring-2 focus:ring-blue-500/20"
-                                        value={quickEditForm.address}
-                                        onChange={e => setQuickEditForm({...quickEditForm, address: e.target.value})}
-                                      />
-                                    </div>
-                                  )}
+                                  <div>
+                                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Nome Faturação / Firma</label>
+                                    <input 
+                                      type="text" 
+                                      className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold uppercase outline-none focus:ring-2 focus:ring-blue-500/20"
+                                      value={quickEditForm.billing_name}
+                                      onChange={e => setQuickEditForm({...quickEditForm, billing_name: e.target.value})}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">NIF (Contribuinte)</label>
+                                    <input 
+                                      type="text" 
+                                      className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold uppercase outline-none focus:ring-2 focus:ring-blue-500/20"
+                                      value={quickEditForm.nif}
+                                      onChange={e => setQuickEditForm({...quickEditForm, nif: e.target.value})}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Telefone Sede</label>
+                                    <input 
+                                      type="tel" 
+                                      className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                                      value={quickEditForm.phone}
+                                      onChange={e => setQuickEditForm({...quickEditForm, phone: e.target.value})}
+                                    />
+                                  </div>
+                                  <div className="lowercase-container">
+                                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Email Faturação</label>
+                                    <input 
+                                      type="email" 
+                                      className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                                      value={quickEditForm.email}
+                                      onChange={e => setQuickEditForm({...quickEditForm, email: e.target.value})}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Loja de Atendimento</label>
+                                    <select 
+                                      className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold uppercase outline-none focus:ring-2 focus:ring-blue-500/20"
+                                      value={quickEditForm.store}
+                                      onChange={e => setQuickEditForm({...quickEditForm, store: e.target.value})}
+                                    >
+                                      <option value="">SELECIONE UMA LOJA</option>
+                                      <option value="Caldas da Rainha">CALDAS DA RAINHA</option>
+                                      <option value="Porto de Mós">PORTO DE MÓS</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Google Drive Cliente</label>
+                                    <input 
+                                      type="url" 
+                                      placeholder="https://drive.google.com/..."
+                                      className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                                      value={quickEditForm.google_drive_link}
+                                      onChange={e => setQuickEditForm({...quickEditForm, google_drive_link: e.target.value})}
+                                    />
+                                  </div>
+                                  <div className="sm:col-span-2">
+                                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Morada Sede / Link Maps</label>
+                                    <input 
+                                      type="text" 
+                                      className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold uppercase outline-none focus:ring-2 focus:ring-blue-500/20"
+                                      value={quickEditForm.address}
+                                      onChange={e => setQuickEditForm({...quickEditForm, address: e.target.value})}
+                                    />
+                                  </div>
+                                  <div className="sm:col-span-2">
+                                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Notas Gerais</label>
+                                    <textarea 
+                                      className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20 min-h-[60px]"
+                                      value={quickEditForm.notes}
+                                      onChange={e => setQuickEditForm({...quickEditForm, notes: e.target.value})}
+                                      placeholder="Notas adicionais..."
+                                    />
+                                  </div>
                                 </div>
                                 <button 
                                   onClick={() => handleSaveQuickEdit(c.id)}
                                   disabled={loading}
                                   className="w-full py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all mt-2"
                                 >
-                                  {loading ? <RefreshCw className="animate-spin" size={14} /> : <Save size={14} />}
+                                  {loading ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
                                   GUARDAR ATUALIZAÇÃO
                                 </button>
                               </div>

@@ -10,7 +10,7 @@
     <link rel="shortcut icon" type="image/png" href="/rf-favicon-v5.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/rf-apple-v5.png">
 
-    <link rel="manifest" href="/manifest.json?v=7">
+    <link rel="manifest" href="/manifest.json?v=8">
     <meta name="theme-color" content="#9d1c24">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -75,6 +75,30 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
     <script>
+      window.onerror = function(msg, url, lineNo, columnNo, error) {
+        var div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.top = '0';
+        div.style.left = '0';
+        div.style.width = '100%';
+        div.style.height = '100%';
+        div.style.backgroundColor = 'white';
+        div.style.color = 'red';
+        div.style.padding = '20px';
+        div.style.zIndex = '9999';
+        div.style.overflow = 'auto';
+        div.style.fontFamily = 'monospace';
+        div.innerHTML = '<h1>Runtime Error</h1>' +
+          '<p><strong>Message:</strong> ' + msg + '</p>' +
+          '<p><strong>URL:</strong> ' + url + '</p>' +
+          '<p><strong>Line:</strong> ' + lineNo + '</p>' +
+          '<p><strong>Column:</strong> ' + columnNo + '</p>' +
+          '<pre>' + (error && error.stack ? error.stack : 'No stack trace available') + '</pre>';
+        document.body.appendChild(div);
+        return false;
+      };
+    </script>
+    <script>
       // Shim para evitar erros em ambientes que esperam process.env
       window.process = window.process || { env: {} };
     </script>
@@ -105,10 +129,10 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          // Atualizado para v7.0 para forçar cache refresh e nova lógica de ativação
-          navigator.serviceWorker.register('/sw.js?v=7.0')
+          // Atualizado para v8.0 para forçar cache refresh e nova lógica de ativação
+          navigator.serviceWorker.register('/sw.js?v=8.0')
             .then(registration => {
-              console.log('SW v7.0 Active');
+              console.log('SW v8.0 Active');
             }).catch(err => {
               console.log('SW registration failed', err);
             });

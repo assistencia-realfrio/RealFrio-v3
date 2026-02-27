@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, ClipboardList, ArrowRight, MapPin, ChevronDown, Palmtree, Database, Wifi, WifiOff, Calculator, Sparkles, ShieldCheck } from 'lucide-react';
+import { Calendar, ClipboardList, ArrowRight, MapPin, ChevronDown, Palmtree, Database, Wifi, WifiOff, Calculator, Sparkles, ShieldCheck, Car } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { OSStatus, QuoteStatus } from '../types';
 import { useStore } from '../contexts/StoreContext';
@@ -11,6 +11,7 @@ const Dashboard: React.FC = () => {
   const [activeCount, setActiveCount] = useState(0);
   const [vacationCount, setVacationCount] = useState(0);
   const [unverifiedQuotesCount, setUnverifiedQuotesCount] = useState(0);
+  const [scheduledFleetCount, setScheduledFleetCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const { currentStore, setStore } = useStore();
@@ -23,10 +24,11 @@ const Dashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [allOS, allVacations, allQuotes] = await Promise.all([
+      const [allOS, allVacations, allQuotes, allMaintenance] = await Promise.all([
         mockData.getServiceOrders(),
         mockData.getVacations(),
-        mockData.getQuotes()
+        mockData.getQuotes(),
+        mockData.getAllMaintenanceRecords()
       ]);
       
       setDbStatus('connected');
@@ -75,6 +77,10 @@ const Dashboard: React.FC = () => {
       const uniqueCollaborators = new Set(ongoingOrUpcomingVacations.map(v => v.user_name));
       setVacationCount(uniqueCollaborators.size);
 
+      // Contagem de Manutenções de Frota Agendadas
+      const scheduledFleet = allMaintenance.filter(m => m.status === 'scheduled').length;
+      setScheduledFleetCount(scheduledFleet);
+
     } catch (e) {
       console.error("Erro dashboard", e);
       setDbStatus('error');
@@ -86,7 +92,7 @@ const Dashboard: React.FC = () => {
   const stores: ('Todas' | 'Caldas da Rainha' | 'Porto de Mós')[] = ['Todas', 'Caldas da Rainha', 'Porto de Mós'];
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 py-2">
+    <div className="max-w-6xl mx-auto space-y-4 py-2">
       <div className="px-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div>
@@ -129,99 +135,132 @@ const Dashboard: React.FC = () => {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 px-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 px-1">
           {/* OS ATIVAS */}
           <button 
             onClick={() => navigate('/os')}
-            className="group bg-white dark:bg-slate-900 p-5 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 text-left relative overflow-hidden active:scale-95"
+            className="group bg-white dark:bg-slate-900 p-3.5 rounded-[1.2rem] border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 text-left relative overflow-hidden active:scale-95 flex items-center justify-between sm:block"
           >
-            <div className="relative z-10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 bg-orange-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-orange-200 dark:shadow-orange-900/20 flex-shrink-0">
-                  <ClipboardList size={18} />
+            <div className="relative z-10 flex items-center gap-3 sm:block">
+              <div className="flex items-center gap-2.5 sm:mb-2">
+                <div className="w-8 h-8 bg-orange-500 text-white rounded-lg flex items-center justify-center shadow-lg shadow-orange-200 dark:shadow-orange-900/20 flex-shrink-0">
+                  <ClipboardList size={16} />
                 </div>
-                <h2 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tighter">OS Ativas</h2>
+                <h2 className="text-[12px] sm:text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tighter">OS Ativas</h2>
               </div>
-              <div className="flex items-baseline gap-4">
-                <span className="text-4xl font-black text-slate-900 dark:text-white leading-none">{activeCount}</span>
-                <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
-                  <span className="text-[8px] font-black uppercase tracking-widest">Ver Listagem</span>
-                  <ArrowRight size={10} className="group-hover:translate-x-1 transition-transform" />
+              <div className="flex items-center gap-3 sm:items-baseline sm:gap-2 ml-auto sm:ml-0">
+                <span className="text-2xl font-black text-slate-900 dark:text-white leading-none">{activeCount}</span>
+                <div className="hidden sm:flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                  <span className="text-[7px] font-black uppercase tracking-widest">Ver</span>
+                  <ArrowRight size={8} className="group-hover:translate-x-1 transition-transform" />
                 </div>
               </div>
             </div>
+            <ArrowRight size={14} className="sm:hidden text-slate-300" />
           </button>
 
           {/* AGENDAMENTOS */}
           <button 
             onClick={() => navigate('/appointments')}
-            className="group bg-white dark:bg-slate-900 p-5 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 text-left relative overflow-hidden active:scale-95"
+            className="group bg-white dark:bg-slate-900 p-3.5 rounded-[1.2rem] border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 text-left relative overflow-hidden active:scale-95 flex items-center justify-between sm:block"
           >
-            <div className="relative z-10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 dark:shadow-blue-900/20 flex-shrink-0">
-                  <Calendar size={18} />
+            <div className="relative z-10 flex items-center gap-3 sm:block">
+              <div className="flex items-center gap-2.5 sm:mb-2">
+                <div className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center shadow-lg shadow-blue-200 dark:shadow-blue-900/20 flex-shrink-0">
+                  <Calendar size={16} />
                 </div>
-                <h2 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tighter">Agendamentos</h2>
+                <h2 className="text-[12px] sm:text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tighter">Agendamentos</h2>
               </div>
-              <div className="flex items-baseline gap-4">
-                <span className="text-4xl font-black text-slate-900 dark:text-white leading-none">{scheduledCount}</span>
-                <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                  <span className="text-[8px] font-black uppercase tracking-widest">Ver Todos</span>
-                  <ArrowRight size={10} className="group-hover:translate-x-1 transition-transform" />
+              <div className="flex items-center gap-3 sm:items-baseline sm:gap-2 ml-auto sm:ml-0">
+                <span className="text-2xl font-black text-slate-900 dark:text-white leading-none">{scheduledCount}</span>
+                <div className="hidden sm:flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                  <span className="text-[7px] font-black uppercase tracking-widest">Ver</span>
+                  <ArrowRight size={8} className="group-hover:translate-x-1 transition-transform" />
                 </div>
               </div>
             </div>
+            <ArrowRight size={14} className="sm:hidden text-slate-300" />
           </button>
 
-          {/* APROVAÇÕES (Propostas que aguardam validação interna) */}
+          {/* APROVAÇÕES */}
           <button 
             onClick={() => navigate('/quotes?status=aguarda_validacao')}
-            className={`group p-5 rounded-[2rem] border shadow-sm transition-all duration-300 text-left relative overflow-hidden active:scale-95 ${
+            className={`group p-3.5 rounded-[1.2rem] border shadow-sm transition-all duration-300 text-left relative overflow-hidden active:scale-95 flex items-center justify-between sm:block ${
               unverifiedQuotesCount > 0 
               ? 'bg-indigo-600 border-indigo-500 text-white shadow-indigo-200 dark:shadow-indigo-900/20' 
               : 'bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800 text-slate-900 dark:text-white'
             }`}
           >
-            <div className="relative z-10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ${
+            <div className="relative z-10 flex items-center gap-3 sm:block">
+              <div className="flex items-center gap-2.5 sm:mb-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-lg ${
                   unverifiedQuotesCount > 0 ? 'bg-white text-indigo-600' : 'bg-indigo-50 text-white shadow-indigo-200'
                 }`}>
-                  <Calculator size={18} />
+                  <Calculator size={16} />
                 </div>
-                <h2 className="text-base font-black uppercase tracking-tighter">Aprovações</h2>
+                <h2 className="text-[12px] sm:text-[11px] font-black uppercase tracking-tighter">Aprovações</h2>
               </div>
-              <div className="flex items-baseline gap-4">
-                <span className="text-4xl font-black leading-none">{unverifiedQuotesCount}</span>
-                <div className={`flex items-center gap-1 ${unverifiedQuotesCount > 0 ? 'text-indigo-100' : 'text-indigo-600'}`}>
-                  <span className="text-[8px] font-black uppercase tracking-widest">Novos Aceites</span>
-                  <Sparkles size={10} className={unverifiedQuotesCount > 0 ? 'animate-pulse' : ''} />
+              <div className="flex items-center gap-3 sm:items-baseline sm:gap-2 ml-auto sm:ml-0">
+                <span className="text-2xl font-black leading-none">{unverifiedQuotesCount}</span>
+                <div className={`hidden sm:flex items-center gap-1 ${unverifiedQuotesCount > 0 ? 'text-indigo-100' : 'text-indigo-600'}`}>
+                  <span className="text-[7px] font-black uppercase tracking-widest">Novos</span>
+                  <Sparkles size={8} className={unverifiedQuotesCount > 0 ? 'animate-pulse' : ''} />
                 </div>
               </div>
             </div>
+            <ArrowRight size={14} className={`sm:hidden ${unverifiedQuotesCount > 0 ? 'text-indigo-200' : 'text-slate-300'}`} />
           </button>
 
           {/* AUSÊNCIAS */}
           <button 
             onClick={() => navigate('/vacations')}
-            className="group bg-white dark:bg-slate-900 p-5 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 text-left relative overflow-hidden active:scale-95"
+            className="group bg-white dark:bg-slate-900 p-3.5 rounded-[1.2rem] border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 text-left relative overflow-hidden active:scale-95 flex items-center justify-between sm:block"
           >
-            <div className="relative z-10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200 dark:shadow-emerald-900/20 flex-shrink-0">
-                  <Palmtree size={18} />
+            <div className="relative z-10 flex items-center gap-3 sm:block">
+              <div className="flex items-center gap-2.5 sm:mb-2">
+                <div className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center shadow-lg shadow-emerald-200 dark:shadow-emerald-900/20 flex-shrink-0">
+                  <Palmtree size={16} />
                 </div>
-                <h2 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight">Ausências</h2>
+                <h2 className="text-[12px] sm:text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tighter">Ausências</h2>
               </div>
-              <div className="flex items-baseline gap-4">
-                <span className="text-4xl font-black text-slate-900 dark:text-white leading-none">{vacationCount}</span>
-                <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                  <span className="text-[8px] font-black uppercase tracking-widest">Equipa</span>
-                  <ArrowRight size={10} />
+              <div className="flex items-center gap-3 sm:items-baseline sm:gap-2 ml-auto sm:ml-0">
+                <span className="text-2xl font-black text-slate-900 dark:text-white leading-none">{vacationCount}</span>
+                <div className="hidden sm:flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                  <span className="text-[7px] font-black uppercase tracking-widest">Equipa</span>
+                  <ArrowRight size={8} />
                 </div>
               </div>
             </div>
+            <ArrowRight size={14} className="sm:hidden text-slate-300" />
+          </button>
+
+          {/* GESTÃO DE FROTA */}
+          <button 
+            onClick={() => navigate('/fleet')}
+            className={`group p-3.5 rounded-[1.2rem] border shadow-sm transition-all duration-300 text-left relative overflow-hidden active:scale-95 flex items-center justify-between sm:block ${
+              scheduledFleetCount > 0 
+              ? 'bg-amber-500 border-amber-400 text-white shadow-amber-200 dark:shadow-amber-900/20' 
+              : 'bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800 text-slate-900 dark:text-white'
+            }`}
+          >
+            <div className="relative z-10 flex items-center gap-3 sm:block">
+              <div className="flex items-center gap-2.5 sm:mb-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-lg ${
+                  scheduledFleetCount > 0 ? 'bg-white text-amber-600' : 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 shadow-amber-200'
+                }`}>
+                  <Car size={16} />
+                </div>
+                <h2 className="text-[12px] sm:text-[11px] font-black uppercase tracking-tighter">Frota</h2>
+              </div>
+              <div className="flex items-center gap-3 sm:items-baseline sm:gap-2 ml-auto sm:ml-0">
+                <span className="text-2xl font-black leading-none">{scheduledFleetCount}</span>
+                <div className={`hidden sm:flex items-center gap-1 ${scheduledFleetCount > 0 ? 'text-amber-50' : 'text-amber-600'}`}>
+                  <span className="text-[7px] font-black uppercase tracking-widest">Agenda</span>
+                  <ArrowRight size={8} className="group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </div>
+            <ArrowRight size={14} className={`sm:hidden ${scheduledFleetCount > 0 ? 'text-amber-200' : 'text-slate-300'}`} />
           </button>
         </div>
       )}
@@ -229,7 +268,7 @@ const Dashboard: React.FC = () => {
       <div className="pt-4 px-2 flex flex-col items-center gap-3">
         <button 
           onClick={() => navigate('/os/new')}
-          className="w-full sm:w-auto bg-slate-900 dark:bg-blue-600 text-white px-10 py-4 rounded-full font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 dark:hover:bg-blue-700 transition-all active:scale-95"
+          className="w-full sm:w-auto bg-slate-900 dark:bg-blue-600 text-white px-10 py-3 rounded-full font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 dark:hover:bg-blue-700 transition-all active:scale-95"
         >
           Nova Ordem de Serviço
         </button>
