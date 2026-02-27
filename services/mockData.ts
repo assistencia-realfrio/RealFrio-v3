@@ -75,11 +75,19 @@ export const mockData = {
 
   // Perfil e Notificações
   savePushSubscription: async (userId: string, subscription: any) => {
+    // Tenta atualizar, mas se o perfil não existir, cria um novo (upsert)
     const { error } = await supabase
       .from('profiles')
-      .update({ push_subscription: subscription })
-      .eq('id', userId);
-    if (error) throw error;
+      .upsert({ 
+        id: userId, 
+        push_subscription: subscription,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+      
+    if (error) {
+      console.error("Erro ao guardar subscrição:", error);
+      throw error;
+    }
     return true;
   },
 
