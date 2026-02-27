@@ -51,40 +51,55 @@ const Profile: React.FC = () => {
   };
 
   const handleRequestNotifications = async () => {
+    if (isSubscribing) return;
     setIsSubscribing(true);
+    setError(null);
+    
     try {
       const granted = await notificationService.requestPermission();
       setPushStatus(Notification.permission as any);
 
       if (granted) {
-        let subscription = null;
+        let subscription = { manual_enabled: true, timestamp: new Date().toISOString() };
+        
+        // Tentar subscrição real de Push (opcional, pode falhar em alguns browsers/ambientes)
         if ('serviceWorker' in navigator && 'PushManager' in window) {
           try {
             const registration = await navigator.serviceWorker.ready;
-            subscription = await registration.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: 'BEl62vp9IH1w94S_7pQ3U656A74377F7A74377F7A74377F7A74377F7A74377F7A' 
-            });
-            await mockData.savePushSubscription(user.id, subscription);
+            // VAPID Key formatada corretamente (exemplo)
+            const publicKey = 'BEl62vp9IH1w94S_7pQ3U656A74377F7A74377F7A74377F7A74377F7A74377F7A';
             
-            // Atualizar sessão local
-            const updatedUser = { ...user, push_subscription: subscription };
-            setUser(updatedUser);
-            localStorage.setItem('rf_active_session_v3', JSON.stringify(updatedUser));
+            const realSub = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: publicKey 
+            });
+            if (realSub) subscription = realSub as any;
           } catch (pushErr) {
-            console.warn("Subscrição opcional não disponível:", pushErr);
+            console.warn("Subscrição Push (VAPID) não disponível, usando modo local:", pushErr);
           }
         }
         
-        setSuccess("Alertas ativados com sucesso!");
+        await mockData.savePushSubscription(user.id, subscription);
+        
+        // Atualizar sessão local imediatamente para o toggle deslizar
+        const updatedUser = { ...user, push_subscription: subscription };
+        setUser(updatedUser);
+        localStorage.setItem('rf_active_session_v3', JSON.stringify(updatedUser));
+        
+        setSuccess("Notificações ativadas!");
+        
+        // Disparar notificação de boas-vindas
         await notificationService.notify(
-          "Sistema Real Frio", 
-          `As notificações foram ligadas para ${user.full_name}.`
+          "Sistema Real Frio 🚨", 
+          `Olá ${user.full_name}, as notificações estão agora ativas neste dispositivo.`,
+          "/profile"
         );
+      } else {
+        setError("Permissão negada. Verifique as definições do seu navegador.");
       }
     } catch (err) {
       console.error("Falha ao configurar:", err);
-      setError("Erro ao configurar notificações.");
+      setError("Não foi possível ativar as notificações. Tente novamente.");
     } finally {
       setIsSubscribing(false);
     }
@@ -266,18 +281,25 @@ const Profile: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${user?.push_subscription ? 'text-emerald-500' : 'text-slate-400'}`}>
               {user?.push_subscription ? 'LIGADO' : 'DESLIGADO'}
             </span>
             <button 
-              onClick={user?.push_subscription ? handleDisableNotifications : handleRequestNotifications}
+              onClick={(e) => {
+                e.preventDefault();
+                if (user?.push_subscription) {
+                  handleDisableNotifications();
+                } else {
+                  handleRequestNotifications();
+                }
+              }}
               disabled={isSubscribing || pushStatus === 'unsupported'}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${user?.push_subscription ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'}`}
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all focus:outline-none shadow-inner ${user?.push_subscription ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'}`}
             >
               <span
                 className={`${
                   user?.push_subscription ? 'translate-x-6' : 'translate-x-1'
-                } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+                } inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ease-in-out`}
               />
             </button>
           </div>
