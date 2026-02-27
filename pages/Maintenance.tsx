@@ -128,20 +128,30 @@ const Maintenance: React.FC = () => {
     }
 
     // Testar Conexão Realtime
-    const testChannel = supabase.channel('realtime-test')
-      .on('system', { event: 'subscribe' }, () => {
-        setRealtimeStatus('connected');
-      })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          setRealtimeStatus('error');
-        }
-      });
+    const startRealtimeTest = () => {
+      setRealtimeStatus('checking');
+      const testChannel = supabase.channel('realtime-test')
+        .subscribe((status) => {
+          console.log("[Realtime Test] Status:", status);
+          if (status === 'SUBSCRIBED') {
+            setRealtimeStatus('connected');
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            setRealtimeStatus('error');
+          }
+        });
+      return testChannel;
+    };
+
+    const channel = startRealtimeTest();
 
     return () => {
-      supabase.removeChannel(testChannel);
+      supabase.removeChannel(channel);
     };
   }, []);
+
+  const handleRetryRealtime = () => {
+    window.location.reload(); // Recarregar é a forma mais segura de resetar o cliente Supabase
+  };
 
   const handleRequestPush = async () => {
     const granted = await notificationService.requestPermission();
@@ -506,12 +516,19 @@ const Maintenance: React.FC = () => {
               {expandedSQL ? <ChevronUp size={20} className="text-indigo-400" /> : <ChevronDown size={20} className="text-indigo-400" />}
             </button>
             
-            <div className="px-8 py-4 sm:py-0 sm:border-l border-white/5 flex flex-col justify-center gap-2 bg-black/20">
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${realtimeStatus === 'connected' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : realtimeStatus === 'error' ? 'bg-red-500' : 'bg-slate-500 animate-pulse'}`}></div>
-                <span className="text-[8px] font-black text-white uppercase tracking-widest">
-                  {realtimeStatus === 'connected' ? 'Canal Ativo' : realtimeStatus === 'error' ? 'Erro Conexão' : 'A Verificar...'}
-                </span>
+            <div className="px-8 py-4 sm:py-0 sm:border-l border-white/5 flex flex-col justify-center gap-2 bg-black/20 min-w-[140px]">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${realtimeStatus === 'connected' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : realtimeStatus === 'error' ? 'bg-red-500' : 'bg-slate-500 animate-pulse'}`}></div>
+                  <span className="text-[8px] font-black text-white uppercase tracking-widest">
+                    {realtimeStatus === 'connected' ? 'Canal Ativo' : realtimeStatus === 'error' ? 'Erro Conexão' : 'A Verificar...'}
+                  </span>
+                </div>
+                {realtimeStatus !== 'connected' && (
+                  <button onClick={handleRetryRealtime} className="text-indigo-400 hover:text-white transition-colors">
+                    <RefreshCw size={10} className={realtimeStatus === 'checking' ? 'animate-spin' : ''} />
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${pushPermission === 'granted' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-orange-500'}`}></div>

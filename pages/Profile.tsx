@@ -57,28 +57,62 @@ const Profile: React.FC = () => {
       setPushStatus(Notification.permission as any);
 
       if (granted) {
+        let subscription = null;
         if ('serviceWorker' in navigator && 'PushManager' in window) {
           try {
             const registration = await navigator.serviceWorker.ready;
-            const subscription = await registration.pushManager.subscribe({
+            subscription = await registration.pushManager.subscribe({
               userVisibleOnly: true,
               applicationServerKey: 'BEl62vp9IH1w94S_7pQ3U656A74377F7A74377F7A74377F7A74377F7A74377F7A' 
             });
             await mockData.savePushSubscription(user.id, subscription);
+            
+            // Atualizar sessão local
+            const updatedUser = { ...user, push_subscription: subscription };
+            setUser(updatedUser);
+            localStorage.setItem('rf_active_session_v3', JSON.stringify(updatedUser));
           } catch (pushErr) {
             console.warn("Subscrição opcional não disponível:", pushErr);
           }
         }
         
-        setSuccess("Alertas configurados!");
+        setSuccess("Alertas ativados com sucesso!");
         await notificationService.notify(
           "Sistema Real Frio", 
-          `Configuração concluída com sucesso para ${user.full_name}.`
+          `As notificações foram ligadas para ${user.full_name}.`
         );
       }
     } catch (err) {
       console.error("Falha ao configurar:", err);
       setError("Erro ao configurar notificações.");
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
+
+  const handleDisableNotifications = async () => {
+    setIsSubscribing(true);
+    try {
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          await subscription.unsubscribe();
+        }
+      }
+      
+      await mockData.savePushSubscription(user.id, null);
+      
+      // Atualizar sessão local
+      const updatedUser = { ...user, push_subscription: null };
+      setUser(updatedUser);
+      localStorage.setItem('rf_active_session_v3', JSON.stringify(updatedUser));
+      
+      setSuccess("Notificações desligadas.");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error("Erro ao desativar:", err);
+      setError("Falha ao desligar notificações.");
     } finally {
       setIsSubscribing(false);
     }
@@ -226,72 +260,58 @@ const Profile: React.FC = () => {
               <BellRing size={24} />
             </div>
             <div>
-              <h3 className="font-black text-slate-900 dark:text-white uppercase text-sm tracking-[0.1em] leading-none">Centro de Alertas</h3>
-              <p className="text-[9px] text-slate-400 dark:text-slate-500 font-black uppercase mt-1.5 tracking-widest">Push do Sistema</p>
+              <h3 className="font-black text-slate-900 dark:text-white uppercase text-sm tracking-[0.1em] leading-none">Notificações Push</h3>
+              <p className="text-[9px] text-slate-400 dark:text-slate-500 font-black uppercase mt-1.5 tracking-widest">Alertas em tempo real</p>
             </div>
           </div>
           
-          {pushStatus === 'granted' ? (
-            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-xl border border-emerald-100 dark:border-emerald-800">
-               <CheckCircle size={14} />
-               <span className="text-[9px] font-black uppercase tracking-widest">Ativo</span>
-            </div>
-          ) : (
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              {user?.push_subscription ? 'LIGADO' : 'DESLIGADO'}
+            </span>
             <button 
-              onClick={handleRequestNotifications}
+              onClick={user?.push_subscription ? handleDisableNotifications : handleRequestNotifications}
               disabled={isSubscribing || pushStatus === 'unsupported'}
-              className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${user?.push_subscription ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'}`}
             >
-              {isSubscribing ? <Loader2 size={14} className="animate-spin" /> : <Bell size={14} />}
-              {pushStatus === 'denied' ? 'DESBLOQUEAR ALERTAS' : 'ATIVAR NOTIFICAÇÕES'}
+              <span
+                className={`${
+                  user?.push_subscription ? 'translate-x-6' : 'translate-x-1'
+                } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+              />
             </button>
-          )}
+          </div>
         </div>
+
+        {pushStatus === 'denied' && (
+          <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-2xl border border-orange-100 dark:border-orange-800 flex items-start gap-3">
+             <AlertTriangle size={16} className="text-orange-500 flex-shrink-0 mt-0.5" />
+             <p className="text-[9px] font-bold text-orange-700 dark:text-orange-400 uppercase leading-relaxed">
+               Bloqueou as notificações no browser. Clique no cadeado na barra de endereço para permitir.
+             </p>
+          </div>
+        )}
         
-        {pushStatus === 'granted' && (
-          <div className="space-y-4">
+        {user?.push_subscription && (
+          <div className="space-y-4 pt-2">
             <button 
               onClick={handleTestNotification}
               disabled={isTesting}
               className="w-full flex items-center justify-center gap-3 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-[9px] font-black uppercase tracking-widest border border-slate-100 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {isTesting ? <RefreshCw size={14} className="animate-spin" /> : <SendHorizontal size={14} />}
-              {isTesting ? 'A ENVIAR TESTE...' : 'Testar Sistema de Alertas'}
+              {isTesting ? 'A ENVIAR TESTE...' : 'Testar Alertas Agora'}
             </button>
 
-            {/* Guia de Ajuda para Android */}
             <div className="p-5 bg-blue-50/50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-900/30">
                <div className="flex items-center gap-2 text-blue-600 mb-3">
                   <Info size={14} />
-                  <h4 className="text-[10px] font-black uppercase tracking-widest">Ajuda para Android</h4>
+                  <h4 className="text-[10px] font-black uppercase tracking-widest">Dica Android</h4>
                </div>
-               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase leading-relaxed mb-3">
-                 Se o botão de teste falhar, o seu telemóvel pode estar a bloquear o motor da app. Siga estes passos:
+               <p className="text-[9px] text-slate-500 dark:text-slate-400 font-bold uppercase leading-relaxed">
+                 Se não receber o teste, verifique se a app tem permissão para "Janelas Flutuantes" e se o modo "Poupança de Bateria" está desativado.
                </p>
-               <ol className="space-y-2">
-                  <li className="flex gap-2">
-                    <span className="text-blue-500 font-black">1.</span>
-                    <p className="text-[9px] text-slate-500 font-bold uppercase">Mantenha o ícone da app pressionado e clique em "Informações da Aplicação".</p>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="text-blue-500 font-black">2.</span>
-                    <p className="text-[9px] text-slate-500 font-bold uppercase">Em "Outras Permissões", ative "Janelas Flutuantes" e "Exibir no Ecrã de Bloqueio".</p>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="text-blue-500 font-black">3.</span>
-                    <p className="text-[9px] text-slate-500 font-bold uppercase">Verifique se o "Poupança de Bateria" não está a restringir a app.</p>
-                  </li>
-               </ol>
             </div>
-          </div>
-        )}
-        
-        {pushStatus === 'denied' && (
-          <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-2xl border border-orange-100 dark:border-orange-800 flex items-start gap-3">
-             <AlertTriangle size={16} className="text-orange-500 flex-shrink-0 mt-0.5" />
-             <p className="text-[9px] font-bold text-orange-700 dark:text-orange-400 uppercase leading-relaxed">
-               Bloqueou as notificações no seu navegador. Para receber alertas de novas OS, aceda às definições do site e permita "Notificações".
-             </p>
           </div>
         )}
       </div>
