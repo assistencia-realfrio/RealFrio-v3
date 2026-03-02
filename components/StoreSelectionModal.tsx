@@ -35,9 +35,9 @@ const StoreSelectionModal: React.FC = () => {
       id: 'Todas', 
       label: 'Ambas as Lojas', 
       icon: Layers, 
-      color: 'bg-slate-900', 
-      light: 'bg-slate-50 dark:bg-slate-800',
-      text: 'text-slate-600 dark:text-slate-400'
+      color: 'bg-emerald-600', 
+      light: 'bg-emerald-50 dark:bg-emerald-900/20',
+      text: 'text-emerald-600 dark:text-emerald-400'
     }
   ];
 

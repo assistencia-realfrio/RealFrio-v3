@@ -213,7 +213,7 @@ const ServiceOrders: React.FC = () => {
   const getStoreTextColorClass = (store: string) => {
     if (store === 'Caldas da Rainha') return 'text-blue-600';
     if (store === 'Porto de Mós') return 'text-red-600';
-    return 'text-slate-600 dark:text-slate-400';
+    return 'text-emerald-600';
   };
 
   const formatScheduledInfo = (scheduledStr: string) => {

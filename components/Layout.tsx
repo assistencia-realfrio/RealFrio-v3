@@ -286,9 +286,36 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const fabConfig = { to: '/os/new', title: 'Nova Ordem de Serviço' };
   const hasResults = searchResults.os.length > 0 || searchResults.clients.length > 0 || searchResults.equipments.length > 0 || searchResults.establishments.length > 0;
 
+  const getStoreClass = () => {
+    switch(currentStore) {
+      case 'Caldas da Rainha': return 'store-caldas';
+      case 'Porto de Mós': return 'store-porto';
+      default: return 'store-todas';
+    }
+  };
+
+  const getStoreColorText = () => {
+    switch(currentStore) {
+      case 'Caldas da Rainha': return 'text-blue-600';
+      case 'Porto de Mós': return 'text-red-600';
+      default: return 'text-emerald-600';
+    }
+  };
+
+  const getStoreBorderClass = () => {
+    switch(currentStore) {
+      case 'Caldas da Rainha': return 'border-blue-600/30';
+      case 'Porto de Mós': return 'border-red-600/30';
+      default: return 'border-emerald-600/30';
+    }
+  };
+
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-slate-950 overflow-hidden font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300">
+    <div className={`flex h-screen bg-gray-100 dark:bg-slate-950 overflow-hidden font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300 ${getStoreClass()}`}>
       
+      {/* INDICADOR DE LOJA SUBTIL (LINHA NO TOPO) */}
+      <div className="store-indicator-line" />
+
       {/* TOAST FLUTUANTE EM TEMPO REAL */}
       {toast && (
         <div 
@@ -321,9 +348,15 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             <button className="xl:hidden text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors p-2" onClick={() => setSidebarOpen(false)}><X size={22} /></button>
           </div>
           <div className="px-4 py-6 bg-white dark:bg-slate-900">
-             <div className="flex items-center text-slate-400 dark:text-slate-500 mb-3 text-[10px] uppercase font-medium tracking-[0.2em] px-2"><MapPin size={12} className="mr-2 text-blue-500" /> Loja Ativa</div>
-             <div className="relative group">
-                <select value={currentStore} onChange={(e) => setStore(e.target.value as any)} className="w-full bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700/50 p-3 appearance-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all outline-none">
+              <div className={`flex items-center mb-3 text-[10px] uppercase font-bold tracking-[0.2em] px-2 ${getStoreColorText()}`}>
+                <MapPin size={12} className="mr-2" /> Loja Ativa
+              </div>
+              <div className="relative group">
+                <select 
+                  value={currentStore} 
+                  onChange={(e) => setStore(e.target.value as any)} 
+                  className={`w-full bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white text-xs font-bold rounded-xl border ${getStoreBorderClass()} p-3 appearance-none transition-all outline-none focus:ring-2 ${currentStore === 'Caldas da Rainha' ? 'focus:ring-blue-600/50 focus:border-blue-600' : currentStore === 'Porto de Mós' ? 'focus:ring-red-600/50 focus:border-red-600' : 'focus:ring-emerald-600/50 focus:border-emerald-600'}`}
+                >
                   <option value="Todas">Todas as Lojas</option>
                   <option value="Caldas da Rainha">Caldas da Rainha</option>
                   <option value="Porto de Mós">Porto de Mós</option>

@@ -70,6 +70,26 @@
       .custom-marker-icon { display: flex; align-items: center; justify-content: center; }
       .marker-pin { width: 24px; height: 24px; border-radius: 50% 50% 50% 0; background: #3b82f6; position: absolute; transform: rotate(-45deg); left: 50%; top: 50%; margin: -12px 0 0 -12px; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
       .marker-pin::after { content: ''; width: 12px; height: 12px; margin: 4px 0 0 4px; background: #fff; position: absolute; border-radius: 50%; }
+
+      /* Store Themes */
+      :root {
+        --store-color: #3b82f6; /* Default Caldas */
+      }
+      .store-caldas { --store-color: #3b82f6; }
+      .store-porto { --store-color: #dc2626; }
+      .store-todas { --store-color: #10b981; }
+
+      .store-indicator-line {
+        height: 3px;
+        width: 100%;
+        background: var(--store-color);
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 101;
+        transition: background-color 0.5s ease;
+        box-shadow: 0 1px 10px var(--store-color);
+      }
     </style>
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>

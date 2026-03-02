@@ -368,6 +368,12 @@ export const ServiceOrderDetail: React.FC = () => {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const getStoreTextColorClass = (store: string) => {
+    if (store === 'Caldas da Rainha') return 'text-blue-600';
+    if (store === 'Porto de Mós') return 'text-red-600';
+    return 'text-emerald-600';
+  };
+
   const missingFields = useMemo(() => {
     const list = [];
     if (!anomaly || !anomaly.trim()) list.push("CAUSA DA AVARIA");
@@ -413,6 +419,40 @@ export const ServiceOrderDetail: React.FC = () => {
     const total = subtotal + iva;
     return { subtotal, iva, total, hasValues: partsUsed.length > 0 };
   }, [partsUsed]);
+
+  const storeColors = useMemo(() => {
+    const store = os?.store || 'Ambas as Lojas';
+    const isPM = store === 'Porto de Mós';
+    const isCR = store === 'Caldas da Rainha';
+    
+    const color = isPM ? 'red' : isCR ? 'blue' : 'emerald';
+    
+    return {
+      text: `text-${color}-600`,
+      textDark: `dark:text-${color}-400`,
+      text700: `text-${color}-700`,
+      text500: `text-${color}-500`,
+      text400: `text-${color}-400`,
+      bg: `bg-${color}-600`,
+      bgHover: `hover:bg-${color}-700`,
+      bg50: `bg-${color}-50`,
+      bg100: `bg-${color}-100`,
+      bgDark20: `dark:bg-${color}-900/20`,
+      bgDark30: `dark:bg-${color}-900/30`,
+      bgDark40: `dark:bg-${color}-900/40`,
+      bgDark10: `dark:bg-${color}-900/10`,
+      border: `border-${color}-100`,
+      border200: `border-${color}-200`,
+      border500: `border-${color}-500`,
+      borderDark30: `dark:border-${color}-900/30`,
+      borderDark40: `dark:border-${color}-900/40`,
+      ring: `focus:ring-${color}-500/10`,
+      ring5: `focus:ring-${color}-500/5`,
+      ring100: `hover:ring-${color}-100`,
+      shadow: `shadow-${color}-900/40`,
+      accent: color
+    };
+  }, [os?.store]);
 
   const handleUpdateStatus = async (newStatus: OSStatus) => {
     if (!id || !os) return;
@@ -861,7 +901,7 @@ export const ServiceOrderDetail: React.FC = () => {
 
   if (loading) return (
     <div className="h-full flex flex-col items-center justify-center p-20">
-      <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+      <Loader2 className={`w-10 h-10 ${storeColors.text} animate-spin`} />
       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-4">A CARREGAR OS...</p>
     </div>
   );
@@ -892,7 +932,7 @@ export const ServiceOrderDetail: React.FC = () => {
                  <div className="grid grid-cols-1 gap-4">
                     <button 
                       onClick={() => cameraInputRef.current?.click()}
-                      className="flex items-center gap-4 p-6 bg-blue-600 text-white rounded-3xl shadow-xl hover:bg-blue-700 transition-all active:scale-95"
+                      className={`flex items-center gap-4 p-6 ${storeColors.bg} text-white rounded-3xl shadow-xl ${storeColors.bgHover} transition-all active:scale-95`}
                     >
                        <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center"><Camera size={28} /></div>
                        <div className="text-left"><p className="font-black text-sm uppercase tracking-tight">Usar Câmara</p><p className="text-[10px] opacity-70 uppercase font-bold">Captura direta do local</p></div>
@@ -901,7 +941,7 @@ export const ServiceOrderDetail: React.FC = () => {
                       onClick={() => galleryInputRef.current?.click()}
                       className="flex items-center gap-4 p-6 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-3xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
                     >
-                       <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-2xl flex items-center justify-center"><LucideImage size={28} /></div>
+                       <div className={`w-12 h-12 ${storeColors.bg100} ${storeColors.bgDark30} ${storeColors.text} rounded-2xl flex items-center justify-center`}><LucideImage size={28} /></div>
                        <div className="text-left"><p className="font-black text-sm uppercase tracking-tight">Abrir Galeria</p><p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">Escolher foto existente</p></div>
                     </button>
                  </div>
@@ -916,8 +956,8 @@ export const ServiceOrderDetail: React.FC = () => {
         <div className="fixed inset-0 z-[700] bg-slate-900/60 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 border border-white/10">
               <div className="relative">
-                 <Loader2 size={48} className="text-blue-600 animate-spin" />
-                 <Camera size={20} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-400" />
+                 <Loader2 size={48} className={`${storeColors.text} animate-spin`} />
+                 <Camera size={20} className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${storeColors.text400}`} />
               </div>
               <div className="text-center">
                  <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Otimizando Imagem</p>
@@ -950,21 +990,21 @@ export const ServiceOrderDetail: React.FC = () => {
       <div className="space-y-2 mb-4">
         <div className="bg-white dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-gray-200 dark:border-slate-800 p-3 flex items-center justify-between transition-colors overflow-hidden">
           <div className="flex-shrink-0">
-            <button onClick={() => navigate('/os')} className="p-2.5 text-slate-500 dark:text-slate-400 hover:text-blue-600 rounded-2xl transition-all bg-slate-50 dark:bg-slate-800 border border-transparent hover:border-blue-100">
+            <button onClick={() => navigate('/os')} className={`p-2.5 text-slate-500 dark:text-slate-400 hover:${storeColors.text} rounded-2xl transition-all bg-slate-50 dark:bg-slate-800 border border-transparent hover:${storeColors.border}`}>
               <ArrowLeft size={20} />
             </button>
           </div>
           <div className="flex-1 px-3 text-center min-w-0 overflow-hidden">
-            <span className="text-[13px] sm:text-[15px] font-black text-blue-600 uppercase tracking-tight sm:tracking-[0.2em] font-mono leading-none whitespace-nowrap block truncate">
+            <span className={`text-[13px] sm:text-[15px] font-black ${getStoreTextColorClass(os?.store || '')} uppercase tracking-tight sm:tracking-[0.2em] font-mono leading-none whitespace-nowrap block truncate`}>
               {os?.code}
             </span>
           </div>
           <div className="flex-shrink-0">
              {actionLoading ? (
-               <RefreshCw size={14} className="animate-spin text-blue-600" />
+               <RefreshCw size={14} className={`animate-spin ${storeColors.text}`} />
              ) : (
                <div className="relative">
-                 <OSStatusBadge status={os?.status || ''} className="cursor-pointer hover:ring-2 hover:ring-blue-100 transition-all scale-90 sm:scale-100 origin-right" />
+                 <OSStatusBadge status={os?.status || ''} className={`cursor-pointer hover:ring-2 ${storeColors.ring100} transition-all scale-90 sm:scale-100 origin-right`} />
                  <select 
                     value={os?.status} 
                     onChange={(e) => handleUpdateStatus(e.target.value as OSStatus)} 
@@ -997,7 +1037,7 @@ export const ServiceOrderDetail: React.FC = () => {
                   </p>
                   <a 
                     href={`tel:${os.contact_phone}`} 
-                    className="text-lg font-black text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2 mt-1"
+                    className={`text-lg font-black ${storeColors.text} ${storeColors.textDark} hover:underline flex items-center gap-2 mt-1`}
                   >
                     {os.contact_phone}
                   </a>
@@ -1007,13 +1047,13 @@ export const ServiceOrderDetail: React.FC = () => {
 
             {/* CARD DE ORÇAMENTO NO TOPO DA FICHA */}
             {quoteTotals.hasValues && (os?.status === OSStatus.PARA_ORCAMENTO || os?.status === OSStatus.ORCAMENTO_ENVIADO) && (
-              <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-100 dark:border-blue-900/40 p-6 animate-in zoom-in-95 duration-500 overflow-hidden relative group">
+              <div className={`bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border ${storeColors.border} ${storeColors.borderDark40} p-6 animate-in zoom-in-95 duration-500 overflow-hidden relative group`}>
                 <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
-                  <Calculator size={80} className="text-blue-600" />
+                  <Calculator size={80} className={storeColors.text} />
                 </div>
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h3 className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.3em]">Resumo do Orçamento</h3>
+                    <h3 className={`text-[10px] font-black ${storeColors.text} ${storeColors.textDark} uppercase tracking-[0.3em]`}>Resumo do Orçamento</h3>
                     <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
                       {quoteTotals.total.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}
                     </p>
@@ -1022,7 +1062,7 @@ export const ServiceOrderDetail: React.FC = () => {
                   <div className="flex flex-col items-end gap-2">
                     <button 
                       onClick={() => navigate('/quotes/new', { state: { osId: os?.id } })}
-                      className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 transition-all shadow-sm"
+                      className={`flex items-center gap-2 ${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text} ${storeColors.textDark} px-4 py-2.5 rounded-xl text-[10px] font-black uppercase ${storeColors.bgHover} transition-all shadow-sm`}
                     >
                       <Edit2 size={12} /> Rever Valores
                     </button>
@@ -1058,7 +1098,7 @@ export const ServiceOrderDetail: React.FC = () => {
               <button 
                 onClick={generateTechnicalTag}
                 disabled={isExportingPDF}
-                className="w-full py-4 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-[1.8rem] text-[10px] font-black uppercase tracking-[0.25em] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center justify-center gap-3 shadow-sm active:scale-95 animate-in slide-in-from-top-2 duration-500 disabled:opacity-50"
+                className={`w-full py-4 bg-white dark:bg-slate-900 ${storeColors.text} ${storeColors.textDark} border ${storeColors.border} ${storeColors.borderDark30} rounded-[1.8rem] text-[10px] font-black uppercase tracking-[0.25em] ${storeColors.bg50} ${storeColors.bgDark20} transition-all flex items-center justify-center gap-3 shadow-sm active:scale-95 animate-in slide-in-from-top-2 duration-500 disabled:opacity-50`}
               >
                 {isExportingPDF ? <Loader2 className="animate-spin" size={18} /> : <QrCode size={18} />} 
                 {isExportingPDF ? 'A PREPARAR ETIQUETA...' : 'IMPRIMIR ETIQUETA TÉCNICA (DUAL QR)'}
@@ -1077,7 +1117,7 @@ export const ServiceOrderDetail: React.FC = () => {
                         <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Cronómetro</h3>
                      </div>
                      <div className="flex items-center gap-1.5 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full">
-                        <Cloud size={10} className="text-blue-400" />
+                        <Cloud size={10} className={storeColors.text400} />
                         <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest hidden sm:inline">Sincronizado</span>
                      </div>
                   </div>
@@ -1094,7 +1134,7 @@ export const ServiceOrderDetail: React.FC = () => {
                           <button 
                             onClick={handleStartTimer}
                             disabled={os?.status === OSStatus.CONCLUIDA || actionLoading}
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-900/40 disabled:opacity-30"
+                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 ${storeColors.bg} text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest ${storeColors.bgHover} transition-all active:scale-95 shadow-lg ${storeColors.shadow} disabled:opacity-30`}
                           >
                              {actionLoading ? <RefreshCw className="animate-spin" size={14} /> : <Play size={14} fill="currentColor" />} INICIAR
                           </button>
@@ -1111,7 +1151,7 @@ export const ServiceOrderDetail: React.FC = () => {
                             <button 
                               onClick={handleStopTimer}
                               disabled={actionLoading}
-                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-blue-900/40 animate-in zoom-in-95 disabled:opacity-50"
+                              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg ${storeColors.shadow} animate-in zoom-in-95 disabled:opacity-50`}
                             >
                                {actionLoading ? <RefreshCw className="animate-spin" size={14} /> : <StopIcon size={14} fill="currentColor" />} PARAR
                             </button>
@@ -1133,7 +1173,7 @@ export const ServiceOrderDetail: React.FC = () => {
                     <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500/70 uppercase tracking-tight mt-1.5">A OS está bloqueada para edição</p>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <button onClick={handleSendEmailShortcut} className="p-3 bg-white dark:bg-slate-800 text-blue-600 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:scale-105 transition-all" title="Enviar Relatório">
+                    <button onClick={handleSendEmailShortcut} className={`p-3 bg-white dark:bg-slate-800 ${storeColors.text} rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:scale-105 transition-all`} title="Enviar Relatório">
                        <Mail size={18} />
                     </button>
                   </div>
@@ -1146,7 +1186,7 @@ export const ServiceOrderDetail: React.FC = () => {
                   <button onClick={() => setShowReopenModal(true)} typeof="button" className="flex items-center justify-center gap-3 py-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 transition-all active:scale-95">
                     <RotateCw size={18} /> REABRIR PARA EDIÇÃO
                   </button>
-                  <button onClick={handleSendEmailShortcut} typeof="button" disabled={isExportingPDF} className="sm:col-span-2 flex items-center justify-center gap-3 py-4 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-blue-100 transition-all active:scale-95 disabled:opacity-50">
+                  <button onClick={handleSendEmailShortcut} typeof="button" disabled={isExportingPDF} className={`sm:col-span-2 flex items-center justify-center gap-3 py-4 ${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text} ${storeColors.textDark} border ${storeColors.border} ${storeColors.borderDark30} rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] ${storeColors.bgHover} transition-all active:scale-95 disabled:opacity-50`}>
                     {isExportingPDF ? <Loader2 size={18} className="animate-spin" /> : <Mail size={18} />} 
                     {isExportingPDF ? 'A PREPARAR...' : `ENVIAR PARA: ${os.client?.email || '(MANUAL)'}`}
                   </button>
@@ -1159,12 +1199,12 @@ export const ServiceOrderDetail: React.FC = () => {
                  <AlertCircle size={18} className="text-orange-500" />
                  <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest leading-none">PEDIDO DO CLIENTE / AVARIA</h3>
               </div>
-              <textarea ref={descTextareaRef} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-xs text-slate-700 dark:text-slate-300 italic font-medium leading-relaxed outline-none focus:ring-4 focus:ring-blue-500/5 transition-all resize-none overflow-hidden" value={description} onChange={e => setDescription(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} placeholder="..." />
+              <textarea ref={descTextareaRef} className={`w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-xs text-slate-700 dark:text-slate-300 italic font-medium leading-relaxed outline-none focus:ring-4 ${storeColors.ring5} transition-all resize-none overflow-hidden`} value={description} onChange={e => setDescription(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} placeholder="..." />
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
                <button onClick={() => setExpandedEquip(!expandedEquip)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                 <div className="flex items-center gap-3"><HardDrive size={18} className="text-slate-400" /><div className="text-left"><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Equipamento Vinculado</h3>{!expandedEquip && os?.equipment && <p className="text-[11px] font-bold text-blue-600 uppercase tracking-tight mt-0.5">{os.equipment.type} - {os.equipment.brand}</p>}</div></div>
+                 <div className="flex items-center gap-3"><HardDrive size={18} className="text-slate-400" /><div className="text-left"><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Equipamento Vinculado</h3>{!expandedEquip && os?.equipment && <p className={`text-[11px] font-bold ${storeColors.text} uppercase tracking-tight mt-0.5`}>{os.equipment.type} - {os.equipment.brand}</p>}</div></div>
                  {expandedEquip ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
                </button>
                {expandedEquip && (
@@ -1173,7 +1213,7 @@ export const ServiceOrderDetail: React.FC = () => {
                       <>
                         <button 
                           onClick={() => navigate(`/equipments/${os.equipment_id}`)}
-                          className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 px-4 py-2.5 rounded-full transition-all hover:bg-blue-100 dark:hover:bg-blue-900/40 w-full"
+                          className={`flex items-center gap-2 ${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text700} ${storeColors.textDark} border ${storeColors.border} ${storeColors.borderDark30} px-4 py-2.5 rounded-full transition-all hover:${storeColors.bg100} dark:hover:${storeColors.bgDark40} w-full`}
                         >
                           <HardDrive size={14} />
                           <span className="text-xs font-black uppercase tracking-tight truncate">{os.equipment.type}</span>
@@ -1261,13 +1301,13 @@ export const ServiceOrderDetail: React.FC = () => {
 
             <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
                <button onClick={() => setExpandedClient(!expandedClient)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                 <div className="flex items-center gap-3"><Building2 size={18} className="text-blue-500" /><div className="text-left"><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Cliente & Contactos</h3>{!expandedClient && os?.client && <p className="text-[11px] font-bold text-blue-600 uppercase tracking-tight mt-0.5">{os.client.name}</p>}</div></div>
+                 <div className="flex items-center gap-3"><Building2 size={18} className={storeColors.text500} /><div className="text-left"><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Cliente & Contactos</h3>{!expandedClient && os?.client && <p className={`text-[11px] font-bold ${storeColors.text} uppercase tracking-tight mt-0.5`}>{os.client.name}</p>}</div></div>
                  {expandedClient ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
                </button>
                {expandedClient && (
                  <div className="px-6 pb-6 space-y-3 animate-in slide-in-from-top-2 duration-200">
-                    <button onClick={() => navigate(`/clients/${os?.client_id}`)} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 px-4 py-2.5 rounded-full transition-all hover:bg-blue-100 dark:hover:bg-blue-900/40 w-full"><User size={14} /><span className="text-xs font-black uppercase tracking-tight truncate">{os?.client?.name}</span></button>
-                    <a href={getMapLink(os?.client?.address || '')} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-800 px-4 py-2.5 rounded-full transition-all hover:border-blue-200 dark:hover:border-blue-700 w-full"><MapPin size={14} className="text-slate-400" /><span className="text-[10px] font-black uppercase tracking-tight truncate">{os?.client?.address}</span></a>
+                    <button onClick={() => navigate(`/clients/${os?.client_id}`)} className={`flex items-center gap-2 ${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text700} ${storeColors.textDark} border ${storeColors.border} ${storeColors.borderDark30} px-4 py-2.5 rounded-full transition-all hover:${storeColors.bg100} dark:hover:${storeColors.bgDark40} w-full`}><User size={14} /><span className="text-xs font-black uppercase tracking-tight truncate">{os?.client?.name}</span></button>
+                    <a href={getMapLink(os?.client?.address || '')} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-800 px-4 py-2.5 rounded-full transition-all hover:${storeColors.border200} dark:hover:border-${storeColors.accent}-700 w-full`}><MapPin size={14} className="text-slate-400" /><span className="text-[10px] font-black uppercase tracking-tight truncate">{os?.client?.address}</span></a>
                     <a href={`tel:${os?.client?.phone}`} className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30 px-4 py-2.5 rounded-full transition-all hover:bg-emerald-100 dark:hover:bg-emerald-900/40 w-full"><Phone size={14} /><span className="text-xs font-black uppercase tracking-tight">{os?.client?.phone}</span></a>
                  </div>
                )}
@@ -1276,13 +1316,13 @@ export const ServiceOrderDetail: React.FC = () => {
             <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
                <button onClick={() => setExpandedPlanning(!expandedPlanning)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                  <div className="flex items-center gap-3">
-                   <Calendar size={18} className="text-blue-500" />
+                   <Calendar size={18} className={storeColors.text500} />
                    <div className="text-left">
                      <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Agendamento e Contacto</h3>
                      {!expandedPlanning && (
                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-0.5">
                          {(scheduledDate || scheduledTime) && (
-                           <p className="text-[11px] font-bold text-blue-600 uppercase tracking-tight">
+                           <p className={`text-[11px] font-bold ${storeColors.text} uppercase tracking-tight`}>
                              {scheduledDate ? new Date(scheduledDate).toLocaleDateString() : ''} {scheduledTime ? ` às ${scheduledTime}` : ''}
                            </p>
                          )}
@@ -1302,11 +1342,11 @@ export const ServiceOrderDetail: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                        <div>
                          <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Data Agendada</label>
-                         <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                         <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className={`w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 ${storeColors.ring} transition-all`} />
                        </div>
                        <div>
                          <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Hora Agendada</label>
-                         <input type="time" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                         <input type="time" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className={`w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 ${storeColors.ring} transition-all`} />
                        </div>
                     </div>
 
@@ -1334,7 +1374,7 @@ export const ServiceOrderDetail: React.FC = () => {
                               value={contactName} 
                               onChange={e => setContactName(e.target.value.toUpperCase())}
                               disabled={os?.status === OSStatus.CONCLUIDA}
-                              className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                              className={`w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 ${storeColors.ring} transition-all`}
                               placeholder="NOME DO CONTACTO"
                             />
                           </div>
@@ -1345,7 +1385,7 @@ export const ServiceOrderDetail: React.FC = () => {
                               value={contactPhone} 
                               onChange={e => setContactPhone(e.target.value)}
                               disabled={os?.status === OSStatus.CONCLUIDA}
-                              className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                              className={`w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 ${storeColors.ring} transition-all`}
                               placeholder="912 345 678"
                             />
                           </div>
@@ -1364,13 +1404,13 @@ export const ServiceOrderDetail: React.FC = () => {
                        <div className="absolute left-0 top-2 bottom-2 w-px bg-slate-100 dark:border-slate-800"></div>
                        {activities.length === 0 ? <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic py-4 text-center">Sem registos.</p> : activities.map((act) => (
                            <div key={act.id} className="relative pl-6">
-                              <div className="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-blue-500 border-2 border-white dark:border-slate-900 shadow-sm"></div>
+                              <div className={`absolute left-[-4px] top-1.5 w-2 h-2 rounded-full ${storeColors.bg} border-2 border-white dark:border-slate-900 shadow-sm`}></div>
                               <div className="flex justify-between items-start"><p className="text-[10px] font-black text-slate-900 dark:text-slate-200 uppercase">{act.user_name}</p><span className="text-[8px] font-black text-slate-300 dark:text-slate-500 uppercase tracking-tighter ml-4">{new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
                               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-tight mt-1 leading-relaxed">{act.description}</p>
                               {(act.client_name || act.equipment_type) && (
                                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                                   {act.client_name && (
-                                    <span className="text-[7px] font-black text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-blue-100 dark:border-blue-900/30">
+                                    <span className={`text-[7px] font-black ${storeColors.text} ${storeColors.bg50} ${storeColors.bgDark20} px-1.5 py-0.5 rounded uppercase tracking-tighter border ${storeColors.border} ${storeColors.borderDark30}`}>
                                       {act.client_name}
                                     </span>
                                   )}
@@ -1393,18 +1433,18 @@ export const ServiceOrderDetail: React.FC = () => {
         {activeTab === 'notas' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm min-h-[400px] flex flex-col transition-colors">
-                <div className="flex items-center gap-3 mb-6"><MessageSquare size={18} className="text-blue-500" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Notas Internas</h3></div>
+                <div className="flex items-center gap-3 mb-6"><MessageSquare size={18} className={storeColors.text500} /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Notas Internas</h3></div>
                 <div className="flex-1 space-y-4 overflow-y-auto max-h-[500px] no-scrollbar mb-6">
                    {notesList.length === 0 ? <div className="h-full flex flex-col items-center justify-center opacity-30 py-20 text-slate-400"><MessageSquare size={32} className="mb-2" /><p className="text-[10px] font-black uppercase tracking-widest">Sem mensagens.</p></div> : notesList.map((note) => (
                        <div key={note.id} className={`flex flex-col ${note.user_id === 'current' || note.user_name === mockData.getSession()?.full_name ? 'items-end' : 'items-start'}`}>
-                          <div className={`max-w-[85%] p-4 rounded-3xl text-sm font-medium ${note.user_id === 'current' || note.user_name === mockData.getSession()?.full_name ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-tl-none'}`}><p className="leading-relaxed">{note.content}</p></div>
+                          <div className={`max-w-[85%] p-4 rounded-3xl text-sm font-medium ${note.user_id === 'current' || note.user_name === mockData.getSession()?.full_name ? `${storeColors.bg} text-white rounded-tr-none` : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-tl-none'}`}><p className="leading-relaxed">{note.content}</p></div>
                           <div className="flex items-center gap-2 mt-1.5 px-2 text-[8px] font-black text-slate-400 uppercase"><span>{note.user_name}</span><span className="text-[7px] text-slate-300 dark:text-slate-600">•</span><span>{new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
                        </div>
                     ))}
                 </div>
                 <div className="relative">
-                   <textarea value={newNoteContent} onChange={e => setNewNoteContent(e.target.value)} placeholder="ESCREVA UMA NOTA..." className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-3xl pl-5 pr-14 py-4 text-sm font-medium text-slate-800 dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all resize-none h-20" />
-                   <button onClick={async () => { await mockData.addOSNote(id!, { content: newNoteContent }); setNewNoteContent(''); fetchOSDetails(false); }} disabled={!newNoteContent.trim() || actionLoading} className="absolute right-3 bottom-3 p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 active:scale-90 transition-all disabled:opacity-30"><Send size={18} /></button>
+                   <textarea value={newNoteContent} onChange={e => setNewNoteContent(e.target.value)} placeholder="ESCREVA UMA NOTA..." className={`w-full bg-slate-50 dark:bg-slate-950 border-none rounded-3xl pl-5 pr-14 py-4 text-sm font-medium text-slate-800 dark:text-white outline-none focus:ring-4 ${storeColors.ring} transition-all resize-none h-20`} />
+                   <button onClick={async () => { await mockData.addOSNote(id!, { content: newNoteContent }); setNewNoteContent(''); fetchOSDetails(false); }} disabled={!newNoteContent.trim() || actionLoading} className={`absolute right-3 bottom-3 p-3 ${storeColors.bg} text-white rounded-full shadow-lg ${storeColors.bgHover} active:scale-90 transition-all disabled:opacity-30`}><Send size={18} /></button>
                 </div>
              </div>
           </div>
@@ -1428,21 +1468,21 @@ export const ServiceOrderDetail: React.FC = () => {
                              description: os?.description
                            } 
                          })} 
-                         className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 transition-all"
+                         className={`flex items-center gap-2 ${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text} ${storeColors.textDark} px-4 py-2 rounded-xl text-[10px] font-black uppercase ${storeColors.bgHover} transition-all`}
                        >
                          <Calculator size={14} /> Orçamento
                        </button>
                     )}
-                    <button onClick={() => { setShowPartModal(true); setIsCreatingNewPart(false); setPartQuantityStr("1"); }} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 active:scale-95 disabled:opacity-50"><Plus size={14} /> ADICIONAR</button>
+                    <button onClick={() => { setShowPartModal(true); setIsCreatingNewPart(false); setPartQuantityStr("1"); }} disabled={os?.status === OSStatus.CONCLUIDA} className={`flex items-center gap-2 ${storeColors.bg} text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase ${storeColors.bgHover} active:scale-95 disabled:opacity-50`}><Plus size={14} /> ADICIONAR</button>
                   </div>
                </div>
                <div className="space-y-2">
                   {partsUsed.length === 0 ? <div className="text-center py-10 opacity-20"><Package size={32} className="mx-auto mb-2" /><p className="text-[10px] font-black uppercase tracking-widest">Nenhum material registado</p></div> : partsUsed.map((part) => (
-                    <div key={part.id} className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center gap-3 transition-all hover:border-blue-100 dark:hover:border-blue-900/30 group">
-                       <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:text-blue-500 group-hover:text-white transition-all"><Package size={14} /></div>
+                    <div key={part.id} className={`p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center gap-3 transition-all hover:${storeColors.border100} dark:hover:${storeColors.borderDark30} group`}>
+                       <div className={`w-8 h-8 rounded-lg bg-white dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:${storeColors.text500} group-hover:text-white transition-all`}><Package size={14} /></div>
                        <div className="flex-1 min-w-0">
                           <p className="text-sm font-black text-slate-900 dark:text-white uppercase leading-tight truncate">{part.name}</p>
-                          <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mt-0.5">REF: {part.reference} • <span className="text-blue-600 dark:text-blue-400 font-black">{part.quantity.toLocaleString('pt-PT', { maximumFractionDigits: 3 })} UN</span> {part.unit_price ? `• ${part.unit_price.toFixed(2)}€/un` : ''}</p>
+                          <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mt-0.5">REF: {part.reference} • <span className={`${storeColors.text} ${storeColors.textDark} font-black`}>{part.quantity.toLocaleString('pt-PT', { maximumFractionDigits: 3 })} UN</span> {part.unit_price ? `• ${part.unit_price.toFixed(2)}€/un` : ''}</p>
                        </div>
                        <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-200/60 dark:border-slate-700 shadow-sm flex-shrink-0">
                           <button onClick={() => { 
@@ -1450,7 +1490,7 @@ export const ServiceOrderDetail: React.FC = () => {
                             setTempQuantityStr(part.quantity.toString().replace('.', ',')); 
                             setTempPriceStr((part.unit_price || 0).toString().replace('.', ','));
                             setShowEditQuantityModal(true); 
-                          }} disabled={os?.status === OSStatus.CONCLUIDA} className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"><Edit2 size={14} /></button>
+                          }} disabled={os?.status === OSStatus.CONCLUIDA} className={`p-1.5 text-slate-400 hover:${storeColors.text500} transition-colors`}><Edit2 size={14} /></button>
                           <div className="w-px h-3 bg-slate-100 dark:bg-slate-700"></div>
                           <button onClick={() => { setPartToDelete(part); setShowDeletePartModal(true); }} disabled={os?.status === OSStatus.CONCLUIDA} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
                        </div>
@@ -1467,25 +1507,25 @@ export const ServiceOrderDetail: React.FC = () => {
                 <div className="flex items-center justify-between mb-6"><div className="flex items-center gap-3"><ImageIcon size={18} className="text-slate-400" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Evidências Fotográficas</h3></div></div>
                 <div className="grid grid-cols-2 gap-3 mb-8">
                    {['antes', 'depois', 'peca', 'geral'].map((type) => (
-                     <div 
+                      <div 
                         key={type} 
                         onClick={() => openSourceSelector(type as any)}
                         onDragOver={handleDrag}
                         onDragEnter={(e) => handleDragIn(e, type)}
                         onDragLeave={(e) => handleDragOut}
                         onDrop={(e) => handleDrop(e, type as any)}
-                        className={`flex flex-col items-center justify-center py-6 bg-slate-50 dark:bg-slate-950 border-2 border-dashed rounded-3xl cursor-pointer transition-all group relative overflow-hidden ${dragActiveType === type ? 'border-blue-500 bg-blue-50/50 scale-[1.02] ring-4 ring-blue-500/10' : 'border-slate-200 dark:border-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:border-blue-200'}`}
+                        className={`flex flex-col items-center justify-center py-6 bg-slate-50 dark:bg-slate-950 border-2 border-dashed rounded-3xl cursor-pointer transition-all group relative overflow-hidden ${dragActiveType === type ? `${storeColors.border500} ${storeColors.bg50}/50 scale-[1.02] ring-4 ${storeColors.ring}` : `border-slate-200 dark:border-slate-800 hover:${storeColors.bg50} dark:hover:${storeColors.bgDark10} hover:${storeColors.border200}`}`}
                      >
                         {dragActiveType === type && (
-                          <div className="absolute inset-0 bg-blue-600/10 backdrop-blur-[2px] flex items-center justify-center z-10 pointer-events-none">
+                          <div className={`absolute inset-0 ${storeColors.bgDark10} backdrop-blur-[2px] flex items-center justify-center z-10 pointer-events-none`}>
                             <div className="flex flex-col items-center gap-2 animate-bounce">
-                              <UploadCloud size={32} className="text-blue-600" />
-                              <span className="text-[10px] font-black text-blue-600 uppercase">Solte para Carregar</span>
+                              <UploadCloud size={32} className={storeColors.text} />
+                              <span className={`text-[10px] font-black ${storeColors.text} uppercase`}>Solte para Carregar</span>
                             </div>
                           </div>
                         )}
-                        <Camera size={24} className={`mb-2 transition-colors ${dragActiveType === type ? 'text-blue-600' : 'text-slate-300 group-hover:text-blue-500'}`} />
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${dragActiveType === type ? 'text-blue-600' : 'text-slate-400'}`}>{type.toUpperCase()}</span>
+                        <Camera size={24} className={`mb-2 transition-colors ${dragActiveType === type ? storeColors.text : `text-slate-300 group-hover:${storeColors.text500}`}`} />
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${dragActiveType === type ? storeColors.text : 'text-slate-400'}`}>{type.toUpperCase()}</span>
                      </div>
                    ))}
                 </div>
@@ -1497,7 +1537,7 @@ export const ServiceOrderDetail: React.FC = () => {
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                              {categoryPhotos.map(photo => (
                                <div key={photo.id} className="relative aspect-square group animate-in zoom-in-95 duration-200">
-                                  <img src={photo.url} onClick={() => setSelectedPhotoForView(photo)} className="w-full h-full object-cover rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 group-hover:ring-4 group-hover:ring-blue-100 cursor-zoom-in transition-all" alt="Evidência" />
+                                  <img src={photo.url} onClick={() => setSelectedPhotoForView(photo)} className={`w-full h-full object-cover rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 group-hover:ring-4 ${storeColors.ring100} cursor-zoom-in transition-all`} alt="Evidência" />
                                   <button onClick={(e) => { e.stopPropagation(); setPhotoToDelete(photo); setShowDeletePhotoModal(true); }} className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full shadow-lg z-10"><Trash2 size={12} /></button>
                                </div>
                              ))}
@@ -1521,17 +1561,17 @@ export const ServiceOrderDetail: React.FC = () => {
                    </div>
                    <button type="button" onClick={handleResetAnomaly} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors p-2" title="Limpar"><RotateCcw size={12} /> <span className="text-[9px] font-black uppercase">LIMPAR</span></button>
                 </div>
-                <input type="text" placeholder="..." className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-xs font-black uppercase dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" value={anomaly} onChange={e => setAnomaly(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} />
+                <input type="text" placeholder="..." className={`w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-xs font-black uppercase dark:text-white outline-none focus:ring-4 ${storeColors.ring} transition-all`} value={anomaly} onChange={e => setAnomaly(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} />
              </div>
              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 transition-colors">
                 <div className="flex items-center justify-between mb-6">
-                   <div className="flex items-center gap-3 text-blue-500"><Sparkles size={18} /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Resumo da Intervenção (IA)</h3></div>
+                   <div className={`flex items-center gap-3 ${storeColors.text500}`}><Sparkles size={18} /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Resumo da Intervenção (IA)</h3></div>
                    <div className="flex items-center gap-2">
                      <button type="button" onClick={handleResetResolution} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors p-2"><RotateCcw size={12} /> <span className="text-[9px] font-black uppercase">LIMPAR</span></button>
-                     <button type="button" onClick={handleGenerateAISummary} disabled={isGenerating || os?.status === OSStatus.CONCLUIDA} className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-[9px] font-black uppercase hover:bg-blue-100 transition-all disabled:opacity-50">{isGenerating ? <RefreshCw size={12} className="animate-spin" /> : <Sparkle size={12} />} GERAR IA</button>
+                     <button type="button" onClick={handleGenerateAISummary} disabled={isGenerating || os?.status === OSStatus.CONCLUIDA} className={`${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text} ${storeColors.textDark} px-4 py-2 rounded-xl text-[9px] font-black uppercase ${storeColors.bgHover} transition-all disabled:opacity-50`}>{isGenerating ? <RefreshCw size={12} className="animate-spin" /> : <Sparkle size={12} />} GERAR IA</button>
                    </div>
                 </div>
-                <textarea className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-[2rem] px-6 py-5 text-sm text-slate-800 dark:text-slate-200 leading-relaxed outline-none focus:ring-4 focus:ring-blue-500/10 transition-all min-h-[160px] resize-none" value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} placeholder="..." />
+                <textarea className={`w-full bg-slate-50 dark:bg-slate-900 border-none rounded-[2rem] px-6 py-5 text-sm text-slate-800 dark:text-slate-200 leading-relaxed outline-none focus:ring-4 ${storeColors.ring} transition-all min-h-[160px] resize-none`} value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} placeholder="..." />
              </div>
              <div className="space-y-4">
                <div className="flex items-center justify-between px-2"><h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Validação de Trabalho</h3></div>
@@ -1540,14 +1580,14 @@ export const ServiceOrderDetail: React.FC = () => {
                  <SignatureCanvas label="Assinatura Técnico" onSave={setTechnicianSignature} onClear={() => setTechnicianSignature(null)} initialValue={technicianSignature} readOnly={os?.status === OSStatus.CONCLUIDA} error={showValidationErrors && !technicianSignature} />
                </div>
              </div>
-             <div className="pt-6"><button onClick={async () => { if (missingFields.length > 0) { setShowValidationErrors(true); setShowValidationErrorModal(true); return; } setShowFinalizeModal(true); }} disabled={os?.status === OSStatus.CONCLUIDA || actionLoading} className="w-full py-5 bg-blue-600 text-white rounded-[2rem] text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 disabled:opacity-50">CONCLUIR ORDEM DE SERVIÇO</button></div>
+             <div className="pt-6"><button onClick={async () => { if (missingFields.length > 0) { setShowValidationErrors(true); setShowValidationErrorModal(true); return; } setShowFinalizeModal(true); }} disabled={os?.status === OSStatus.CONCLUIDA || actionLoading} className={`w-full py-5 ${storeColors.bg} text-white rounded-[2rem] text-sm font-black uppercase tracking-[0.2em] shadow-xl ${storeColors.bgHover} active:scale-95 disabled:opacity-50`}>CONCLUIR ORDEM DE SERVIÇO</button></div>
           </div>
         )}
       </div>
 
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-[#9d1c24] dark:border-[#9d1c24]/60 shadow-[0_12px_40px_rgba(157,28,36,0.25)] rounded-full p-1.5 flex items-center justify-around transition-all animate-in slide-in-from-bottom-10 duration-500">
         {[ { id: 'info', icon: Info, label: 'INFO' }, { id: 'notas', icon: MessageSquare, label: 'NOTAS' }, { id: 'tecnico', icon: Package, label: 'MATERIAL' }, { id: 'fotos', icon: ImageIcon, label: 'FOTOS' }, { id: 'finalizar', icon: CheckCircle, label: 'FECHO' } ].map((tab) => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)} className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-full transition-all gap-1 ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>
+          <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)} className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-full transition-all gap-1 ${activeTab === tab.id ? `${storeColors.bg} text-white shadow-lg` : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>
             <tab.icon size={18} /><span className="text-[7px] font-black uppercase tracking-widest">{tab.label}</span>
           </button>
         ))}
@@ -1561,7 +1601,7 @@ export const ServiceOrderDetail: React.FC = () => {
                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Dados em Falta</h3>
                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-6 uppercase">Preencha os seguintes campos para concluir:</p>
                  <div className="space-y-2 mb-8">{missingFields.map((field, idx) => (<div key={idx} className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 p-3 rounded-xl text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest">{field}</div>))}</div>
-                 <button onClick={() => setShowValidationErrorModal(false)} className="w-full py-4 bg-slate-900 dark:bg-blue-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all">ENTENDIDO, VOU PREENCHER</button>
+                 <button onClick={() => setShowValidationErrorModal(false)} className={`w-full py-4 bg-slate-900 ${storeColors.bgDark20} text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all`}>ENTENDIDO, VOU PREENCHER</button>
               </div>
            </div>
         </div>
@@ -1572,7 +1612,7 @@ export const ServiceOrderDetail: React.FC = () => {
            <div className="w-full max-w-5xl mx-auto flex-1 flex flex-col bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden border border-white/10">
               <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
                  <div className="flex items-center gap-3">
-                   <Printer size={20} className="text-blue-600" />
+                   <Printer size={20} className={storeColors.text} />
                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Etiqueta Técnica Gerada</h3>
                  </div>
                  <button onClick={() => { setShowTagPreview(false); setTagPdfUrl(null); }} className="text-gray-400 hover:text-red-500 p-2 transition-colors"><X size={28}/></button>
@@ -1581,7 +1621,7 @@ export const ServiceOrderDetail: React.FC = () => {
                  <iframe id="tag-preview-iframe" src={tagPdfUrl} className="w-full h-full rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 bg-white" title="PDF Preview" />
               </div>
               <div className="p-8 border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900">
-                 <button onClick={handlePrintTag} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] text-sm font-black uppercase tracking-[0.25em] shadow-2xl hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-3"><Printer size={24} /> ABRIR PARA IMPRESSÃO</button>
+                 <button onClick={handlePrintTag} className={`w-full ${storeColors.bg} text-white py-5 rounded-[2rem] text-sm font-black uppercase tracking-[0.25em] shadow-2xl ${storeColors.bgHover} active:scale-95 transition-all flex items-center justify-center gap-3`}><Printer size={24} /> ABRIR PARA IMPRESSÃO</button>
               </div>
            </div>
         </div>
@@ -1591,20 +1631,20 @@ export const ServiceOrderDetail: React.FC = () => {
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-white/10">
               <div className="p-10 text-center">
-                 <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner"><Clock size={40} /></div>
+                 <div className={`w-20 h-20 ${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text} ${storeColors.textDark} rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner`}><Clock size={40} /></div>
                  <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-3">Registar Tempo</h3>
                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-10 uppercase tracking-widest">Selecione o tipo de intervenção efetuada para contabilização:</p>
                  <div className="grid grid-cols-1 gap-4">
-                    <button onClick={() => handleConfirmTimerRegistration('GERAL')} className="group flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 hover:bg-blue-600 hover:text-white rounded-[2rem] transition-all active:scale-95 border border-transparent hover:shadow-xl hover:shadow-blue-600/20">
+                    <button onClick={() => handleConfirmTimerRegistration('GERAL')} className={`group flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 hover:${storeColors.bg} hover:text-white rounded-[2rem] transition-all active:scale-95 border border-transparent hover:shadow-xl ${storeColors.shadow}`}>
                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 text-blue-600 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white"><Wrench size={20} /></div>
+                          <div className={`w-10 h-10 rounded-xl bg-white dark:bg-slate-900 ${storeColors.text} flex items-center justify-center group-hover:${storeColors.bg} group-hover:text-white`}><Wrench size={20} /></div>
                           <span className="text-sm font-black uppercase tracking-tight">Mão de Obra Geral</span>
                        </div>
                        <ChevronRight size={18} className="opacity-30 group-hover:opacity-100" />
                     </button>
                     <button onClick={() => handleConfirmTimerRegistration('FRIO')} className="group flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 hover:bg-emerald-600 hover:text-white rounded-[2rem] transition-all active:scale-95 border border-transparent hover:shadow-xl hover:shadow-emerald-600/20">
                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 text-emerald-600 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white"><Snowflake size={20} /></div>
+                          <div className={`w-10 h-10 rounded-xl bg-white dark:bg-slate-900 text-emerald-600 flex items-center justify-center group-hover:${storeColors.bg} group-hover:text-white`}><Snowflake size={20} /></div>
                           <span className="text-sm font-black uppercase tracking-tight">Mão de Obra Frio</span>
                        </div>
                        <ChevronRight size={18} className="opacity-30 group-hover:opacity-100" />
@@ -1629,12 +1669,12 @@ export const ServiceOrderDetail: React.FC = () => {
                 <div className="space-y-4">
                   <div className="relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input type="text" placeholder="Pesquisar no catálogo..." className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase" value={partSearchTerm} onChange={(e) => setPartSearchTerm(e.target.value)} />
+                    <input type="text" placeholder="Pesquisar no catálogo..." className={`w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 ${storeColors.ring} outline-none transition-all uppercase`} value={partSearchTerm} onChange={(e) => setPartSearchTerm(e.target.value)} />
                   </div>
                   <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
-                    {filteredCatalog.length === 0 ? ( <div className="text-center py-10 opacity-30"> <p className="text-[10px] font-black uppercase">Nenhum artigo encontrado</p> </div> ) : ( filteredCatalog.map(item => ( <button key={item.id} onClick={() => setSelectedPartId(item.id)} className={`w-full text-left p-4 rounded-2xl border transition-all flex justify-between items-center ${selectedPartId === item.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'}`}> <div className="min-w-0 flex-1"> <p className={`text-xs font-black uppercase truncate ${selectedPartId === item.id ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{item.name}</p> <p className={`text-[9px] font-bold uppercase tracking-widest ${selectedPartId === item.id ? 'text-blue-100' : 'text-slate-400'}`}>REF: {item.reference}</p> </div> {selectedPartId === item.id && <Check size={18} />} </button> )) )}
+                    {filteredCatalog.length === 0 ? ( <div className="text-center py-10 opacity-30"> <p className="text-[10px] font-black uppercase">Nenhum artigo encontrado</p> </div> ) : ( filteredCatalog.map(item => ( <button key={item.id} onClick={() => setSelectedPartId(item.id)} className={`w-full text-left p-4 rounded-2xl border transition-all flex justify-between items-center ${selectedPartId === item.id ? `${storeColors.bg} text-white ${storeColors.border500} shadow-lg` : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'}`}> <div className="min-w-0 flex-1"> <p className={`text-xs font-black uppercase truncate ${selectedPartId === item.id ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{item.name}</p> <p className={`text-[9px] font-bold uppercase tracking-widest ${selectedPartId === item.id ? `${storeColors.bg100}` : 'text-slate-400'}`}>REF: {item.reference}</p> </div> {selectedPartId === item.id && <Check size={18} />} </button> )) )}
                   </div>
-                  <button onClick={() => setIsCreatingNewPart(true)} className="w-full py-4 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest hover:underline text-center"> + Criar Artigo Fora do Catálogo </button>
+                  <button onClick={() => setIsCreatingNewPart(true)} className={`w-full py-4 ${storeColors.text} ${storeColors.textDark} text-[10px] font-black uppercase tracking-widest hover:underline text-center`}> + Criar Artigo Fora do Catálogo </button>
                 </div>
               ) : (
                 <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
@@ -1648,17 +1688,17 @@ export const ServiceOrderDetail: React.FC = () => {
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Quantidade</label>
                   <div className="flex items-center gap-2">
-                    <input type="text" inputMode="decimal" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-lg font-black dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 text-center" value={partQuantityStr} onChange={(e) => setPartQuantityStr(e.target.value)} />
+                    <input type="text" inputMode="decimal" className={`w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-lg font-black dark:text-white outline-none focus:ring-4 ${storeColors.ring} text-center`} value={partQuantityStr} onChange={(e) => setPartQuantityStr(e.target.value)} />
                   </div>
                 </div>
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Preço Unitário (€)</label>
                   <div className="flex items-center gap-2">
-                    <input type="text" inputMode="decimal" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-lg font-black dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 text-center" value={partPriceStr} onChange={(e) => setPartPriceStr(e.target.value)} />
+                    <input type="text" inputMode="decimal" className={`w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-lg font-black dark:text-white outline-none focus:ring-4 ${storeColors.ring} text-center`} value={partPriceStr} onChange={(e) => setPartPriceStr(e.target.value)} />
                   </div>
                 </div>
               </div>
-              <button onClick={isCreatingNewPart ? handleCreateAndAddPart : handleAddPart} disabled={actionLoading || (!selectedPartId && !newPartForm.name)} className="w-full bg-blue-600 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50">{actionLoading ? <RefreshCw className="animate-spin mx-auto" /> : 'CONFIRMAR ADIÇÃO'}</button>
+              <button onClick={isCreatingNewPart ? handleCreateAndAddPart : handleAddPart} disabled={actionLoading || (!selectedPartId && !newPartForm.name)} className={`w-full ${storeColors.bg} text-white py-5 rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-xl ${storeColors.bgHover} active:scale-95 transition-all disabled:opacity-50`}>{actionLoading ? <RefreshCw className="animate-spin mx-auto" /> : 'CONFIRMAR ADIÇÃO'}</button>
             </div>
           </div>
         </div>
@@ -1680,14 +1720,14 @@ export const ServiceOrderDetail: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                    <div>
                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 text-center">Quantidade</label>
-                      <input autoFocus type="text" inputMode="decimal" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-2xl font-black text-blue-600 dark:text-blue-400 outline-none focus:ring-4 focus:ring-blue-500/10 text-center" value={tempQuantityStr} onChange={(e) => setTempQuantityStr(e.target.value)} />
+                      <input autoFocus type="text" inputMode="decimal" className={`w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-2xl font-black ${storeColors.text} ${storeColors.textDark} outline-none focus:ring-4 ${storeColors.ring} text-center`} value={tempQuantityStr} onChange={(e) => setTempQuantityStr(e.target.value)} />
                    </div>
                    <div>
                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 text-center">Preço (€)</label>
-                      <input type="text" inputMode="decimal" className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-2xl font-black text-blue-600 dark:text-blue-400 outline-none focus:ring-4 focus:ring-blue-500/10 text-center" value={tempPriceStr} onChange={(e) => setTempPriceStr(e.target.value)} />
+                      <input type="text" inputMode="decimal" className={`w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-2xl font-black ${storeColors.text} ${storeColors.textDark} outline-none focus:ring-4 ${storeColors.ring} text-center`} value={tempPriceStr} onChange={(e) => setTempPriceStr(e.target.value)} />
                    </div>
                 </div>
-                <button onClick={() => handleUpdatePartQuantity(partToEditQuantity.id, tempQuantityStr, tempPriceStr)} disabled={actionLoading} className="w-full bg-blue-600 text-white py-5 rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 active:scale-95 transition-all">{actionLoading ? <RefreshCw className="animate-spin mx-auto" /> : 'GUARDAR ALTERAÇÃO'}</button>
+                <button onClick={() => handleUpdatePartQuantity(partToEditQuantity.id, tempQuantityStr, tempPriceStr)} disabled={actionLoading} className={`w-full ${storeColors.bg} text-white py-5 rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-xl ${storeColors.bgHover} active:scale-95 transition-all`}>{actionLoading ? <RefreshCw className="animate-spin mx-auto" /> : 'GUARDAR ALTERAÇÃO'}</button>
              </div>
           </div>
         </div>
@@ -1793,11 +1833,11 @@ export const ServiceOrderDetail: React.FC = () => {
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
               <div className="p-8 text-center">
-                 <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><RotateCw size={32}/></div>
+                 <div className={`w-16 h-16 ${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text} ${storeColors.textDark} rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner`}><RotateCw size={32}/></div>
                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Reabrir OS</h3>
                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 uppercase">Selecione o novo estado para a OS reaberta:</p>
                  <div className="space-y-2">
-                    <button onClick={() => handleSelectReopenStatus(OSStatus.INICIADA)} className="w-full py-4 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-100 transition-all">MARCAR COMO INICIADA</button>
+                    <button onClick={() => handleSelectReopenStatus(OSStatus.INICIADA)} className={`w-full py-4 ${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text} ${storeColors.textDark} rounded-2xl font-black text-[10px] uppercase tracking-widest ${storeColors.bgHover} transition-all`}>MARCAR COMO INICIADA</button>
                     <button onClick={() => handleSelectReopenStatus(OSStatus.AGUARDA_PECAS)} className="w-full py-4 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-orange-100 transition-all">AGUARDA PEÇAS</button>
                     <button onClick={() => handleSelectReopenStatus(OSStatus.PARA_ORCAMENTO)} className="w-full py-4 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-yellow-100 transition-all">PARA ORÇAMENTO</button>
                     <button onClick={() => setShowReopenModal(false)} className="w-full py-4 mt-4 text-slate-400 font-black text-[9px] uppercase tracking-widest">CANCELAR</button>
@@ -1809,7 +1849,7 @@ export const ServiceOrderDetail: React.FC = () => {
       
       {selectedPhotoForView && (
         <div className="fixed inset-0 z-[300] bg-slate-950 flex flex-col animate-in fade-in duration-300">
-           <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 z-[310] bg-gradient-to-b from-black/80 to-transparent"><span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em]">{selectedPhotoForView.type}</span><button onClick={() => setSelectedPhotoForView(null)} className="p-4 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all active:scale-90 backdrop-blur-lg"><X size={24} /></button></div>
+           <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 z-[310] bg-gradient-to-b from-black/80 to-transparent"><span className={`text-[10px] font-black ${storeColors.text400} uppercase tracking-[0.3em]`}>{selectedPhotoForView.type}</span><button onClick={() => setSelectedPhotoForView(null)} className="p-4 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all active:scale-90 backdrop-blur-lg"><X size={24} /></button></div>
            <div className="flex-1 w-full h-full"><ZoomableImage src={selectedPhotoForView.url} alt="Evidência" /></div>
         </div>
       )}
