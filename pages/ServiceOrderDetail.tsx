@@ -1478,7 +1478,7 @@ export const ServiceOrderDetail: React.FC = () => {
                </div>
                <div className="space-y-2">
                   {partsUsed.length === 0 ? <div className="text-center py-10 opacity-20"><Package size={32} className="mx-auto mb-2" /><p className="text-[10px] font-black uppercase tracking-widest">Nenhum material registado</p></div> : partsUsed.map((part) => (
-                    <div key={part.id} className={`p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center gap-3 transition-all hover:${storeColors.border100} dark:hover:${storeColors.borderDark30} group`}>
+                    <div key={part.id} className={`p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center gap-3 transition-all hover:${storeColors.border} dark:hover:${storeColors.borderDark30} group`}>
                        <div className={`w-8 h-8 rounded-lg bg-white dark:bg-slate-800 text-slate-400 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:${storeColors.text500} group-hover:text-white transition-all`}><Package size={14} /></div>
                        <div className="flex-1 min-w-0">
                           <p className="text-sm font-black text-slate-900 dark:text-white uppercase leading-tight truncate">{part.name}</p>
