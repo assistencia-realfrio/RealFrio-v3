@@ -28,7 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   // Gestão de Toasts In-App
   const [toast, setToast] = useState<{ title: string; body: string; url: string; id: string } | null>(null);
 
-  const [activities, setActivities] = useState<(OSActivity & { os_code?: string; client_name?: string })[]>([]);
+  const [activities, setActivities] = useState<(OSActivity & { os_code?: string; client_name?: string; equipment_type?: string })[]>([]);
   const [searchResults, setSearchResults] = useState<{
     os: ServiceOrder[];
     clients: Client[];
@@ -57,32 +57,60 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   useEffect(() => {
     if (!activeSessionUser) return;
 
-    const channel = supabase
-      .channel('layout-toasts')
-      .on('postgres_changes', { event: '*', table: 'os_activities', schema: 'public' }, (payload) => {
-        const newData = payload.new as any;
-        if (newData && newData.user_name !== activeSessionUser.full_name) {
-          showToast(
-            "Atividade Recente",
-            newData.description,
-            `/os/${newData.os_id}`
-          );
-        }
-      })
-      .on('postgres_changes', { event: 'INSERT', table: 'service_orders', schema: 'public' }, (payload) => {
+    let channel: any;
+
+    const setupToastChannel = () => {
+      if (channel) supabase.removeChannel(channel);
+
+      channel = supabase
+        .channel('layout-toasts')
+        .on('postgres_changes', { event: '*', table: 'os_activities', schema: 'public' }, async (payload) => {
           const newData = payload.new as any;
-          if (newData) {
+          if (newData && newData.user_name !== activeSessionUser.full_name) {
+            // Filtrar por loja se necessário
+            if (currentStore && currentStore !== 'Todas') {
+              const { data: os } = await supabase.from('service_orders').select('store').eq('id', newData.os_id).single();
+              if (os && os.store !== currentStore) return;
+            }
+
             showToast(
-              "Nova Ordem de Serviço",
-              `Registada OS ${newData.code}.`,
-              `/os/${newData.id}`
+              "Atividade Recente",
+              newData.description,
+              `/os/${newData.os_id}`
             );
           }
-      })
-      .subscribe();
+        })
+        .on('postgres_changes', { event: 'INSERT', table: 'service_orders', schema: 'public' }, (payload) => {
+            const newData = payload.new as any;
+            if (newData) {
+              // Filtrar por loja se necessário
+              if (currentStore && currentStore !== 'Todas' && newData.store !== currentStore) return;
 
-    return () => { supabase.removeChannel(channel); };
-  }, [activeSessionUser]);
+              showToast(
+                "Nova Ordem de Serviço",
+                `Registada OS ${newData.code}.`,
+                `/os/${newData.id}`
+              );
+            }
+        })
+        .subscribe();
+    };
+
+    setupToastChannel();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setupToastChannel();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => { 
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (channel) supabase.removeChannel(channel); 
+    };
+  }, [activeSessionUser, currentStore]);
 
   const showToast = (title: string, body: string, url: string) => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -161,11 +189,11 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   }, [searchTerm]);
 
   const fetchGlobalActivities = async () => {
-    const data = await mockData.getAllActivities();
+    const data = await mockData.getAllActivities(currentStore);
     setActivities(data.slice(0, 15));
   };
 
-  useEffect(() => { if (notificationsOpen) { setSearchOpen(false); setScannerOpen(false); fetchGlobalActivities(); } }, [notificationsOpen]);
+  useEffect(() => { if (notificationsOpen) { setSearchOpen(false); setScannerOpen(false); fetchGlobalActivities(); } }, [notificationsOpen, currentStore]);
   useEffect(() => { if (searchOpen) { setNotificationsOpen(false); setScannerOpen(false); setTimeout(() => searchInputRef.current?.focus(), 150); } }, [searchOpen]);
 
   useEffect(() => {
@@ -362,7 +390,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                                    <p className="text-[11px] font-bold text-slate-600 dark:text-slate-400 line-clamp-3 leading-snug mb-2 uppercase italic">{act.description}</p>
                                    <div className="flex items-center justify-between min-w-0">
                                       <span className="text-[9px] font-black text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded uppercase tracking-tighter truncate max-w-full">
-                                         {act.os_code} {act.client_name ? `• ${act.client_name}` : ''}
+                                         {act.os_code} {act.client_name ? `• ${act.client_name}` : ''} {act.equipment_type ? `• ${act.equipment_type}` : ''}
                                       </span>
                                       <ArrowRight size={10} className="text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity translate-x-0 group-hover:translate-x-1 flex-shrink-0 ml-1" />
                                    </div>

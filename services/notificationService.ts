@@ -24,23 +24,30 @@ export const notificationService = {
         url: window.location.origin + '/#' + url
       };
 
-      // Tentar via postMessage se o controlador existir (mais seguro contra bloqueios de UI)
+      // No mobile, a registration direta costuma ser mais fiável que o postMessage
+      // se a app estiver em primeiro plano.
+      if (registration && registration.showNotification) {
+        try {
+          await registration.showNotification(title, {
+            body,
+            icon: '/rf-icon-192-v5.png',
+            badge: '/rf-favicon-v5.png',
+            vibrate: [200, 100, 200],
+            tag: 'rf-msg-' + Date.now(),
+            renotify: true,
+            data: { url: window.location.origin + '/#' + url }
+          } as any);
+          console.log("[NotificationService] Enviado via registration direta.");
+          return true;
+        } catch (showErr) {
+          console.warn("[NotificationService] Falha na registration direta, tentando postMessage:", showErr);
+        }
+      }
+
+      // Fallback para postMessage
       if (navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage(payload);
         console.log("[NotificationService] Enviado via controlador.");
-        return true;
-      }
-
-      // Se não houver controlador (ex: página acabou de carregar), usar a registration direta
-      if (registration && registration.showNotification) {
-        await registration.showNotification(title, {
-          body,
-          icon: '/rf-icon-192-v5.png',
-          badge: '/rf-favicon-v5.png',
-          vibrate: [200, 100, 200],
-          data: { url: window.location.origin + '/#' + url }
-        } as any);
-        console.log("[NotificationService] Enviado via registration direta.");
         return true;
       }
     } catch (e) {

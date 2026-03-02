@@ -40,7 +40,7 @@ const AppContent: React.FC<{
   onLogout: () => void; 
   loading: boolean 
 }> = ({ user, onLogin, onLogout, loading }) => {
-  const { triggerSelectionModal } = useStore();
+  const { triggerSelectionModal, currentStore } = useStore();
   const [showPermissions, setShowPermissions] = useState(false);
 
   useEffect(() => {
@@ -100,59 +100,113 @@ const AppContent: React.FC<{
   useEffect(() => {
     if (!user) return;
 
-    // 1. Ouvir Novas OS e Mudanças de Estado
-    const osChannel = supabase
-      .channel('os-realtime-alerts')
-      .on('postgres_changes', { event: '*', table: 'service_orders', schema: 'public' }, async (payload) => {
-        const newData = payload.new as any;
-        const oldData = payload.old as any;
-        
-        if (payload.eventType === 'INSERT' && newData) {
-          notificationService.notify(
-            "🚨 NOVA ORDEM DE SERVIÇO",
-            `Nova OS ${newData.code} registada.`,
-            `/os/${newData.id}`
-          );
-        } else if (payload.eventType === 'UPDATE' && newData) {
-          // Robustez: Se oldData.status não existir (Replica Identity não está FULL), 
-          // ainda assim podemos notificar sobre qualquer alteração se a app estiver aberta.
-          const hasStatusChanged = oldData && oldData.status !== undefined ? oldData.status !== newData.status : true;
+    let osChannel: any;
+    let activityChannel: any;
+
+    const setupChannels = () => {
+      // Limpar canais existentes se houver
+      if (osChannel) supabase.removeChannel(osChannel);
+      if (activityChannel) supabase.removeChannel(activityChannel);
+
+      // 1. Ouvir Novas OS e Mudanças de Estado
+      osChannel = supabase
+        .channel('os-realtime-alerts')
+        .on('postgres_changes', { event: '*', table: 'service_orders', schema: 'public' }, async (payload) => {
+          const newData = payload.new as any;
+          const oldData = payload.old as any;
           
-          if (hasStatusChanged) {
-            const statusLabel = (newData.status as string).replace('_', ' ').toUpperCase();
+          if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && newData) {
+            // Filtrar por loja se necessário
+            if (currentStore && currentStore !== 'Todas' && newData.store !== currentStore) return;
+
+            // Buscar detalhes adicionais (Cliente e Equipamento) para a notificação
+            const { data: osDetails } = await supabase
+              .from('service_orders')
+              .select('code, client:clients(name), equipment:equipments(type)')
+              .eq('id', newData.id)
+              .single();
+
+            const clientName = (osDetails as any)?.client?.name || '---';
+            const equipType = (osDetails as any)?.equipment?.type || '---';
+            const osCode = osDetails?.code || newData.code;
+
+            if (payload.eventType === 'INSERT') {
+              notificationService.notify(
+                "🚨 NOVA ORDEM DE SERVIÇO",
+                `OS ${osCode} • ${clientName} • ${equipType}`,
+                `/os/${newData.id}`
+              );
+            } else if (payload.eventType === 'UPDATE') {
+              const hasStatusChanged = oldData && oldData.status !== undefined ? oldData.status !== newData.status : true;
+              
+              if (hasStatusChanged) {
+                const statusLabel = (newData.status as string).replace('_', ' ').toUpperCase();
+                notificationService.notify(
+                  "🔄 MUDANÇA DE ESTADO",
+                  `OS ${osCode} [${statusLabel}] • ${clientName} • ${equipType}`,
+                  `/os/${newData.id}`
+                );
+              }
+            }
+          }
+        })
+        .subscribe((status) => {
+          console.log(`[Realtime OS] Status: ${status}`);
+        });
+
+      // 2. Ouvir Atividade Técnica (Notas, Fotos, Materiais)
+      activityChannel = supabase
+        .channel('activity-realtime-alerts')
+        .on('postgres_changes', { event: 'INSERT', table: 'os_activities', schema: 'public' }, async (payload) => {
+          const newData = payload.new as any;
+          if (!newData) return;
+
+          // Não notificar o próprio utilizador sobre as suas ações
+          if (newData.user_name !== user.full_name) {
+            // Buscar detalhes da OS para contexto
+            const { data: osDetails } = await supabase
+              .from('service_orders')
+              .select('code, store, client:clients(name), equipment:equipments(type)')
+              .eq('id', newData.os_id)
+              .single();
+
+            // Filtrar por loja se necessário
+            if (currentStore && currentStore !== 'Todas' && (osDetails as any)?.store !== currentStore) return;
+
+            const clientName = (osDetails as any)?.client?.name || '---';
+            const equipType = (osDetails as any)?.equipment?.type || '---';
+            const osCode = osDetails?.code || '---';
+
             notificationService.notify(
-              "🔄 MUDANÇA DE ESTADO",
-              `OS ${newData.code} agora está: ${statusLabel}.`,
-              `/os/${newData.id}`
+              `👷 ${newData.user_name?.toUpperCase()}`,
+              `${newData.description} • OS ${osCode} • ${clientName} • ${equipType}`,
+              `/os/${newData.os_id}`
             );
           }
-        }
-      })
-      .subscribe();
+        })
+        .subscribe((status) => {
+          console.log(`[Realtime Activity] Status: ${status}`);
+        });
+    };
 
-    // 2. Ouvir Atividade Técnica (Notas, Fotos, Materiais)
-    const activityChannel = supabase
-      .channel('activity-realtime-alerts')
-      .on('postgres_changes', { event: 'INSERT', table: 'os_activities', schema: 'public' }, (payload) => {
-        const newData = payload.new as any;
-        if (!newData) return;
+    setupChannels();
 
-        // Não notificar o próprio utilizador sobre as suas ações
-        if (newData.user_name !== user.full_name) {
-          notificationService.notify(
-            "🛠️ ATUALIZAÇÃO TÉCNICA",
-            `${newData.user_name}: ${newData.description}`,
-            `/os/${newData.os_id}`
-          );
-        }
-      })
-      .subscribe();
+    // Re-conectar quando a app volta ao primeiro plano (crítico para mobile)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("[App] App visível, a reforçar canais realtime...");
+        setupChannels();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      supabase.removeChannel(osChannel);
-      supabase.removeChannel(activityChannel);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (osChannel) supabase.removeChannel(osChannel);
+      if (activityChannel) supabase.removeChannel(activityChannel);
     };
-  }, [user]);
+  }, [user, currentStore]);
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 text-gray-500 uppercase font-black text-[10px] tracking-widest">A iniciar...</div>;
 

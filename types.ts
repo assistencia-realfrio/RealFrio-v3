@@ -231,6 +231,9 @@ export interface OSActivity {
   user_name: string;
   description: string;
   created_at: string;
+  os_code?: string;
+  client_name?: string;
+  equipment_type?: string;
 }
 
 export interface Vacation {

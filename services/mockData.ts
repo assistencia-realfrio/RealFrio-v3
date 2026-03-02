@@ -423,22 +423,38 @@ export const mockData = {
   },
 
   // Utils
-  getAllActivities: async () => {
+  getAllActivities: async (store?: string) => {
+    let query = supabase
+      .from('os_activities')
+      .select('*, service_orders!inner(code, store, client:clients(name), equipment:equipments(type))')
+      .order('created_at', { ascending: false });
+    
+    if (store && store !== 'Todas') {
+      query = query.eq('service_orders.store', store);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []).map(act => ({
+      ...act,
+      os_code: (act.service_orders as any)?.service_orders?.code || (act.service_orders as any)?.code,
+      client_name: (act.service_orders as any)?.client?.name,
+      equipment_type: (act.service_orders as any)?.equipment?.type
+    }));
+  },
+  getOSActivity: async (osId: string) => {
     const { data, error } = await supabase
       .from('os_activities')
-      .select('*, service_orders(code, clients:clients(name))')
+      .select('*, service_orders(code, client:clients(name), equipment:equipments(type))')
+      .eq('os_id', osId)
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data || []).map(act => ({
       ...act,
-      os_code: (act.service_orders as any)?.code,
-      client_name: (act.service_orders as any)?.clients?.name
+      os_code: (act.service_orders as any)?.service_orders?.code || (act.service_orders as any)?.code,
+      client_name: (act.service_orders as any)?.client?.name,
+      equipment_type: (act.service_orders as any)?.equipment?.type
     }));
-  },
-  getOSActivity: async (osId: string) => {
-    const { data, error } = await supabase.from('os_activities').select('*').eq('os_id', osId).order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
   },
   addOSActivity: async (osId: string, act: Partial<OSActivity>) => {
     const session = mockData.getSession();

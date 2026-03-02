@@ -202,7 +202,6 @@ export const ServiceOrderDetail: React.FC = () => {
   const [expandedEquip, setExpandedEquip] = useState(false);
   const [expandedWarranty, setExpandedWarranty] = useState(false);
   const [expandedPlanning, setExpandedPlanning] = useState(false);
-  const [expandedCallBeforeGoing, setExpandedCallBeforeGoing] = useState(false);
   const [expandedLog, setExpandedLog] = useState(false);
 
   // Estados para Upload Seletivo
@@ -1276,71 +1275,83 @@ export const ServiceOrderDetail: React.FC = () => {
             
             <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
                <button onClick={() => setExpandedPlanning(!expandedPlanning)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                 <div className="flex items-center gap-3"><Calendar size={18} className="text-blue-500" /><div className="text-left"><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Planeamento / Agendamento</h3>{!expandedPlanning && (scheduledDate || scheduledTime) && <p className="text-[11px] font-bold text-blue-600 uppercase tracking-tight mt-0.5">{scheduledDate ? new Date(scheduledDate).toLocaleDateString() : ''} {scheduledTime ? ` às ${scheduledTime}` : ''}</p>}</div></div>
+                 <div className="flex items-center gap-3">
+                   <Calendar size={18} className="text-blue-500" />
+                   <div className="text-left">
+                     <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Agendamento e Contacto</h3>
+                     {!expandedPlanning && (
+                       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-0.5">
+                         {(scheduledDate || scheduledTime) && (
+                           <p className="text-[11px] font-bold text-blue-600 uppercase tracking-tight">
+                             {scheduledDate ? new Date(scheduledDate).toLocaleDateString() : ''} {scheduledTime ? ` às ${scheduledTime}` : ''}
+                           </p>
+                         )}
+                         {callBeforeGoing && (
+                           <p className="text-[11px] font-bold text-amber-600 uppercase tracking-tight flex items-center gap-1">
+                             <Phone size={10} /> Ligar antes
+                           </p>
+                         )}
+                       </div>
+                     )}
+                   </div>
+                 </div>
                  {expandedPlanning ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
                </button>
                {expandedPlanning && (
-                 <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-200">
+                 <div className="px-6 pb-6 space-y-6 animate-in slide-in-from-top-2 duration-200">
                     <div className="grid grid-cols-2 gap-4">
-                       <div><label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Data</label><input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" /></div>
-                       <div><label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Hora</label><input type="time" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" /></div>
-                    </div>
-                 </div>
-               )}
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
-               <button onClick={() => setExpandedCallBeforeGoing(!expandedCallBeforeGoing)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                 <div className="flex items-center gap-3">
-                   <Phone size={18} className={callBeforeGoing ? "text-amber-500" : "text-slate-400"} />
-                   <div className="text-left">
-                     <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Aviso de Contacto</h3>
-                     <p className={`text-[11px] font-bold uppercase tracking-tight mt-0.5 ${callBeforeGoing ? "text-amber-600" : "text-slate-400"}`}>
-                       {callBeforeGoing ? "Ligar antes de ir" : "Sem aviso de contacto"}
-                     </p>
-                   </div>
-                 </div>
-                 {expandedCallBeforeGoing ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
-               </button>
-               {expandedCallBeforeGoing && (
-                 <div className="px-6 pb-6 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl">
-                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ligar antes de ir ao local</span>
-                       <button 
-                         onClick={() => setCallBeforeGoing(!callBeforeGoing)}
-                         disabled={os?.status === OSStatus.CONCLUIDA}
-                         className={`w-12 h-6 rounded-full transition-all relative ${callBeforeGoing ? 'bg-amber-500' : 'bg-slate-200 dark:bg-slate-800'}`}
-                       >
-                         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${callBeforeGoing ? 'left-7' : 'left-1'}`} />
-                       </button>
+                       <div>
+                         <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Data Agendada</label>
+                         <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                       </div>
+                       <div>
+                         <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Hora Agendada</label>
+                         <input type="time" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} disabled={os?.status === OSStatus.CONCLUIDA} className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                       </div>
                     </div>
 
-                    {callBeforeGoing && (
-                      <div className="space-y-3 pt-2 animate-in zoom-in-95">
-                        <div>
-                          <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Nome do Contacto</label>
-                          <input 
-                            type="text" 
-                            value={contactName} 
-                            onChange={e => setContactName(e.target.value.toUpperCase())}
-                            disabled={os?.status === OSStatus.CONCLUIDA}
-                            className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
-                            placeholder="NOME DO CONTACTO"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Telefone / Telemóvel</label>
-                          <input 
-                            type="tel" 
-                            value={contactPhone} 
-                            onChange={e => setContactPhone(e.target.value)}
-                            disabled={os?.status === OSStatus.CONCLUIDA}
-                            className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
-                            placeholder="912 345 678"
-                          />
-                        </div>
+                    <div className="pt-2 border-t border-slate-50 dark:border-slate-800">
+                      <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl mb-4">
+                         <div className="flex items-center gap-3">
+                           <Phone size={16} className={callBeforeGoing ? "text-amber-500" : "text-slate-400"} />
+                           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ligar antes de ir ao local</span>
+                         </div>
+                         <button 
+                           onClick={() => setCallBeforeGoing(!callBeforeGoing)}
+                           disabled={os?.status === OSStatus.CONCLUIDA}
+                           className={`w-12 h-6 rounded-full transition-all relative ${callBeforeGoing ? 'bg-amber-500' : 'bg-slate-200 dark:bg-slate-800'}`}
+                         >
+                           <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${callBeforeGoing ? 'left-7' : 'left-1'}`} />
+                         </button>
                       </div>
-                    )}
+
+                      {callBeforeGoing && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in zoom-in-95">
+                          <div>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Nome do Contacto</label>
+                            <input 
+                              type="text" 
+                              value={contactName} 
+                              onChange={e => setContactName(e.target.value.toUpperCase())}
+                              disabled={os?.status === OSStatus.CONCLUIDA}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                              placeholder="NOME DO CONTACTO"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1 tracking-widest">Telefone / Telemóvel</label>
+                            <input 
+                              type="tel" 
+                              value={contactPhone} 
+                              onChange={e => setContactPhone(e.target.value)}
+                              disabled={os?.status === OSStatus.CONCLUIDA}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                              placeholder="912 345 678"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                  </div>
                )}
             </div>
@@ -1356,6 +1367,20 @@ export const ServiceOrderDetail: React.FC = () => {
                               <div className="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-blue-500 border-2 border-white dark:border-slate-900 shadow-sm"></div>
                               <div className="flex justify-between items-start"><p className="text-[10px] font-black text-slate-900 dark:text-slate-200 uppercase">{act.user_name}</p><span className="text-[8px] font-black text-slate-300 dark:text-slate-500 uppercase tracking-tighter ml-4">{new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
                               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-tight mt-1 leading-relaxed">{act.description}</p>
+                              {(act.client_name || act.equipment_type) && (
+                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                  {act.client_name && (
+                                    <span className="text-[7px] font-black text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-blue-100 dark:border-blue-900/30">
+                                      {act.client_name}
+                                    </span>
+                                  )}
+                                  {act.equipment_type && (
+                                    <span className="text-[7px] font-black text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-indigo-100 dark:border-indigo-900/30">
+                                      {act.equipment_type}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                            </div>
                         ))}
                     </div>

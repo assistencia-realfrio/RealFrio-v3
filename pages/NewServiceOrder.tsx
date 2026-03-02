@@ -148,17 +148,25 @@ const NewServiceOrder: React.FC = () => {
   }, [equipments, equipmentSearch]);
 
   const handleSelectClient = (client: Client) => {
-    setFormData({ ...formData, client_id: client.id, establishment_id: '', equipment_id: '' });
+    setFormData({ 
+      ...formData, 
+      client_id: client.id, 
+      establishment_id: '', 
+      equipment_id: '',
+      store: (currentStore === 'Todas' && client.store ? client.store : formData.store) as 'Caldas da Rainha' | 'Porto de Mós'
+    });
     setMainSearch(client.name);
     setIsMainListOpen(false);
   };
 
   const handleSelectEstablishment = (est: Establishment & { client_name?: string }) => {
+    const client = clients.find(c => c.id === est.client_id);
     setFormData({ 
       ...formData, 
       client_id: est.client_id, 
       establishment_id: est.id, 
-      equipment_id: '' 
+      equipment_id: '',
+      store: (currentStore === 'Todas' && client?.store ? client.store : formData.store) as 'Caldas da Rainha' | 'Porto de Mós'
     });
     setMainSearch(`${est.name} (${est.client_name})`);
     setIsMainListOpen(false);
