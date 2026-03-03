@@ -8,8 +8,11 @@ export const generateOSReportSummary = async (
   type: string
 ): Promise<string> => {
   try {
-    // Correctly initialize GoogleGenAI as per coding guidelines using the environment variable API_KEY
-    const apiKey = "";
+    // Correctly initialize GoogleGenAI as per coding guidelines using the environment variable GEMINI_API_KEY
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("A chave da API Gemini não está configurada.");
+    }
     const ai = new GoogleGenAI({ apiKey });
     
     // Prompt otimizado para PT-PT e contexto técnico da Real Frio
