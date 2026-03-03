@@ -124,3 +124,7 @@ COMMENT ON COLUMN public.service_orders.contact_phone IS 'Telefone/Telemóvel da
 -- Adicionar campo unit_price à tabela de materiais aplicados (parts_used)
 ALTER TABLE public.parts_used ADD COLUMN IF NOT EXISTS unit_price DECIMAL(10, 2) DEFAULT 0;
 COMMENT ON COLUMN public.parts_used.unit_price IS 'Preço unitário do material aplicado na Ordem de Serviço';
+
+-- Adicionar campo zone à tabela de equipamentos
+ALTER TABLE public.equipments ADD COLUMN IF NOT EXISTS zone TEXT;
+COMMENT ON COLUMN public.equipments.zone IS 'Zona ou área do estabelecimento onde o equipamento está instalado (ex: Cozinha, Bar)';

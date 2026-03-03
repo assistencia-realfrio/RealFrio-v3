@@ -143,7 +143,7 @@ const Dashboard: React.FC = () => {
           >
             <div className="relative z-10 flex items-center gap-3 sm:block">
               <div className="flex items-center gap-2.5 sm:mb-2">
-                <div className="w-8 h-8 bg-orange-500 text-white rounded-lg flex items-center justify-center shadow-lg shadow-orange-200 dark:shadow-orange-900/20 flex-shrink-0">
+                <div className="w-8 h-8 bg-orange-500 text-white rounded-lg flex items-center justify-center flex-shrink-0">
                   <ClipboardList size={16} />
                 </div>
                 <h2 className="text-[12px] sm:text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tighter">OS Ativas</h2>
@@ -166,7 +166,7 @@ const Dashboard: React.FC = () => {
           >
             <div className="relative z-10 flex items-center gap-3 sm:block">
               <div className="flex items-center gap-2.5 sm:mb-2">
-                <div className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center shadow-lg shadow-blue-200 dark:shadow-blue-900/20 flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center flex-shrink-0">
                   <Calendar size={16} />
                 </div>
                 <h2 className="text-[12px] sm:text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tighter">Agendamentos</h2>
@@ -193,8 +193,8 @@ const Dashboard: React.FC = () => {
           >
             <div className="relative z-10 flex items-center gap-3 sm:block">
               <div className="flex items-center gap-2.5 sm:mb-2">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-lg ${
-                  unverifiedQuotesCount > 0 ? 'bg-white text-indigo-600' : 'bg-indigo-50 text-white shadow-indigo-200'
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  unverifiedQuotesCount > 0 ? 'bg-white text-indigo-600' : 'bg-indigo-50 text-white'
                 }`}>
                   <Calculator size={16} />
                 </div>
@@ -218,7 +218,7 @@ const Dashboard: React.FC = () => {
           >
             <div className="relative z-10 flex items-center gap-3 sm:block">
               <div className="flex items-center gap-2.5 sm:mb-2">
-                <div className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center shadow-lg shadow-emerald-200 dark:shadow-emerald-900/20 flex-shrink-0">
+                <div className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center flex-shrink-0">
                   <Palmtree size={16} />
                 </div>
                 <h2 className="text-[12px] sm:text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tighter">Ausências</h2>
@@ -245,8 +245,8 @@ const Dashboard: React.FC = () => {
           >
             <div className="relative z-10 flex items-center gap-3 sm:block">
               <div className="flex items-center gap-2.5 sm:mb-2">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-lg ${
-                  scheduledFleetCount > 0 ? 'bg-white text-amber-600' : 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 shadow-amber-200'
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  scheduledFleetCount > 0 ? 'bg-white text-amber-600' : 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400'
                 }`}>
                   <Car size={16} />
                 </div>

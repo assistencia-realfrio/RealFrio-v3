@@ -1,7 +1,6 @@
 {
   "requestFramePermissions": [
-    "camera",
-    "geolocation"
+    "camera"
   ],
   "name": "RealFrio v3",
   "description": ""

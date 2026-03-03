@@ -349,6 +349,12 @@ const ServiceOrders: React.FC = () => {
                           <span>{os.equipment?.type}</span>
                           <span className="opacity-20">|</span>
                           <span>{os.equipment?.brand}</span>
+                          {os.equipment?.zone && (
+                            <>
+                              <span className="opacity-20">|</span>
+                              <span>{os.equipment.zone}</span>
+                            </>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
                           {os.scheduled_date && (
@@ -413,6 +419,12 @@ const ServiceOrders: React.FC = () => {
 
                       <div className="text-base font-black text-slate-900 dark:text-slate-200 uppercase tracking-tight mb-2">
                          {os.equipment?.type} <span className="mx-1 opacity-20">|</span> {os.equipment?.brand}
+                         {os.equipment?.zone && (
+                           <>
+                             <span className="mx-1 opacity-20">|</span>
+                             <span>{os.equipment.zone}</span>
+                           </>
+                         )}
                       </div>
 
                       <div className="pt-3 border-t border-gray-50 dark:border-slate-800 space-y-2">

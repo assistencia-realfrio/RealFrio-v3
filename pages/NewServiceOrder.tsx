@@ -45,11 +45,29 @@ const NewServiceOrder: React.FC = () => {
     call_before_going: false,
     contact_name: '',
     contact_phone: '',
-    store: currentStore === 'Todas' ? 'Caldas da Rainha' : currentStore
+    store: currentStore === 'Todas' ? '' : currentStore as 'Caldas da Rainha' | 'Porto de Mós'
   });
 
   const mainContainerRef = useRef<HTMLDivElement>(null);
   const eqContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const loadClients = async () => {
+      if (!formData.store) {
+        setClients([]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const allClients = await mockData.getClients();
+        const filteredClients = allClients.filter(c => c.store === formData.store);
+        setClients(filteredClients.sort((a, b) => a.name.localeCompare(b.name)));
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadClients();
+  }, [formData.store]);
 
   useEffect(() => {
     fetchBaseData();
@@ -96,17 +114,11 @@ const NewServiceOrder: React.FC = () => {
   const fetchBaseData = async () => {
     setLoading(true);
     try {
-      const [allClients, allEsts, allOS] = await Promise.all([
-        mockData.getClients(),
+      const [allEsts, allOS] = await Promise.all([
         mockData.getAllEstablishments(),
         mockData.getServiceOrders()
       ]);
       
-      const filteredClients = currentStore === 'Todas' 
-        ? allClients 
-        : allClients.filter(c => c.store === currentStore);
-      
-      setClients(filteredClients.sort((a, b) => a.name.localeCompare(b.name)));
       setAllEstablishments(allEsts);
       setAllServiceOrders(allOS);
     } finally {
@@ -177,7 +189,7 @@ const NewServiceOrder: React.FC = () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      if (!formData.client_id || !formData.description) throw new Error("Preencha os campos obrigatórios.");
+      if (!formData.client_id || !formData.description || !formData.store) throw new Error("Preencha os campos obrigatórios (Loja, Cliente, Descrição).");
       const selectedClient = clients.find(c => c.id === formData.client_id);
       
       let finalScheduledDate = formData.scheduled_date;
@@ -220,7 +232,7 @@ const NewServiceOrder: React.FC = () => {
         email: (data.get('email') as string) || '',
         address: (data.get('address') as string).toUpperCase() || '',
         type: 'Empresa',
-        store: currentStore === 'Todas' ? 'Caldas da Rainha' : currentStore as string
+        store: formData.store
       });
       setClients([newClient, ...clients].sort((a, b) => a.name.localeCompare(b.name)));
       handleSelectClient(newClient);
@@ -242,13 +254,44 @@ const NewServiceOrder: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-slate-800 p-8 space-y-6">
+           {/* SELECÇÃO DE LOJA */}
+           <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Loja / Delegação *</label>
+              <div className="relative">
+                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                <select 
+                  required
+                  value={formData.store} 
+                  onChange={e => {
+                    const newStore = e.target.value as 'Caldas da Rainha' | 'Porto de Mós';
+                    setFormData({
+                      ...formData, 
+                      store: newStore,
+                      client_id: '',
+                      establishment_id: '',
+                      equipment_id: ''
+                    });
+                    setMainSearch('');
+                    setEquipmentSearch('');
+                  }}
+                  className="w-full pl-12 pr-10 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white appearance-none outline-none focus:ring-4 focus:ring-blue-500/10 transition-all uppercase"
+                >
+                  <option value="" disabled>SELECCIONE UMA LOJA...</option>
+                  <option value="Caldas da Rainha">CALDAS DA RAINHA</option>
+                  <option value="Porto de Mós">PORTO DE MÓS</option>
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={16} />
+              </div>
+           </div>
+
            {/* PESQUISA DE CLIENTE */}
-           <div className="relative" ref={mainContainerRef}>
+           <div className={`relative ${!formData.store ? 'opacity-50 pointer-events-none' : ''}`} ref={mainContainerRef}>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Cliente ou Local *</label>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                 <input 
-                  type="text" placeholder="Pesquisar..." 
+                  type="text" placeholder={formData.store ? "Pesquisar..." : "Seleccione primeiro a loja"} 
+                  disabled={!formData.store}
                   value={mainSearch} onChange={(e) => { setMainSearch(e.target.value); setIsMainListOpen(true); }}
                   onFocus={() => setIsMainListOpen(true)}
                   className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase"
@@ -276,7 +319,7 @@ const NewServiceOrder: React.FC = () => {
 
            {/* LOCAL E EQUIPAMENTO */}
            {formData.client_id && (
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-4 duration-300">
+             <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-4 duration-300 ${!formData.store ? 'opacity-50 pointer-events-none' : ''}`}>
                <div>
                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Local / Estabelecimento</label>
                  <div className="relative">
@@ -331,8 +374,15 @@ const NewServiceOrder: React.FC = () => {
                          className="w-full text-left px-5 py-4 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-b dark:border-slate-800 last:border-0 flex items-center gap-4 group"
                        >
                           <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><HardDrive size={14} /></div>
-                          <div className="min-w-0">
-                             <p className="text-xs font-black dark:text-white uppercase truncate">{eq.type} {eq.brand}</p>
+                          <div className="min-w-0 flex-1">
+                             <div className="flex items-center justify-between gap-2">
+                               <p className="text-xs font-black dark:text-white uppercase truncate">{eq.type} {eq.brand}</p>
+                               {eq.zone && (
+                                 <span className="text-[7px] font-black bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded border border-amber-100 dark:border-amber-900/30 uppercase tracking-tighter">
+                                   {eq.zone}
+                                 </span>
+                               )}
+                             </div>
                              <p className="text-[9px] text-slate-400 font-bold uppercase truncate">S/N: {eq.serial_number || 'NÃO REGISTADO'}</p>
                           </div>
                        </button>
@@ -343,24 +393,7 @@ const NewServiceOrder: React.FC = () => {
              </div>
            )}
 
-           <div className={`grid grid-cols-1 ${currentStore === 'Todas' ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4`}>
-              {currentStore === 'Todas' && (
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Loja / Delegação</label>
-                  <div className="relative">
-                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                    <select 
-                      value={formData.store} 
-                      onChange={e => setFormData({...formData, store: e.target.value as 'Caldas da Rainha' | 'Porto de Mós'})}
-                      className="w-full pl-12 pr-10 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white appearance-none outline-none focus:ring-4 focus:ring-blue-500/10 transition-all uppercase"
-                    >
-                      <option value="Caldas da Rainha">CALDAS DA RAINHA</option>
-                      <option value="Porto de Mós">PORTO DE MÓS</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={16} />
-                  </div>
-                </div>
-              )}
+           <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${!formData.store ? 'opacity-50 pointer-events-none' : ''}`}>
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Tipo de Serviço</label>
                 <div className="relative">
@@ -386,7 +419,12 @@ const NewServiceOrder: React.FC = () => {
               </div>
            </div>
 
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+           <div className={!formData.store ? 'opacity-50 pointer-events-none' : ''}>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Descrição do Pedido *</label>
+              <textarea required rows={4} disabled={!formData.store} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-3xl text-sm font-medium dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all resize-none uppercase" placeholder="DESCREVA O PROBLEMA OU PEDIDO DO CLIENTE..." />
+           </div>
+
+           <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${!formData.store ? 'opacity-50 pointer-events-none' : ''}`}>
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Agendamento (Data)</label>
                 <div className="relative">
@@ -411,20 +449,8 @@ const NewServiceOrder: React.FC = () => {
               </div>
            </div>
 
-           <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Descrição do Pedido *</label>
-              <textarea required rows={4} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-3xl text-sm font-medium dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all resize-none uppercase" placeholder="DESCREVA O PROBLEMA OU PEDIDO DO CLIENTE..." />
-           </div>
-
-           <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border-2 border-transparent hover:border-blue-500/20 transition-all cursor-pointer" onClick={() => setFormData({...formData, is_warranty: !formData.is_warranty})}>
-              <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${formData.is_warranty ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-transparent'}`}>
-                <CheckCircle2 size={14} />
-              </div>
-              <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">Equipamento em Garantia</span>
-           </div>
-
-           <div className="space-y-4">
-              <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border-2 border-transparent hover:border-blue-500/20 transition-all cursor-pointer" onClick={() => setFormData({...formData, call_before_going: !formData.call_before_going})}>
+           <div className={`space-y-4 ${!formData.store ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border-2 border-transparent hover:border-blue-500/20 transition-all cursor-pointer" onClick={() => formData.store && setFormData({...formData, call_before_going: !formData.call_before_going})}>
                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${formData.call_before_going ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-transparent'}`}>
                   <CheckCircle2 size={14} />
                 </div>
@@ -459,6 +485,13 @@ const NewServiceOrder: React.FC = () => {
                   </div>
                 </div>
               )}
+           </div>
+
+           <div className={`flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border-2 border-transparent hover:border-blue-500/20 transition-all cursor-pointer ${!formData.store ? 'opacity-50 pointer-events-none' : ''}`} onClick={() => formData.store && setFormData({...formData, is_warranty: !formData.is_warranty})}>
+              <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${formData.is_warranty ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-transparent'}`}>
+                <CheckCircle2 size={14} />
+              </div>
+              <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">Equipamento em Garantia</span>
            </div>
 
            <div className="pt-4">

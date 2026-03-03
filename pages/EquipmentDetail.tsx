@@ -339,7 +339,17 @@ const EquipmentDetail: React.FC = () => {
                 </div>
                 <div className="p-4 flex items-center gap-4">
                    <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 flex items-center justify-center flex-shrink-0"> <MapPin size={20} /> </div>
-                   <div className="min-w-0 pr-4"> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Localização de Instalação</p> <p className="text-[13px] font-black text-slate-900 dark:text-white uppercase truncate">{establishmentName}</p> </div>
+                   <div className="min-w-0 pr-4 flex-1"> 
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Localização de Instalação</p> 
+                      <div className="flex items-center justify-between">
+                        <p className="text-[13px] font-black text-slate-900 dark:text-white uppercase truncate">{establishmentName}</p>
+                        {equipment.zone && (
+                          <span className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest border border-amber-100 dark:border-amber-900/30">
+                            {equipment.zone}
+                          </span>
+                        )}
+                      </div>
+                   </div>
                 </div>
                 <div className="p-4 flex items-center gap-4">
                    <div className="w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center flex-shrink-0"> <Tag size={20} /> </div>

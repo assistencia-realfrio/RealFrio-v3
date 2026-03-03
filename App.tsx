@@ -48,14 +48,9 @@ const AppContent: React.FC<{
       // Check if permissions are already granted or if we should ask
       const checkInitialPermissions = async () => {
         const notif = "Notification" in window && Notification.permission === 'granted';
-        let loc = false;
-        try {
-          const locPerm = await navigator.permissions.query({ name: 'geolocation' });
-          loc = locPerm.state === 'granted';
-        } catch (e) {}
         
         // If any important permission is missing, show modal
-        if (!notif || !loc) {
+        if (!notif) {
           setShowPermissions(true);
         }
       };
@@ -69,32 +64,6 @@ const AppContent: React.FC<{
     onLogin();
     triggerSelectionModal();
   };
-
-  // MONITORIZAÇÃO DE LOCALIZAÇÃO LIVE
-  useEffect(() => {
-    if (!user || user.role === UserRole.BACKOFFICE) return;
-
-    const updateLiveLocation = () => {
-      if (!navigator.geolocation) return;
-      const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
-      const success = async (position: GeolocationPosition) => {
-        try {
-          await mockData.updateProfile(user.id, {
-            last_lat: position.coords.latitude,
-            last_lng: position.coords.longitude,
-            last_location_update: new Date().toISOString()
-          });
-        } catch (e) {}
-      };
-      const error = (err: GeolocationPositionError) => {
-        navigator.geolocation.getCurrentPosition(success, () => {}, { enableHighAccuracy: false, timeout: 5000 });
-      };
-      navigator.geolocation.getCurrentPosition(success, error, options);
-    };
-    updateLiveLocation();
-    const interval = setInterval(updateLiveLocation, 3 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [user]);
 
   // ENGINE DE ALERTAS EM TEMPO REAL (SUPABASE REALTIME)
   useEffect(() => {

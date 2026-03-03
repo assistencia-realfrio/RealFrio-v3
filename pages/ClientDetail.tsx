@@ -488,7 +488,14 @@ const ClientDetail: React.FC = () => {
                       <div className="space-y-1">
                         <div className="flex items-baseline text-slate-900 dark:text-white uppercase gap-2 mb-1 border-b border-slate-50 dark:border-slate-800/50 pb-1">
                           <span className="text-[8px] font-black text-slate-300 dark:text-slate-600 w-10 flex-shrink-0">EQUIP:</span> 
-                          <span className="text-[13px] font-black tracking-tight leading-tight group-hover:text-blue-600 transition-colors truncate">{eq.type}</span>
+                          <div className="flex-1 flex items-center justify-between min-w-0">
+                            <span className="text-[13px] font-black tracking-tight leading-tight group-hover:text-blue-600 transition-colors truncate">{eq.type}</span>
+                            {eq.zone && (
+                              <span className="text-[7px] font-black bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded border border-amber-100 dark:border-amber-900/30 uppercase tracking-tighter">
+                                {eq.zone}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-baseline text-slate-900 dark:text-white uppercase gap-2">
                           <span className="text-[8px] font-black text-slate-300 dark:text-slate-600 w-10 flex-shrink-0">MARCA:</span> 

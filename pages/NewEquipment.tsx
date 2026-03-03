@@ -21,7 +21,8 @@ const NewEquipment: React.FC = () => {
     model: '',
     pnc: '',
     serial_number: '',
-    install_date: ''
+    install_date: '',
+    zone: ''
   });
 
   useEffect(() => {
@@ -48,7 +49,8 @@ const NewEquipment: React.FC = () => {
         model: formData.model.trim() ? formData.model.toUpperCase().trim() : null,
         pnc: formData.pnc.trim() ? formData.pnc.toUpperCase().trim() : null,
         serial_number: formData.serial_number.trim() ? formData.serial_number.toUpperCase().trim() : null,
-        install_date: formData.install_date || null
+        install_date: formData.install_date || null,
+        zone: formData.zone.trim() ? formData.zone.toUpperCase().trim() : null
       };
 
       await mockData.createEquipment(payload);
@@ -108,6 +110,19 @@ const NewEquipment: React.FC = () => {
                   ))}
                 </select>
                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={16} />
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Zona / Área do Estabelecimento</label>
+              <div className="relative">
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                <input 
+                  type="text" name="zone"
+                  className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase"
+                  value={formData.zone} onChange={handleChange}
+                  placeholder="Ex: Cozinha, Bar, Armazém..."
+                />
               </div>
             </div>
 

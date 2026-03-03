@@ -1,17 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, MapPin, Camera, Check, X } from 'lucide-react';
+import { Bell, Camera, Check, X } from 'lucide-react';
 import { notificationService } from '../services/notificationService';
 
 interface PermissionStatus {
   notifications: boolean;
-  location: boolean;
   camera: boolean;
 }
 
 const PermissionRequestModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [permissions, setPermissions] = useState<PermissionStatus>({
     notifications: false,
-    location: false,
     camera: false
   });
   const [loading, setLoading] = useState<string | null>(null);
@@ -24,13 +22,6 @@ const PermissionRequestModal: React.FC<{ onClose: () => void }> = ({ onClose }) 
     // Check Notification
     const notif = "Notification" in window && Notification.permission === 'granted';
     
-    // Check Location (approximate check via permissions API if available, otherwise assume false until requested)
-    let loc = false;
-    try {
-      const locPerm = await navigator.permissions.query({ name: 'geolocation' });
-      loc = locPerm.state === 'granted';
-    } catch (e) {}
-
     // Check Camera
     let cam = false;
     try {
@@ -38,10 +29,10 @@ const PermissionRequestModal: React.FC<{ onClose: () => void }> = ({ onClose }) 
       cam = camPerm.state === 'granted';
     } catch (e) {}
 
-    setPermissions({ notifications: notif, location: loc, camera: cam });
+    setPermissions({ notifications: notif, camera: cam });
     
     // If all granted, close automatically
-    if (notif && loc && cam) {
+    if (notif && cam) {
       onClose();
     }
   };
@@ -51,21 +42,6 @@ const PermissionRequestModal: React.FC<{ onClose: () => void }> = ({ onClose }) 
     await notificationService.requestPermission();
     await checkPermissions();
     setLoading(null);
-  };
-
-  const requestLocation = () => {
-    setLoading('location');
-    navigator.geolocation.getCurrentPosition(
-      () => {
-        checkPermissions();
-        setLoading(null);
-      },
-      (err) => {
-        console.error(err);
-        setLoading(null);
-        alert("É necessário permitir a localização nas definições do navegador.");
-      }
-    );
   };
 
   const requestCamera = async () => {
@@ -84,7 +60,7 @@ const PermissionRequestModal: React.FC<{ onClose: () => void }> = ({ onClose }) 
   };
 
   // If all permissions are granted, don't render anything (or close)
-  if (permissions.notifications && permissions.location && permissions.camera) {
+  if (permissions.notifications && permissions.camera) {
     return null;
   }
 
@@ -123,32 +99,6 @@ const PermissionRequestModal: React.FC<{ onClose: () => void }> = ({ onClose }) 
                 className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-blue-700 transition-colors"
               >
                 {loading === 'notification' ? '...' : 'Ativar'}
-              </button>
-            )}
-          </div>
-
-          {/* LOCATION */}
-          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
-            <div className="flex items-center gap-4">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${permissions.location ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
-                <MapPin size={20} />
-              </div>
-              <div className="text-left">
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Localização</h3>
-                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Navegação e Check-in</p>
-              </div>
-            </div>
-            {permissions.location ? (
-              <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white">
-                <Check size={16} />
-              </div>
-            ) : (
-              <button 
-                onClick={requestLocation}
-                disabled={loading === 'location'}
-                className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                {loading === 'location' ? '...' : 'Ativar'}
               </button>
             )}
           </div>

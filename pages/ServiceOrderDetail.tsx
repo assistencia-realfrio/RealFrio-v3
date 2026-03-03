@@ -1232,6 +1232,12 @@ export const ServiceOrderDetail: React.FC = () => {
                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest w-12">S/N</span>
                              <span className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase font-mono">{os.equipment.serial_number || '---'}</span>
                           </div>
+                          {os.equipment.zone && (
+                            <div className="flex items-baseline gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest w-12">Zona</span>
+                               <span className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase">{os.equipment.zone}</span>
+                            </div>
+                          )}
                         </div>
                       </>
                     ) : (

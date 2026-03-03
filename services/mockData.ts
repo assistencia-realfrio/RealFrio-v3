@@ -353,12 +353,24 @@ export const mockData = {
   },
   createEquipment: async (eq: Partial<Equipment>) => {
     const { data, error } = await supabase.from('equipments').insert([cleanPayload(eq)]).select().single();
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST204' && error.message.includes('zone')) {
+        console.error("ERRO DE SCHEMA: A coluna 'zone' não existe na tabela 'equipments'.");
+        throw new Error("ERRO DE BASE DE DADOS: A coluna 'zone' não existe. Por favor, execute o script SQL 'add_zone_column.sql' no seu painel Supabase.");
+      }
+      throw error;
+    }
     return data;
   },
   updateEquipment: async (id: string, updates: Partial<Equipment>) => {
     const { error } = await supabase.from('equipments').update(cleanPayload(updates)).eq('id', id);
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST204' && error.message.includes('zone')) {
+        console.error("ERRO DE SCHEMA: A coluna 'zone' não existe na tabela 'equipments'.");
+        throw new Error("ERRO DE BASE DE DADOS: A coluna 'zone' não existe. Por favor, execute o script SQL 'add_zone_column.sql' no seu painel Supabase.");
+      }
+      throw error;
+    }
   },
   deleteEquipment: async (id: string) => {
     const { error } = await supabase.from('equipments').delete().eq('id', id);

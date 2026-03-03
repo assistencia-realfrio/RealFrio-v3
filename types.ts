@@ -106,6 +106,7 @@ export interface Equipment {
   serial_number?: string | null;
   nameplate_url?: string | null;
   install_date?: string | null;
+  zone?: string | null;
   attachments?: EquipmentAttachment[];
 }
 
@@ -209,8 +210,6 @@ export interface ServiceOrder {
   store: string;
   timer_is_active?: boolean;
   timer_start_time?: string | null;
-  checkin_lat?: number | null;
-  checkin_lng?: number | null;
 }
 
 export interface Profile {
@@ -219,9 +218,6 @@ export interface Profile {
   full_name: string;
   role: UserRole;
   store: string;
-  last_lat?: number | null;
-  last_lng?: number | null;
-  last_location_update?: string | null;
   push_subscription?: any;
 }
 
