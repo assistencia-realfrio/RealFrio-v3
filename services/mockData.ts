@@ -483,11 +483,23 @@ export const mockData = {
   addOSPart: async (osId: string, part: Partial<PartUsed>) => {
     const { data, error } = await supabase.from('parts_used').insert([{ ...part, os_id: osId }]).select().single();
     if (error) throw error;
+
+    // Atualizar o último preço no catálogo (exceto deslocação)
+    if (data && data.part_id && data.unit_price && data.name?.toUpperCase() !== 'DESLOCAÇÃO') {
+      await supabase.from('catalog').update({ last_price: data.unit_price }).eq('id', data.part_id);
+    }
+
     return data;
   },
   updateOSPart: async (id: string, updates: Partial<PartUsed>) => {
     const { data, error } = await supabase.from('parts_used').update(updates).eq('id', id).select().single();
     if (error) throw error;
+
+    // Atualizar o último preço no catálogo (exceto deslocação)
+    if (data && data.part_id && data.unit_price && data.name?.toUpperCase() !== 'DESLOCAÇÃO') {
+      await supabase.from('catalog').update({ last_price: data.unit_price }).eq('id', data.part_id);
+    }
+
     return data;
   },
   removeOSPart: async (id: string) => {

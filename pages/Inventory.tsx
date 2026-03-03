@@ -12,7 +12,7 @@ const Inventory: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<PartCatalogItem | null>(null);
-  const [formData, setFormData] = useState({ name: '', reference: '', stock: '' });
+  const [formData, setFormData] = useState({ name: '', reference: '', stock: '', last_price: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => { fetchCatalog(); }, []);
@@ -37,10 +37,15 @@ const Inventory: React.FC = () => {
   const handleOpenModal = (item?: PartCatalogItem) => {
     if (item) {
       setEditingItem(item);
-      setFormData({ name: item.name, reference: item.reference, stock: item.stock.toString().replace('.', ',') });
+      setFormData({ 
+        name: item.name, 
+        reference: item.reference, 
+        stock: item.stock.toString().replace('.', ','),
+        last_price: item.last_price ? item.last_price.toString().replace('.', ',') : ''
+      });
     } else {
       setEditingItem(null);
-      setFormData({ name: '', reference: '', stock: '0' });
+      setFormData({ name: '', reference: '', stock: '0', last_price: '' });
     }
     setShowModal(true);
   };
@@ -51,17 +56,21 @@ const Inventory: React.FC = () => {
     setIsSubmitting(true);
     try {
       const numericStock = parseFloat(formData.stock.replace(',', '.'));
+      const numericLastPrice = formData.last_price ? parseFloat(formData.last_price.replace(',', '.')) : 0;
+      
       if (editingItem) {
         await mockData.updateCatalogItem(editingItem.id, {
           name: formData.name.toUpperCase(),
           reference: formData.reference.toUpperCase(),
-          stock: numericStock || 0
+          stock: numericStock || 0,
+          last_price: numericLastPrice
         });
       } else {
         await mockData.addCatalogItem({
           name: formData.name.toUpperCase(),
           reference: formData.reference.toUpperCase(),
-          stock: numericStock || 0
+          stock: numericStock || 0,
+          last_price: numericLastPrice
         });
       }
       setShowModal(false);
@@ -125,6 +134,11 @@ const Inventory: React.FC = () => {
                       <div className="flex items-center gap-2 mb-0.5">
                          <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest font-mono bg-blue-50/50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">{item.reference}</span>
                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${status.color}`}>{status.label}</span>
+                         {item.last_price && item.name.toUpperCase() !== 'DESLOCAÇÃO' && (
+                           <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase border bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/30">
+                             Último: {item.last_price.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}
+                           </span>
+                         )}
                       </div>
                       <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase truncate leading-tight group-hover:text-blue-600 transition-colors">{item.name}</h3>
                     </div>
@@ -187,21 +201,38 @@ const Inventory: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Stock em Armazém</label>
-                <input 
-                  type="text" 
-                  inputMode="decimal"
-                  className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
-                  value={formData.stock} 
-                  onChange={e => {
-                    const val = e.target.value.replace(',', '.');
-                    if (/^\d*[.]?\d*$/.test(val) || val === '') {
-                      setFormData({...formData, stock: e.target.value});
-                    }
-                  }}
-                />
-              </div>
+               <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Stock em Armazém</label>
+                   <input 
+                     type="text" 
+                     inputMode="decimal"
+                     className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                     value={formData.stock} 
+                     onChange={e => {
+                       const val = e.target.value.replace(',', '.');
+                       if (/^\d*[.]?\d*$/.test(val) || val === '') {
+                         setFormData({...formData, stock: e.target.value});
+                       }
+                     }}
+                   />
+                 </div>
+                 <div>
+                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Último Preço (€)</label>
+                   <input 
+                     type="text" 
+                     inputMode="decimal"
+                     className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                     value={formData.last_price} 
+                     onChange={e => {
+                       const val = e.target.value.replace(',', '.');
+                       if (/^\d*[.]?\d*$/.test(val) || val === '') {
+                         setFormData({...formData, last_price: e.target.value});
+                       }
+                     }}
+                   />
+                 </div>
+               </div>
 
               <button 
                 type="submit" disabled={isSubmitting}

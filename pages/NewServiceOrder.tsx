@@ -373,17 +373,28 @@ const NewServiceOrder: React.FC = () => {
                          }} 
                          className="w-full text-left px-5 py-4 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-b dark:border-slate-800 last:border-0 flex items-center gap-4 group"
                        >
-                          <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><HardDrive size={14} /></div>
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 flex-shrink-0"><HardDrive size={14} /></div>
                           <div className="min-w-0 flex-1">
-                             <div className="flex items-center justify-between gap-2">
-                               <p className="text-xs font-black dark:text-white uppercase truncate">{eq.type} {eq.brand}</p>
+                             <div className="flex items-start justify-between gap-2">
+                               <div className="min-w-0">
+                                 <p className="text-[11px] font-black dark:text-white uppercase truncate leading-tight">
+                                   {eq.type} {eq.brand}
+                                 </p>
+                                 <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase truncate mt-0.5">
+                                   {eq.model ? `MOD: ${eq.model}` : ''} {eq.pnc ? `| PNC: ${eq.pnc}` : ''}
+                                 </p>
+                               </div>
                                {eq.zone && (
-                                 <span className="text-[7px] font-black bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded border border-amber-100 dark:border-amber-900/30 uppercase tracking-tighter">
+                                 <span className="flex-shrink-0 text-[7px] font-black bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-900/30 uppercase tracking-tighter">
                                    {eq.zone}
                                  </span>
                                )}
                              </div>
-                             <p className="text-[9px] text-slate-400 font-bold uppercase truncate">S/N: {eq.serial_number || 'NÃO REGISTADO'}</p>
+                             <div className="flex items-center gap-2 mt-1">
+                               <span className="text-[8px] font-black bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded uppercase tracking-widest">
+                                 S/N: {eq.serial_number || 'NÃO REGISTADO'}
+                               </span>
+                             </div>
                           </div>
                        </button>
                      ))}

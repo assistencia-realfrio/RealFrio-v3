@@ -115,6 +115,7 @@ export interface PartCatalogItem {
   name: string;
   reference: string;
   stock: number;
+  last_price?: number;
 }
 
 export interface PartUsed {

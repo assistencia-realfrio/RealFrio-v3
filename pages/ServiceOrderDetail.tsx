@@ -770,6 +770,15 @@ export const ServiceOrderDetail: React.FC = () => {
 
   const handleDeletePhoto = async () => { if (!photoToDelete) return; setActionLoading(true); try { await mockData.deleteOSPhoto(photoToDelete.id); await mockData.addOSActivity(id!, { description: `REMOVEU FOTO: ${photoToDelete.type.toUpperCase()}` }); setShowDeletePhotoModal(false); setPhotoToDelete(null); fetchOSDetails(false); } finally { setActionLoading(false); } };
 
+  const handleSelectPart = (item: PartCatalogItem) => {
+    setSelectedPartId(item.id);
+    if (item.last_price && item.name.toUpperCase() !== 'DESLOCAÇÃO') {
+      setPartPriceStr(item.last_price.toString().replace('.', ','));
+    } else {
+      setPartPriceStr("0");
+    }
+  };
+
   const handleAddPart = async () => { 
     if (!id || !selectedPartId) return; 
     const part = catalog.find(p => p.id === selectedPartId); 
@@ -1678,7 +1687,32 @@ export const ServiceOrderDetail: React.FC = () => {
                     <input type="text" placeholder="Pesquisar no catálogo..." className={`w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-4 ${storeColors.ring} outline-none transition-all uppercase`} value={partSearchTerm} onChange={(e) => setPartSearchTerm(e.target.value)} />
                   </div>
                   <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
-                    {filteredCatalog.length === 0 ? ( <div className="text-center py-10 opacity-30"> <p className="text-[10px] font-black uppercase">Nenhum artigo encontrado</p> </div> ) : ( filteredCatalog.map(item => ( <button key={item.id} onClick={() => setSelectedPartId(item.id)} className={`w-full text-left p-4 rounded-2xl border transition-all flex justify-between items-center ${selectedPartId === item.id ? `${storeColors.bg} text-white ${storeColors.border500} shadow-lg` : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'}`}> <div className="min-w-0 flex-1"> <p className={`text-xs font-black uppercase truncate ${selectedPartId === item.id ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{item.name}</p> <p className={`text-[9px] font-bold uppercase tracking-widest ${selectedPartId === item.id ? `${storeColors.bg100}` : 'text-slate-400'}`}>REF: {item.reference}</p> </div> {selectedPartId === item.id && <Check size={18} />} </button> )) )}
+                    {filteredCatalog.length === 0 ? (
+                      <div className="text-center py-10 opacity-30">
+                        <p className="text-[10px] font-black uppercase">Nenhum artigo encontrado</p>
+                      </div>
+                    ) : (
+                      filteredCatalog.map(item => (
+                        <button 
+                          key={item.id} 
+                          onClick={() => handleSelectPart(item)} 
+                          className={`w-full text-left p-4 rounded-2xl border transition-all flex justify-between items-center ${selectedPartId === item.id ? `${storeColors.bg} text-white ${storeColors.border500} shadow-lg` : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs font-black uppercase truncate ${selectedPartId === item.id ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{item.name}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className={`text-[9px] font-bold uppercase tracking-widest ${selectedPartId === item.id ? `${storeColors.bg100}` : 'text-slate-400'}`}>REF: {item.reference}</p>
+                              {item.last_price && item.name.toUpperCase() !== 'DESLOCAÇÃO' && (
+                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${selectedPartId === item.id ? 'bg-white/20 text-white' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'}`}>
+                                  ÚLTIMO: {item.last_price.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {selectedPartId === item.id && <Check size={18} />}
+                        </button>
+                      ))
+                    )}
                   </div>
                   <button onClick={() => setIsCreatingNewPart(true)} className={`w-full py-4 ${storeColors.text} ${storeColors.textDark} text-[10px] font-black uppercase tracking-widest hover:underline text-center`}> + Criar Artigo Fora do Catálogo </button>
                 </div>
