@@ -1,5 +1,28 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 1000; // 1 second
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const callGeminiWithRetry = async (fn: () => Promise<any>, retries = MAX_RETRIES): Promise<any> => {
+  try {
+    return await fn();
+  } catch (error: any) {
+    const isRetryable = error?.message?.includes('503') || 
+                        error?.message?.includes('high demand') || 
+                        error?.message?.includes('UNAVAILABLE');
+    
+    if (isRetryable && retries > 0) {
+      const delay = INITIAL_RETRY_DELAY * (MAX_RETRIES - retries + 1);
+      console.warn(`Gemini API busy (503). Retrying in ${delay}ms... (${retries} attempts left)`);
+      await sleep(delay);
+      return callGeminiWithRetry(fn, retries - 1);
+    }
+    throw error;
+  }
+};
+
 export const extractDeliveryDataFromPDF = async (pdfBase64: string): Promise<any> => {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -30,7 +53,7 @@ export const extractDeliveryDataFromPDF = async (pdfBase64: string): Promise<any
       Retorna APENAS o JSON válido.
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await callGeminiWithRetry(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {
         parts: [
@@ -48,7 +71,7 @@ export const extractDeliveryDataFromPDF = async (pdfBase64: string): Promise<any
       config: {
         responseMimeType: "application/json",
       }
-    });
+    }));
 
     const text = response.text?.trim();
     if (!text) throw new Error("Resposta vazia da IA.");
@@ -56,9 +79,13 @@ export const extractDeliveryDataFromPDF = async (pdfBase64: string): Promise<any
     return JSON.parse(text);
   } catch (error: any) {
     console.error("Erro Gemini PDF:", error);
+    if (error?.message?.includes('503') || error?.message?.includes('high demand')) {
+      throw new Error("O serviço de IA está temporariamente sobrecarregado. Por favor, tente novamente dentro de alguns segundos.");
+    }
     throw new Error("Falha ao analisar o documento com IA. Verifique o ficheiro e tente novamente.");
   }
 };
+
 export const generateOSReportSummary = async (
   description: string,
   anomaly: string,
@@ -67,14 +94,12 @@ export const generateOSReportSummary = async (
   type: string
 ): Promise<string> => {
   try {
-    // Correctly initialize GoogleGenAI as per coding guidelines using the environment variable GEMINI_API_KEY
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("A chave da API Gemini não está configurada.");
     }
     const ai = new GoogleGenAI({ apiKey });
     
-    // Prompt otimizado para PT-PT e contexto técnico da Real Frio
     const prompt = `
       Atua como um técnico sénior de refrigeração e climatização da empresa Real Frio.
       Gera um resumo técnico, profissional e extremamente conciso para o relatório de uma Ordem de Serviço (OS).
@@ -95,14 +120,17 @@ export const generateOSReportSummary = async (
       5. RETORNA APENAS O TEXTO DO RESUMO.
     `;
 
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response: GenerateContentResponse = await callGeminiWithRetry(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
-    });
+    }));
 
     return response.text?.trim() || "Não foi possível gerar um resumo automático.";
   } catch (error: any) {
     console.error("Erro Gemini:", error);
+    if (error?.message?.includes('503') || error?.message?.includes('high demand')) {
+      throw new Error("O serviço de IA está temporariamente sobrecarregado. Por favor, tente novamente mais tarde.");
+    }
     throw new Error("Falha na comunicação com a IA. Tente novamente mais tarde.");
   }
 };
