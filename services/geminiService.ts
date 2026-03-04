@@ -1,8 +1,9 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configure worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Configure worker with a more reliable CDN and correct file extension for v5+
+// We use unpkg which mirrors npm directly, ensuring version match
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 2000; // Increased delay
