@@ -21,7 +21,35 @@ const Deliveries: React.FC = () => {
     setLoading(true);
     try {
       const data = await mockData.getMaterialDeliveries();
-      setDeliveries(data);
+      
+      // Enrich data with metadata status check
+      const enrichedData = data.map((d: MaterialDelivery) => {
+        let metadata: any = {};
+        try {
+          if (d.notes && (d.notes.startsWith('{') || d.notes.startsWith('['))) {
+            metadata = JSON.parse(d.notes);
+          }
+        } catch (e) {}
+
+        // Determine correct status
+        let realStatus = d.status;
+        if (d.status === 'pending') {
+          if (metadata.real_status) {
+            realStatus = metadata.real_status;
+          } else if (metadata.partial_signature || d.items.some((i: any) => i.delivered)) {
+            realStatus = 'partial';
+          }
+        }
+
+        return {
+          ...d,
+          status: realStatus,
+          client_nif: d.client_nif || metadata.client_nif,
+          at_code: d.at_code || metadata.at_code
+        };
+      });
+
+      setDeliveries(enrichedData);
     } catch (error) {
       console.error("Erro ao carregar entregas:", error);
     } finally {
@@ -48,6 +76,7 @@ const Deliveries: React.FC = () => {
   const getStatusConfig = (status: string) => {
     switch(status) {
       case 'delivered': return { color: 'bg-emerald-50 text-emerald-600 border-emerald-100', icon: CheckCircle2, label: 'Entregue' };
+      case 'partial': return { color: 'bg-blue-50 text-blue-600 border-blue-100', icon: Clock, label: 'Parcial' };
       case 'canceled': return { color: 'bg-red-50 text-red-600 border-red-100', icon: XCircle, label: 'Cancelada' };
       default: return { color: 'bg-amber-50 text-amber-600 border-amber-100', icon: Clock, label: 'Pendente' };
     }

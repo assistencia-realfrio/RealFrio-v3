@@ -58,6 +58,12 @@ const DeliveryDetail: React.FC = () => {
           : data.status
       };
 
+      // Sort items: Delivered first
+      enrichedData.items.sort((a: MaterialDeliveryItem, b: MaterialDeliveryItem) => {
+        if (a.delivered === b.delivered) return 0;
+        return a.delivered ? -1 : 1;
+      });
+
       setDelivery(enrichedData);
       if (enrichedData.client_signature) {
         setClientSignature(enrichedData.client_signature);
@@ -120,10 +126,11 @@ const DeliveryDetail: React.FC = () => {
 
     setActionLoading(true);
     try {
+      const now = new Date().toISOString();
       const updatedItems = delivery.items.map((item: MaterialDeliveryItem, idx: number) => {
         const itemId = item.id || `item-${idx}`;
         if (selectedItemIds.includes(itemId)) {
-          return { ...item, id: itemId, delivered: true };
+          return { ...item, id: itemId, delivered: true, delivered_at: now };
         }
         return { ...item, id: itemId };
       });
@@ -152,10 +159,10 @@ const DeliveryDetail: React.FC = () => {
 
       if (allDelivered) {
         safeUpdates.client_signature = clientSignature;
-        safeUpdates.delivered_at = new Date().toISOString();
+        safeUpdates.delivered_at = now;
       } else {
         newMetadata.partial_signature = partialSignature;
-        newMetadata.partial_delivered_at = new Date().toISOString();
+        newMetadata.partial_delivered_at = now;
       }
 
       safeUpdates.notes = JSON.stringify(newMetadata);
@@ -186,25 +193,20 @@ const DeliveryDetail: React.FC = () => {
     }
   };
 
-  const getBase64ImageFromURL = (url: string): Promise<string | null> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.setAttribute('crossOrigin', 'anonymous');
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL("image/png"));
-        } else {
-          resolve(null);
-        }
-      };
-      img.onerror = () => resolve(null);
-      img.src = url;
-    });
+  const getBase64ImageFromURL = async (url: string): Promise<string | null> => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      console.error("Error loading image:", url, e);
+      return null;
+    }
   };
 
   const generatePDF = async () => {
@@ -235,6 +237,15 @@ const DeliveryDetail: React.FC = () => {
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
         doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", margin + 25, 24);
+      } else {
+        // Fallback text if no logo
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
+        doc.text("REAL FRIO", margin, 18);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", margin, 24);
       }
 
       doc.setTextColor(255, 255, 255);
@@ -308,23 +319,34 @@ const DeliveryDetail: React.FC = () => {
         margin: { left: margin, right: margin },
         theme: 'striped',
         head: [['DESIGNAÇÃO DO MATERIAL', 'QUANTIDADE']],
-        body: delivery.items.map(item => [
-          item.name.toUpperCase() + (item.delivered ? ' (ENTREGUE)' : ' (PENDENTE)'), 
-          `${item.quantity} UN`
-        ]),
+        body: delivery.items.map(item => {
+          let name = item.name.toUpperCase();
+          if (item.delivered) {
+            name += ' (ENTREGUE)';
+            if (item.delivered_at) {
+              name += `\nEntregue a: ${new Date(item.delivered_at).toLocaleString('pt-PT')}`;
+            } else if (delivery.delivered_at) {
+               // Fallback if item doesn't have date but delivery has (legacy data)
+               name += `\nEntregue a: ${new Date(delivery.delivered_at).toLocaleString('pt-PT')}`;
+            }
+          } else {
+            name += ' (PENDENTE)';
+          }
+          return [name, `${item.quantity} UN`];
+        }),
         headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
         styles: { fontSize: 8, cellPadding: 4 },
         columnStyles: { 
           0: { cellWidth: 'auto' },
           1: { halign: 'right', cellWidth: 30 } 
         },
-        didDrawCell: (data) => {
+        didParseCell: (data) => {
           if (data.section === 'body' && data.column.index === 0) {
-            const text = data.cell.text[0];
+            const text = data.cell.raw as string;
             if (text.includes('(ENTREGUE)')) {
-              doc.setTextColor(16, 185, 129); // Emerald-600
+              data.cell.styles.textColor = [16, 185, 129]; // Emerald-600
             } else {
-              doc.setTextColor(245, 158, 11); // Amber-500
+              data.cell.styles.textColor = [245, 158, 11]; // Amber-500
             }
           }
         }

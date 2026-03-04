@@ -257,6 +257,7 @@ export interface MaterialDeliveryItem {
   name: string;
   quantity: number;
   delivered?: boolean;
+  delivered_at?: string;
 }
 
 export interface MaterialDelivery {
