@@ -5,19 +5,28 @@ const INITIAL_RETRY_DELAY = 1000; // 1 second
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const callGeminiWithRetry = async (fn: () => Promise<any>, retries = MAX_RETRIES): Promise<any> => {
+const callGeminiWithRetry = async (ai: any, params: any, retries = MAX_RETRIES): Promise<any> => {
   try {
-    return await fn();
+    return await ai.models.generateContent(params);
   } catch (error: any) {
     const isRetryable = error?.message?.includes('503') || 
                         error?.message?.includes('high demand') || 
-                        error?.message?.includes('UNAVAILABLE');
+                        error?.message?.includes('UNAVAILABLE') ||
+                        error?.message?.includes('429');
     
     if (isRetryable && retries > 0) {
       const delay = INITIAL_RETRY_DELAY * (MAX_RETRIES - retries + 1);
-      console.warn(`Gemini API busy (503). Retrying in ${delay}ms... (${retries} attempts left)`);
+      console.warn(`Gemini API busy or rate limited. Retrying in ${delay}ms... (${retries} attempts left)`);
+      
+      // Fallback strategy: if gemini-3 fails, try gemini-flash-latest or vice versa
+      if (params.model === 'gemini-3-flash-preview') {
+        params.model = 'gemini-flash-latest';
+      } else if (params.model === 'gemini-flash-latest') {
+        params.model = 'gemini-3.1-flash-lite-preview';
+      }
+
       await sleep(delay);
-      return callGeminiWithRetry(fn, retries - 1);
+      return callGeminiWithRetry(ai, params, retries - 1);
     }
     throw error;
   }
@@ -53,8 +62,8 @@ export const extractDeliveryDataFromPDF = async (pdfBase64: string): Promise<any
       Retorna APENAS o JSON válido.
     `;
 
-    const response = await callGeminiWithRetry(() => ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+    const response = await callGeminiWithRetry(ai, {
+      model: 'gemini-flash-latest', // Usar 1.5 Flash por defeito (mais rápido e estável)
       contents: {
         parts: [
           {
@@ -71,7 +80,7 @@ export const extractDeliveryDataFromPDF = async (pdfBase64: string): Promise<any
       config: {
         responseMimeType: "application/json",
       }
-    }));
+    });
 
     const text = response.text?.trim();
     if (!text) throw new Error("Resposta vazia da IA.");
@@ -80,7 +89,7 @@ export const extractDeliveryDataFromPDF = async (pdfBase64: string): Promise<any
   } catch (error: any) {
     console.error("Erro Gemini PDF:", error);
     if (error?.message?.includes('503') || error?.message?.includes('high demand')) {
-      throw new Error("O serviço de IA está temporariamente sobrecarregado. Por favor, tente novamente dentro de alguns segundos.");
+      throw new Error("O serviço de IA está temporariamente sobrecarregado em todos os modelos. Por favor, tente novamente dentro de alguns segundos.");
     }
     throw new Error("Falha ao analisar o documento com IA. Verifique o ficheiro e tente novamente.");
   }
@@ -120,10 +129,10 @@ export const generateOSReportSummary = async (
       5. RETORNA APENAS O TEXTO DO RESUMO.
     `;
 
-    const response: GenerateContentResponse = await callGeminiWithRetry(() => ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+    const response: GenerateContentResponse = await callGeminiWithRetry(ai, {
+      model: 'gemini-flash-latest',
       contents: prompt,
-    }));
+    });
 
     return response.text?.trim() || "Não foi possível gerar um resumo automático.";
   } catch (error: any) {
