@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 // Added ChevronRight to the lucide-react imports
-import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, ChevronRight, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench, RefreshCw, Loader2, QrCode, Scan, Building2, Calculator, Info, CheckCircle2, Truck } from 'lucide-react';
+import { Menu, X, ClipboardList, Users as UsersIcon, HardDrive, LayoutDashboard, LogOut, User, Plus, ArrowUp, Package, MapPin, ChevronDown, ChevronRight, Bell, Activity, ArrowRight, History, Search, Calendar, Palmtree, UserCog, Sun, Moon, Wrench, RefreshCw, Loader2, QrCode, Scan, Building2, Calculator, Info, CheckCircle2, Truck, Box } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { UserRole, OSActivity, ServiceOrder, Client, Equipment, Establishment } from '../types';
 import { mockData } from '../services/mockData';
@@ -259,6 +259,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     { name: 'Orçamentos', path: '/quotes', icon: Calculator },
     { name: 'Clientes', path: '/clients', icon: UsersIcon },
     { name: 'Stock & Catálogo', path: '/inventory', icon: Package },
+    { name: 'Entregas de Material', path: '/deliveries', icon: Box },
     { name: 'Gestão de Frota', path: '/fleet', icon: Truck },
     ...(isAdmin ? [
       { name: 'Equipa', path: '/users', icon: UserCog }
@@ -364,22 +365,24 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 dark:text-slate-500"><ChevronDown size={14} /></div>
              </div>
           </div>
-          <nav className="px-3 py-2 space-y-1 flex-1 overflow-y-auto no-scrollbar bg-white dark:bg-slate-900">
-            {navItems.map((item) => (
-              <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)} className={`flex items-center px-4 py-3.5 text-xs font-medium uppercase tracking-widest rounded-xl transition-all ${isActive(item.path) ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/10 dark:shadow-blue-900/20 translate-x-1' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-white'}`}>
-                <item.icon className={`mr-3 h-5 w-5 ${isActive(item.path) ? 'text-white' : 'text-slate-400 group-hover:text-blue-500'}`} />{item.name}
+          <div className="flex-1 overflow-y-auto no-scrollbar bg-white dark:bg-slate-900">
+            <nav className="px-3 py-2 space-y-0.5">
+              {navItems.map((item) => (
+                <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)} className={`flex items-center px-4 py-2.5 text-xs font-medium uppercase tracking-widest rounded-xl transition-all ${isActive(item.path) ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/10 dark:shadow-blue-900/20 translate-x-1' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-white'}`}>
+                  <item.icon className={`mr-3 h-5 w-5 ${isActive(item.path) ? 'text-white' : 'text-slate-400 group-hover:text-blue-500'}`} />{item.name}
+                </Link>
+              ))}
+            </nav>
+            <div className="px-3 py-2 border-t border-slate-100 dark:border-slate-800 space-y-0.5">
+              <button onClick={toggleTheme} className="flex items-center w-full px-4 py-2.5 text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group">
+                {theme === 'light' ? <><Moon className="mr-3 h-4 w-4 text-slate-400 group-hover:text-blue-500" />MODO ESCURO</> : <><Sun className="mr-3 h-4 w-4 text-slate-400 group-hover:text-yellow-500" />MODO CLARO</>}
+              </button>
+              <Link to="/profile" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 px-4 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group">
+                <div className="w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all"><User size={16} /></div>
+                <div className="flex flex-col min-w-0"><span className="text-[10px] font-medium text-slate-900 dark:text-white uppercase truncate">{activeSessionUser?.full_name || 'Utilizador'}</span><span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-tighter truncate">Ver Perfil</span></div>
               </Link>
-            ))}
-          </nav>
-          <div className="bg-white dark:bg-slate-900 p-4 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
-            <button onClick={toggleTheme} className="flex items-center w-full px-4 py-3.5 text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors mb-2 group">
-              {theme === 'light' ? <><Moon className="mr-3 h-4 w-4 text-slate-400 group-hover:text-blue-500" />Modo Escuro</> : <><Sun className="mr-3 h-4 w-4 text-slate-400 group-hover:text-yellow-500" />Modo Claro</>}
-            </button>
-            <Link to="/profile" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group mb-2">
-              <div className="w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all"><User size={16} /></div>
-              <div className="flex flex-col min-w-0"><span className="text-[10px] font-medium text-slate-900 dark:text-white uppercase truncate">{activeSessionUser?.full_name || 'Utilizador'}</span><span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-tighter truncate">Ver Perfil</span></div>
-            </Link>
-            <button onClick={handleLogoutClick} className="flex items-center w-full px-4 py-3 text-[10px] font-medium text-red-500 dark:text-red-400 uppercase tracking-widest rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"><LogOut className="mr-3 h-4 w-4" />Sair da Conta</button>
+              <button onClick={handleLogoutClick} className="flex items-center w-full px-4 py-2.5 text-[10px] font-medium text-red-500 dark:text-red-400 uppercase tracking-widest rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"><LogOut className="mr-3 h-4 w-4" />Sair da Conta</button>
+            </div>
           </div>
         </div>
       </aside>

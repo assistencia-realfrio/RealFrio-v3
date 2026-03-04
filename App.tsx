@@ -24,6 +24,10 @@ import EditEquipment from './pages/EditEquipment';
 import EquipmentDetail from './pages/EquipmentDetail';
 import Equipments from './pages/Equipments';
 import Inventory from './pages/Inventory';
+import Deliveries from './pages/Deliveries';
+import NewDelivery from './pages/NewDelivery';
+import EditDelivery from './pages/EditDelivery';
+import DeliveryDetail from './pages/DeliveryDetail';
 import Profile from './pages/Profile';
 import Users from './pages/Users';
 import Maintenance from './pages/Maintenance';
@@ -211,6 +215,10 @@ const AppContent: React.FC<{
         <Route path="/equipments/:id/edit" element={user ? <Layout user={user} onLogout={onLogout}><EditEquipment /></Layout> : <Navigate to="/login" />} />
         
         <Route path="/inventory" element={user ? <Layout user={user} onLogout={onLogout}><Inventory /></Layout> : <Navigate to="/login" />} />
+        <Route path="/deliveries" element={user ? <Layout user={user} onLogout={onLogout}><Deliveries /></Layout> : <Navigate to="/login" />} />
+        <Route path="/deliveries/new" element={user ? <Layout user={user} onLogout={onLogout}><NewDelivery /></Layout> : <Navigate to="/login" />} />
+        <Route path="/deliveries/:id/edit" element={user ? <Layout user={user} onLogout={onLogout}><EditDelivery /></Layout> : <Navigate to="/login" />} />
+        <Route path="/deliveries/:id" element={user ? <Layout user={user} onLogout={onLogout}><DeliveryDetail /></Layout> : <Navigate to="/login" />} />
         <Route path="/fleet" element={user ? <Layout user={user} onLogout={onLogout}><FleetManagement /></Layout> : <Navigate to="/login" />} />
         <Route path="/users" element={user && user.role === UserRole.ADMIN ? <Layout user={user} onLogout={onLogout}><Users /></Layout> : <Navigate to="/" />} />
         <Route path="/maintenance" element={user && user.role === UserRole.ADMIN ? <Layout user={user} onLogout={onLogout}><Maintenance /></Layout> : <Navigate to="/" />} />

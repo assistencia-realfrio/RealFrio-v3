@@ -691,5 +691,31 @@ export const mockData = {
       }
     }
     return repairedCount;
+  },
+
+  // Material Deliveries
+  getMaterialDeliveries: async () => {
+    const { data, error } = await supabase.from('material_deliveries').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+  getMaterialDeliveryById: async (id: string) => {
+    const { data, error } = await supabase.from('material_deliveries').select('*').eq('id', id).single();
+    if (error) throw error;
+    return data;
+  },
+  createMaterialDelivery: async (delivery: any) => {
+    const { data, error } = await supabase.from('material_deliveries').insert([delivery]).select().single();
+    if (error) throw error;
+    return data;
+  },
+  updateMaterialDelivery: async (id: string, updates: any) => {
+    const { data, error } = await supabase.from('material_deliveries').update(updates).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  },
+  deleteMaterialDelivery: async (id: string) => {
+    const { error } = await supabase.from('material_deliveries').delete().eq('id', id);
+    if (error) throw error;
   }
 };

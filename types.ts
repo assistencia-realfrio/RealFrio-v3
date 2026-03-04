@@ -251,3 +251,27 @@ export interface TimeEntry {
   duration_minutes: number;
   description?: string;
 }
+
+export interface MaterialDeliveryItem {
+  id: string;
+  name: string;
+  quantity: number;
+  delivered?: boolean;
+}
+
+export interface MaterialDelivery {
+  id: string;
+  client_name: string;
+  client_nif?: string;
+  loading_address?: string;
+  unloading_address?: string;
+  at_code?: string;
+  items: MaterialDeliveryItem[];
+  status: 'pending' | 'partial' | 'delivered' | 'canceled';
+  client_signature?: string;
+  partial_signature?: string;
+  partial_delivered_at?: string;
+  notes?: string;
+  created_at: string;
+  delivered_at?: string;
+}
