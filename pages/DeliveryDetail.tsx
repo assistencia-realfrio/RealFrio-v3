@@ -500,7 +500,7 @@ const DeliveryDetail: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <div className="space-y-6">
           <div className="bg-white dark:bg-slate-900 rounded-[2rem] sm:rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-slate-800 p-6 sm:p-8 space-y-6">
             <div>
@@ -545,6 +545,87 @@ const DeliveryDetail: React.FC = () => {
                 )}
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-900 rounded-[2rem] sm:rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-slate-800 p-6 sm:p-8 space-y-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                <Box size={18} className="text-blue-500" /> Artigos Entregues
+              </h3>
+              
+              {(delivery.status === 'pending' || delivery.status === 'partial') && (
+                <button 
+                  onClick={() => {
+                    const selectableIds = delivery.items
+                      .filter(i => !i.delivered)
+                      .map(i => i.id);
+                    
+                    const allSelectableSelected = selectableIds.length > 0 && 
+                      selectableIds.every(id => selectedItemIds.includes(id));
+
+                    if (allSelectableSelected) {
+                      setSelectedItemIds(selectedItemIds.filter(id => !selectableIds.includes(id)));
+                    } else {
+                      setSelectedItemIds([...new Set([...selectedItemIds, ...selectableIds])]);
+                    }
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl border border-slate-100 dark:border-slate-700 text-[9px] font-black uppercase tracking-widest hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 transition-all active:scale-95"
+                >
+                  {delivery.items.filter(i => !i.delivered).length > 0 && 
+                   delivery.items.filter(i => !i.delivered).every(i => selectedItemIds.includes(i.id)) ? (
+                    <><CheckSquare size={14} /> Desmarcar Pendentes</>
+                  ) : (
+                    <><Square size={14} /> Marcar Pendentes</>
+                  )}
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {delivery.items.map((item, index) => {
+                const isSelected = selectedItemIds.includes(item.id);
+                const canSelect = !item.delivered && (delivery.status === 'pending' || delivery.status === 'partial');
+                
+                return (
+                  <div 
+                    key={item.id || index} 
+                    onClick={() => canSelect && toggleItemSelection(item.id)}
+                    className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                      item.delivered 
+                        ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30 opacity-80' 
+                        : isSelected 
+                          ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' 
+                          : 'bg-slate-50 dark:bg-slate-950 border-slate-100 dark:border-slate-800'
+                    } ${canSelect ? 'cursor-pointer active:scale-[0.98]' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {canSelect ? (
+                        <div className={`transition-colors ${isSelected ? 'text-blue-600' : 'text-slate-300'}`}>
+                          {isSelected ? <CheckSquare size={20} /> : <Square size={20} />}
+                        </div>
+                      ) : item.delivered ? (
+                        <div className="text-emerald-600">
+                          <CheckCircle2 size={20} />
+                        </div>
+                      ) : null}
+                      
+                      <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs font-black">
+                        {item.quantity}
+                      </div>
+                      <p className={`text-xs font-black uppercase ${item.delivered ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
+                        {item.name}
+                      </p>
+                    </div>
+                    
+                    {item.delivered && (
+                      <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded-lg">Entregue</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {(delivery.status === 'pending' || delivery.status === 'partial') && (
@@ -622,56 +703,6 @@ const DeliveryDetail: React.FC = () => {
               )}
             </div>
           )}
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 rounded-[2rem] sm:rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-slate-800 p-6 sm:p-8 space-y-6">
-          <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2 mb-6">
-            <Box size={18} className="text-blue-500" /> Artigos Entregues
-          </h3>
-
-          <div className="space-y-3">
-            {delivery.items.map((item, index) => {
-              const isSelected = selectedItemIds.includes(item.id);
-              const canSelect = !item.delivered && (delivery.status === 'pending' || delivery.status === 'partial');
-              
-              return (
-                <div 
-                  key={item.id || index} 
-                  onClick={() => canSelect && toggleItemSelection(item.id)}
-                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
-                    item.delivered 
-                      ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30 opacity-80' 
-                      : isSelected 
-                        ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' 
-                        : 'bg-slate-50 dark:bg-slate-950 border-slate-100 dark:border-slate-800'
-                  } ${canSelect ? 'cursor-pointer active:scale-[0.98]' : ''}`}
-                >
-                  <div className="flex items-center gap-3">
-                    {canSelect ? (
-                      <div className={`transition-colors ${isSelected ? 'text-blue-600' : 'text-slate-300'}`}>
-                        {isSelected ? <CheckSquare size={20} /> : <Square size={20} />}
-                      </div>
-                    ) : item.delivered ? (
-                      <div className="text-emerald-600">
-                        <CheckCircle2 size={20} />
-                      </div>
-                    ) : null}
-                    
-                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs font-black">
-                      {item.quantity}
-                    </div>
-                    <p className={`text-xs font-black uppercase ${item.delivered ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
-                      {item.name}
-                    </p>
-                  </div>
-                  
-                  {item.delivered && (
-                    <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded-lg">Entregue</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
         </div>
       </div>
 
