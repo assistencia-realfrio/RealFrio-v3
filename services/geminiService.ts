@@ -1,12 +1,12 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configure worker with a more reliable CDN and correct file extension for v5+
-// We use unpkg which mirrors npm directly, ensuring version match
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+// Configure worker with a reliable CDN
+// Using jsdelivr which is often more reliable for modules
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY = 2000; // Increased delay
+const INITIAL_RETRY_DELAY = 2000;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -23,11 +23,11 @@ const callGeminiWithRetry = async (ai: any, params: any, retries = MAX_RETRIES):
       const delay = INITIAL_RETRY_DELAY * (MAX_RETRIES - retries + 1);
       console.warn(`Gemini API busy or rate limited. Retrying in ${delay}ms... (${retries} attempts left)`);
       
-      // Fallback strategy: try different models
-      if (params.model === 'gemini-1.5-flash') {
-        params.model = 'gemini-1.5-pro';
-      } else if (params.model === 'gemini-1.5-pro') {
-        params.model = 'gemini-1.5-flash-8b';
+      // Fallback strategy: try different valid models
+      if (params.model === 'gemini-3-flash-preview') {
+        params.model = 'gemini-3.1-flash-lite-preview';
+      } else if (params.model === 'gemini-3.1-flash-lite-preview') {
+        params.model = 'gemini-flash-latest';
       }
 
       await sleep(delay);
@@ -118,7 +118,7 @@ export const extractDeliveryDataFromPDF = async (pdfBase64: string): Promise<any
     };
 
     const response = await callGeminiWithRetry(ai, {
-      model: 'gemini-1.5-flash', // Usar versão estável de produção
+      model: 'gemini-3-flash-preview', // Use recommended model
       contents: contents,
       config: {
         responseMimeType: "application/json",
@@ -176,7 +176,7 @@ export const generateOSReportSummary = async (
     `;
 
     const response: GenerateContentResponse = await callGeminiWithRetry(ai, {
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
     });
 
