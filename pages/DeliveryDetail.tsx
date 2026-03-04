@@ -154,7 +154,7 @@ const DeliveryDetail: React.FC = () => {
       // Prepare the minimal, safe update object
       const safeUpdates: any = {
         items: updatedItems,
-        status: allDelivered ? 'delivered' : 'pending',
+        status: allDelivered ? 'delivered' : 'partial',
       };
 
       if (allDelivered) {
@@ -195,7 +195,10 @@ const DeliveryDetail: React.FC = () => {
 
   const getBase64ImageFromURL = async (url: string): Promise<string | null> => {
     try {
-      const response = await fetch(url);
+      // Ensure absolute path for fetch to avoid relative path issues in different environments
+      const absoluteUrl = url.startsWith('/') ? window.location.origin + url : url;
+      const response = await fetch(absoluteUrl);
+      if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
       const blob = await response.blob();
       return new Promise((resolve) => {
         const reader = new FileReader();
@@ -238,14 +241,14 @@ const DeliveryDetail: React.FC = () => {
         doc.setFont("helvetica", "normal");
         doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", margin + 25, 24);
       } else {
-        // Fallback text if no logo
+        // Fallback text if no logo is found
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(16);
+        doc.setFontSize(18);
         doc.setFont("helvetica", "bold");
         doc.text("REAL FRIO", margin, 18);
-        doc.setFontSize(8);
+        doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
-        doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", margin, 24);
+        doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", margin, 25);
       }
 
       doc.setTextColor(255, 255, 255);
@@ -314,6 +317,8 @@ const DeliveryDetail: React.FC = () => {
       
       currentY += 4;
       
+      const allDelivered = delivery.items.every(item => item.delivered);
+
       autoTable(doc, {
         startY: currentY,
         margin: { left: margin, right: margin },
@@ -323,11 +328,10 @@ const DeliveryDetail: React.FC = () => {
           let name = item.name.toUpperCase();
           if (item.delivered) {
             name += ' (ENTREGUE)';
-            if (item.delivered_at) {
-              name += `\nEntregue a: ${new Date(item.delivered_at).toLocaleString('pt-PT')}`;
-            } else if (delivery.delivered_at) {
-               // Fallback if item doesn't have date but delivery has (legacy data)
-               name += `\nEntregue a: ${new Date(delivery.delivered_at).toLocaleString('pt-PT')}`;
+            // Use item.delivered_at if available, fallback to delivery dates for legacy data
+            const itemDate = item.delivered_at || (allDelivered ? delivery.delivered_at : delivery.partial_delivered_at);
+            if (itemDate) {
+              name += `\nEntregue a: ${new Date(itemDate).toLocaleString('pt-PT')}`;
             }
           } else {
             name += ' (PENDENTE)';
@@ -342,11 +346,13 @@ const DeliveryDetail: React.FC = () => {
         },
         didParseCell: (data) => {
           if (data.section === 'body' && data.column.index === 0) {
-            const text = data.cell.raw as string;
-            if (text.includes('(ENTREGUE)')) {
+            const cellText = data.cell.text.join(' ');
+            if (cellText.includes('(ENTREGUE)')) {
               data.cell.styles.textColor = [16, 185, 129]; // Emerald-600
-            } else {
+              data.cell.styles.fontStyle = 'bold';
+            } else if (cellText.includes('(PENDENTE)')) {
               data.cell.styles.textColor = [245, 158, 11]; // Amber-500
+              data.cell.styles.fontStyle = 'bold';
             }
           }
         }
