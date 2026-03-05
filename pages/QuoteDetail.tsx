@@ -37,20 +37,26 @@ const QuoteDetail: React.FC = () => {
   });
 
   useEffect(() => { 
-    if (id) fetchData(); 
+    if (id) {
+      setRecipientEmail('');
+      fetchData(); 
+    }
   }, [id]);
 
   useEffect(() => {
-    if (quote?.client?.email) {
+    if (quote?.client?.email && !recipientEmail) {
       setRecipientEmail(quote.client.email);
     }
-  }, [quote]);
+  }, [quote, recipientEmail]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const data = await mockData.getQuoteById(id!);
       setQuote(data);
+      if (data?.client?.email) {
+        setRecipientEmail(data.client.email);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -410,13 +416,13 @@ const QuoteDetail: React.FC = () => {
         const doc = await generateInsurancePDF();
         if (doc) {
           const blob = doc.output('blob');
-          files.push(new File([blob], `RELATORIO_PERITAGEM_${quote.code}.code.pdf`, { type: 'application/pdf' }));
+          files.push(new File([blob], `RELATORIO_PERITAGEM_${quote.code}.pdf`, { type: 'application/pdf' }));
         }
       }
 
-      const clientEmail = recipientEmail || quote.client?.email || '';
+      const clientEmail = recipientEmail.trim() || quote?.client?.email || '';
       const subject = `Proposta Comercial Real Frio - ${quote.code}`;
-      const body = `Exmo.(a) Sr.(a) ${quote.client?.name},\n\nSegue em anexo a documentação referente ao orçamento ${quote.code}.\n\nMelhores cumprimentos,\nReal Frio, Lda`;
+      const body = `Exmo.(a) Sr.(a) ${quote.client?.name || 'Cliente'},\n\nSegue em anexo a documentação referente ao orçamento ${quote.code}.\n\nMelhores cumprimentos,\nReal Frio, Lda`;
 
       if (navigator.share && navigator.canShare && navigator.canShare({ files })) {
         await navigator.share({

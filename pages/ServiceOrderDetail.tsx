@@ -253,7 +253,18 @@ export const ServiceOrderDetail: React.FC = () => {
     );
   }, [os, description, anomaly, resolutionNotes, observations, scheduledDate, scheduledTime, clientSignature, technicianSignature, isWarranty, warrantyInfo, callBeforeGoing, contactName, contactPhone]);
 
-  useEffect(() => { fetchOSDetails(); }, [id]);
+  useEffect(() => { 
+    if (id) {
+      setRecipientEmail('');
+      fetchOSDetails(); 
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (os?.client?.email && !recipientEmail) {
+      setRecipientEmail(os.client.email);
+    }
+  }, [os, recipientEmail]);
 
   useEffect(() => {
     if (activeTab === 'info' && descTextareaRef.current) {
@@ -719,9 +730,9 @@ export const ServiceOrderDetail: React.FC = () => {
       const file = new File([blob], `RELATORIO_REALFRIO_${os.code}.pdf`, { type: 'application/pdf' });
       const files = [file];
 
-      const clientEmail = recipientEmail || os.client?.email || '';
+      const clientEmail = recipientEmail.trim() || os.client?.email || '';
       const subject = `Relatório Técnico Real Frio - ${os.code}`;
-      const body = `Exmo.(a) Sr.(a) ${os.client?.name},\n\nSegue em anexo o relatório técnico referente à intervenção ${os.code}.\n\nMelhores cumprimentos,\nReal Frio, Lda`;
+      const body = `Exmo.(a) Sr.(a) ${os.client?.name || 'Cliente'},\n\nSegue em anexo o relatório técnico referente à intervenção ${os.code}.\n\nMelhores cumprimentos,\nReal Frio, Lda`;
 
       if (navigator.share && navigator.canShare && navigator.canShare({ files })) {
         await navigator.share({
