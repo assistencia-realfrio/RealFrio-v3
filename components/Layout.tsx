@@ -8,6 +8,7 @@ import { UserRole, OSActivity, ServiceOrder, Client, Equipment, Establishment } 
 import { mockData } from '../services/mockData';
 import { supabase } from '../supabaseClient';
 import BrandLogo from './BrandLogo';
+import PWAInstallPrompt from './PWAInstallPrompt';
 import { useStore } from '../contexts/StoreContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { normalizeString } from '../utils';
@@ -374,6 +375,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               ))}
             </nav>
             <div className="px-3 py-2 border-t border-slate-100 dark:border-slate-800 space-y-0.5">
+              <PWAInstallPrompt />
               <button onClick={toggleTheme} className="flex items-center w-full px-4 py-2.5 text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group">
                 {theme === 'light' ? <><Moon className="mr-3 h-4 w-4 text-slate-400 group-hover:text-blue-500" />MODO ESCURO</> : <><Sun className="mr-3 h-4 w-4 text-slate-400 group-hover:text-yellow-500" />MODO CLARO</>}
               </button>

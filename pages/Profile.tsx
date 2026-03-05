@@ -12,6 +12,7 @@ import { mockData } from '../services/mockData';
 import { notificationService } from '../services/notificationService';
 import { useNavigate } from 'react-router-dom';
 import { Vacation, VacationStatus, Profile as UserProfile } from '../types';
+import PWAInstallPrompt from '../components/PWAInstallPrompt';
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
@@ -372,6 +373,9 @@ const Profile: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* INSTALAÇÃO PWA */}
+      <PWAInstallPrompt variant="profile" />
 
       {/* SEGURANÇA */}
       <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 p-8 space-y-8 transition-all">

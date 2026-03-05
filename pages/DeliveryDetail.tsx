@@ -49,7 +49,6 @@ const DeliveryDetail: React.FC = () => {
           ...item,
           id: item.id || `item-${idx}`
         })),
-        client_nif: data.client_nif || metadata.client_nif,
         partial_signature: data.partial_signature || metadata.partial_signature,
         partial_delivered_at: data.partial_delivered_at || metadata.partial_delivered_at,
         // If status is pending but we have partial info or real_status, treat as partial
@@ -147,7 +146,6 @@ const DeliveryDetail: React.FC = () => {
 
       const newMetadata = {
         ...metadata,
-        client_nif: delivery.client_nif,
         real_status: allDelivered ? 'delivered' : 'partial'
       };
 
@@ -278,11 +276,8 @@ const DeliveryDetail: React.FC = () => {
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
-      if (delivery.client_nif) {
-        doc.text(`NIF: ${delivery.client_nif}`, margin + 5, currentY + 21);
-      }
       if (delivery.at_code) {
-        doc.text(`CÓDIGO AT: ${delivery.at_code}`, margin + 5, currentY + 26);
+        doc.text(`CÓDIGO AT: ${delivery.at_code}`, margin + 5, currentY + 21);
       }
 
       // Addresses
@@ -298,13 +293,6 @@ const DeliveryDetail: React.FC = () => {
         doc.text("CARGA:", col2X, currentY + 13);
         doc.setTextColor(40, 40, 40);
         doc.text(delivery.loading_address.toUpperCase(), col2X + 12, currentY + 13, { maxWidth: (contentWidth / 2) - 20 });
-      }
-      
-      doc.setTextColor(100, 116, 139);
-      if (delivery.unloading_address) {
-        doc.text("DESCARGA:", col2X, currentY + 22);
-        doc.setTextColor(40, 40, 40);
-        doc.text(delivery.unloading_address.toUpperCase(), col2X + 17, currentY + 22, { maxWidth: (contentWidth / 2) - 25 });
       }
 
       currentY += 45;
@@ -506,9 +494,6 @@ const DeliveryDetail: React.FC = () => {
             <div>
               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cliente</h3>
               <p className="text-lg font-black text-slate-900 dark:text-white uppercase">{delivery.client_name}</p>
-              {delivery.client_nif && (
-                <p className="text-xs font-bold text-slate-500 uppercase mt-1">NIF: {delivery.client_nif}</p>
-              )}
             </div>
 
             {delivery.at_code && (
@@ -523,26 +508,15 @@ const DeliveryDetail: React.FC = () => {
               </div>
             )}
 
-            {(delivery.loading_address || delivery.unloading_address) && (
+            {delivery.loading_address && (
               <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                {delivery.loading_address && (
-                  <div className="flex gap-3">
-                    <MapPin size={16} className="text-slate-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Morada de Carga</h3>
-                      <p className="text-xs font-bold text-slate-900 dark:text-white uppercase">{delivery.loading_address}</p>
-                    </div>
+                <div className="flex gap-3">
+                  <MapPin size={16} className="text-slate-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Morada de Carga</h3>
+                    <p className="text-xs font-bold text-slate-900 dark:text-white uppercase">{delivery.loading_address}</p>
                   </div>
-                )}
-                {delivery.unloading_address && (
-                  <div className="flex gap-3">
-                    <MapPin size={16} className="text-blue-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <h3 className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-0.5">Morada de Descarga</h3>
-                      <p className="text-xs font-bold text-slate-900 dark:text-white uppercase">{delivery.unloading_address}</p>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             )}
           </div>

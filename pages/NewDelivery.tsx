@@ -1,9 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, FileText, Loader2, Check, AlertCircle, Box, MapPin, Hash, Trash2, Plus } from 'lucide-react';
+import { ArrowLeft, Upload, FileText, Loader2, Check, AlertCircle, Box, MapPin, Hash, Trash2, Plus, Search, User } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { extractDeliveryDataFromPDF } from '../services/geminiService';
-import { MaterialDeliveryItem } from '../types';
+import { MaterialDeliveryItem, Client, Establishment } from '../types';
 
 const NewDelivery: React.FC = () => {
   const navigate = useNavigate();
@@ -12,14 +12,66 @@ const NewDelivery: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [clients, setClients] = useState<Client[]>([]);
+  const [establishments, setEstablishments] = useState<Establishment[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [selectedEstId, setSelectedEstId] = useState<string>('');
+
   const [formData, setFormData] = useState({
     client_name: '',
-    client_nif: '',
-    loading_address: '',
-    unloading_address: '',
+    loading_address: 'Real Frio - CR',
     at_code: '',
   });
+  const [loadingAddressType, setLoadingAddressType] = useState<'CR' | 'PM' | 'other'>('CR');
   const [items, setItems] = useState<MaterialDeliveryItem[]>([]);
+
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  const fetchClients = async () => {
+    try {
+      const data = await mockData.getClients();
+      setClients(data);
+    } catch (err) {
+      console.error("Erro ao carregar clientes:", err);
+    }
+  };
+
+  const handleClientChange = async (clientId: string) => {
+    setSelectedClientId(clientId);
+    setSelectedEstId('');
+    
+    if (clientId) {
+      const client = clients.find(c => c.id === clientId);
+      if (client) {
+        setFormData(prev => ({
+          ...prev,
+          client_name: client.name
+        }));
+        
+        try {
+          const ests = await mockData.getEstablishmentsByClient(clientId);
+          setEstablishments(ests);
+          if (ests.length > 0) {
+            // Se houver apenas um (geralmente a SEDE), seleciona automaticamente
+            if (ests.length === 1) {
+              const sede = ests[0];
+              setSelectedEstId(sede.id);
+            }
+          }
+        } catch (err) {
+          console.error("Erro ao carregar estabelecimentos:", err);
+        }
+      }
+    } else {
+      // Se desmarcar o cliente, não limpamos os campos para permitir edição manual
+    }
+  };
+
+  const handleEstChange = (estId: string) => {
+    setSelectedEstId(estId);
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -42,21 +94,20 @@ const NewDelivery: React.FC = () => {
         try {
           const extractedData = await extractDeliveryDataFromPDF(base64String);
           
-          setFormData({
-            client_name: extractedData.client_name || '',
-            client_nif: extractedData.client_nif || '',
-            loading_address: extractedData.loading_address || '',
-            unloading_address: extractedData.unloading_address || '',
-            at_code: extractedData.at_code || '',
-          });
-          
+          // Apenas importamos os artigos, conforme solicitado
           if (extractedData.items && Array.isArray(extractedData.items)) {
-            setItems(extractedData.items.map((i: any) => ({
+            const newItems = extractedData.items.map((i: any) => ({
               id: Math.random().toString(36).substr(2, 9),
               name: i.name || 'Artigo Desconhecido',
               quantity: Number(i.quantity) || 1,
               delivered: false
-            })));
+            }));
+            setItems(prev => [...prev, ...newItems]);
+          }
+
+          // Opcionalmente, podemos importar o código AT se existir
+          if (extractedData.at_code && !formData.at_code) {
+            setFormData(prev => ({ ...prev, at_code: extractedData.at_code }));
           }
         } catch (err: any) {
           setError(err.message || "Erro ao extrair dados do PDF.");
@@ -74,11 +125,18 @@ const NewDelivery: React.FC = () => {
     }
   };
 
-  const handleSave = async () => {
-    if (!formData.client_name) {
-      setError("O nome do cliente é obrigatório.");
-      return;
+  const handleLoadingAddressTypeChange = (type: 'CR' | 'PM' | 'other') => {
+    setLoadingAddressType(type);
+    if (type === 'CR') {
+      setFormData(prev => ({ ...prev, loading_address: 'Real Frio - CR' }));
+    } else if (type === 'PM') {
+      setFormData(prev => ({ ...prev, loading_address: 'Real Frio - PM' }));
+    } else {
+      setFormData(prev => ({ ...prev, loading_address: '' }));
     }
+  };
+
+  const handleSave = async () => {
     if (items.length === 0) {
       setError("Adicione pelo menos um artigo à entrega.");
       return;
@@ -88,23 +146,17 @@ const NewDelivery: React.FC = () => {
     setError(null);
 
     try {
-      const payload: any = {
+      const payload = {
         ...formData,
         items,
         status: 'pending',
-        notes: JSON.stringify({ client_nif: formData.client_nif })
+        notes: JSON.stringify({ 
+          client_id: selectedClientId || null,
+          establishment_id: selectedEstId || null
+        })
       };
 
-      let newDelivery;
-      try {
-        newDelivery = await mockData.createMaterialDelivery(payload);
-      } catch (e) {
-        console.warn("Retrying without client_nif column:", e);
-        const safePayload = { ...payload };
-        delete safePayload.client_nif;
-        newDelivery = await mockData.createMaterialDelivery(safePayload);
-      }
-      
+      const newDelivery = await mockData.createMaterialDelivery(payload);
       navigate(`/deliveries/${newDelivery.id}`);
     } catch (err: any) {
       setError(err.message || "Erro ao guardar a entrega.");
@@ -191,55 +243,97 @@ const NewDelivery: React.FC = () => {
         </h3>
 
         <div className="space-y-4">
+          {/* Seleção de Cliente */}
           <div className="grid grid-cols-1 gap-4">
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Nome do Cliente *</label>
-              <input 
-                type="text" 
-                className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all uppercase"
-                value={formData.client_name} 
-                onChange={e => setFormData({...formData, client_name: e.target.value})}
-                placeholder="EX: RESTAURANTE O MAR"
-              />
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Selecionar Cliente (Base de Dados)</label>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                <select 
+                  className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all uppercase appearance-none"
+                  value={selectedClientId}
+                  onChange={(e) => handleClientChange(e.target.value)}
+                >
+                  <option value="">-- SELECIONAR CLIENTE OU INTRODUZIR MANUALMENTE --</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
+
+            {selectedClientId && establishments.length > 0 && (
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Estabelecimento / Local de Entrega</label>
+                <div className="relative">
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                  <select 
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all uppercase appearance-none"
+                    value={selectedEstId}
+                    onChange={(e) => handleEstChange(e.target.value)}
+                  >
+                    <option value="">-- SELECIONAR ESTABELECIMENTO --</option>
+                    {establishments.map(e => (
+                      <option key={e.id} value={e.id}>{e.name} - {e.address}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">NIF do Cliente</label>
-              <input 
-                type="text" 
-                className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all uppercase"
-                value={formData.client_nif} 
-                onChange={e => setFormData({...formData, client_nif: e.target.value})}
-                placeholder="EX: 500123456"
-              />
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Nome do Cliente</label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                <input 
+                  type="text" 
+                  className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all uppercase"
+                  value={formData.client_name} 
+                  onChange={e => setFormData({...formData, client_name: e.target.value})}
+                  placeholder="EX: RESTAURANTE O MAR"
+                />
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Morada de Carga</label>
-              <div className="relative">
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                <input 
-                  type="text" 
-                  className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all uppercase"
-                  value={formData.loading_address} 
-                  onChange={e => setFormData({...formData, loading_address: e.target.value})}
-                  placeholder="MORADA DE ORIGEM"
-                />
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <button 
+                  onClick={() => handleLoadingAddressTypeChange('CR')}
+                  className={`py-3 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${loadingAddressType === 'CR' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-transparent'}`}
+                >
+                  Real Frio - CR
+                </button>
+                <button 
+                  onClick={() => handleLoadingAddressTypeChange('PM')}
+                  className={`py-3 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${loadingAddressType === 'PM' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-transparent'}`}
+                >
+                  Real Frio - PM
+                </button>
+                <button 
+                  onClick={() => handleLoadingAddressTypeChange('other')}
+                  className={`py-3 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${loadingAddressType === 'other' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-transparent'}`}
+                >
+                  Outra
+                </button>
               </div>
-            </div>
-            <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Morada de Descarga</label>
-              <div className="relative">
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                <input 
-                  type="text" 
-                  className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all uppercase"
-                  value={formData.unloading_address} 
-                  onChange={e => setFormData({...formData, unloading_address: e.target.value})}
-                  placeholder="MORADA DE DESTINO"
-                />
-              </div>
+              
+              {loadingAddressType === 'other' && (
+                <div className="relative animate-in slide-in-from-top-2 duration-200">
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                  <input 
+                    type="text" 
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-bold dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all uppercase"
+                    value={formData.loading_address} 
+                    onChange={e => setFormData({...formData, loading_address: e.target.value})}
+                    placeholder="MORADA DE ORIGEM"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
