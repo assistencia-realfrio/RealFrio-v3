@@ -10,7 +10,7 @@
     <link rel="shortcut icon" type="image/png" href="/rf-favicon-v5.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/rf-apple-v5.png">
 
-    <link rel="manifest" href="/manifest.json?v=8">
+    <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#9d1c24">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -149,10 +149,10 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          // Atualizado para v9.0 para forçar cache refresh e nova lógica de ativação
-          navigator.serviceWorker.register('/sw.js?v=9.0')
+          // Atualizado para v10.0 para forçar cache refresh e nova lógica de ativação
+          navigator.serviceWorker.register('/sw.js?v=10.0')
             .then(registration => {
-              console.log('SW v9.0 Active');
+              console.log('SW v10.0 Active');
             }).catch(err => {
               console.log('SW registration failed', err);
             });

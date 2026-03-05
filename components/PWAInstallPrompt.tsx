@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Download, Smartphone, Info, ExternalLink, Share } from 'lucide-react';
+import { Download, Smartphone, Info, ExternalLink, Share, MoreVertical } from 'lucide-react';
 
 interface PWAInstallPromptProps {
   variant?: 'sidebar' | 'profile';
@@ -8,10 +8,10 @@ interface PWAInstallPromptProps {
 
 const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ variant = 'sidebar' }) => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isVisible, setIsVisible] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isInIframe, setIsInIframe] = useState(false);
+  const [showManualInstructions, setShowManualInstructions] = useState(false);
 
   useEffect(() => {
     // Verificar se está num iframe
@@ -21,34 +21,28 @@ const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ variant = 'sidebar'
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(isIOSDevice);
 
-    // Verificar se já está instalado
-    if (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone) {
-      setIsInstalled(true);
-    }
+    // Verificar se já está instalado (standalone)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+    setIsInstalled(isStandalone);
 
     const handler = (e: any) => {
+      console.log('Event beforeinstallprompt fired');
       e.preventDefault();
       setDeferredPrompt(e);
-      setIsVisible(true);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
 
     window.addEventListener('appinstalled', () => {
       setDeferredPrompt(null);
-      setIsVisible(false);
       setIsInstalled(true);
+      setShowManualInstructions(false);
     });
-
-    // No iOS, mostramos sempre se não estiver instalado, pois não há evento automático
-    if (isIOSDevice && !isInstalled) {
-      setIsVisible(true);
-    }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
     };
-  }, [isInstalled]);
+  }, []);
 
   const handleInstallClick = async () => {
     if (isIOS) {
@@ -56,16 +50,15 @@ const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ variant = 'sidebar'
       return;
     }
 
-    if (!deferredPrompt) {
-      alert("O seu navegador não suporta a instalação direta ou a aplicação já está instalada. Se estiver no Chrome, procure por 'Instalar' no menu de 3 pontos.");
-      return;
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response: ${outcome}`);
+      setDeferredPrompt(null);
+    } else {
+      // Fallback: mostrar instruções manuais
+      setShowManualInstructions(true);
     }
-
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log(`User response: ${outcome}`);
-    setDeferredPrompt(null);
-    setIsVisible(false);
   };
 
   if (isInstalled) return null;
@@ -90,47 +83,57 @@ const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ variant = 'sidebar'
     );
   }
 
-  if (!isVisible && !isIOS && variant === 'profile') {
-    return (
-      <div className="bg-slate-50 dark:bg-slate-800/50 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-8">
-        <div className="flex items-center gap-4 opacity-50">
-          <Smartphone size={24} className="text-slate-400" />
-          <div>
-            <h3 className="font-black text-slate-900 dark:text-white uppercase text-sm">Instalação Indisponível</h3>
-            <p className="text-[9px] text-slate-500 font-black uppercase mt-1">Navegador não suportado ou já instalado</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isVisible && !isIOS) return null;
-
   if (variant === 'profile') {
     return (
-      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 p-8 space-y-6 transition-all">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center shadow-inner">
-              {isIOS ? <Share size={24} /> : <Smartphone size={24} />}
+      <div className="space-y-4">
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 p-8 space-y-6 transition-all">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center shadow-inner">
+                {isIOS ? <Share size={24} /> : <Smartphone size={24} />}
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-white uppercase text-sm tracking-[0.1em] leading-none">
+                  {isIOS ? 'Instalar no iOS' : 'Instalar Aplicação'}
+                </h3>
+                <p className="text-[9px] text-slate-400 dark:text-slate-500 font-black uppercase mt-1.5 tracking-widest">
+                  {isIOS ? 'Siga as instruções de partilha' : 'Acesso rápido no ecrã principal'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-black text-slate-900 dark:text-white uppercase text-sm tracking-[0.1em] leading-none">
-                {isIOS ? 'Instalar no iOS' : 'Instalar Aplicação'}
-              </h3>
-              <p className="text-[9px] text-slate-400 dark:text-slate-500 font-black uppercase mt-1.5 tracking-widest">
-                {isIOS ? 'Siga as instruções de partilha' : 'Acesso rápido no ecrã principal'}
-              </p>
-            </div>
+            <button 
+              onClick={handleInstallClick}
+              className="px-6 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-2"
+            >
+              {isIOS ? <Info size={14} /> : <Download size={14} />}
+              {isIOS ? 'Como Instalar' : 'Instalar'}
+            </button>
           </div>
-          <button 
-            onClick={handleInstallClick}
-            className="px-6 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-2"
-          >
-            {isIOS ? <Info size={14} /> : <Download size={14} />}
-            {isIOS ? 'Como Instalar' : 'Instalar'}
-          </button>
         </div>
+
+        {showManualInstructions && !isIOS && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-[2.5rem] border border-blue-100 dark:border-blue-800 p-8 space-y-4 animate-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-3 text-blue-600">
+              <Info size={18} />
+              <h4 className="text-[10px] font-black uppercase tracking-widest">Instalação Manual (Chrome)</h4>
+            </div>
+            <div className="space-y-3">
+              <p className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase leading-relaxed">
+                O prompt automático não foi disparado pelo navegador. Siga estes passos:
+              </p>
+              <ol className="text-[10px] text-slate-600 dark:text-slate-400 font-medium space-y-2 list-decimal pl-4">
+                <li>Clique no menu do Chrome (3 pontos <MoreVertical size={12} className="inline" /> no topo direito)</li>
+                <li>Procure e clique em <span className="font-black text-blue-600">"Instalar aplicação"</span> ou <span className="font-black text-blue-600">"Adicionar ao ecrã principal"</span></li>
+              </ol>
+            </div>
+            <button 
+              onClick={() => setShowManualInstructions(false)}
+              className="text-[9px] font-black text-blue-600 underline uppercase tracking-widest"
+            >
+              Fechar Instruções
+            </button>
+          </div>
+        )}
       </div>
     );
   }
