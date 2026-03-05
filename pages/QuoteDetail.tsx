@@ -425,6 +425,14 @@ const QuoteDetail: React.FC = () => {
       const body = `Exmo.(a) Sr.(a) ${quote.client?.name || 'Cliente'},\n\nSegue em anexo a documentação referente ao orçamento ${quote.code}.\n\nMelhores cumprimentos,\nReal Frio, Lda`;
 
       if (navigator.share && navigator.canShare && navigator.canShare({ files })) {
+        if (clientEmail) {
+          try {
+            await navigator.clipboard.writeText(clientEmail);
+            alert(`Email do cliente (${clientEmail}) copiado! Cole no campo 'Para' da sua aplicação de email.`);
+          } catch (err) {
+            console.error("Erro ao copiar email:", err);
+          }
+        }
         await navigator.share({
           files,
           title: subject,

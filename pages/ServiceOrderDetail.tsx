@@ -735,6 +735,14 @@ export const ServiceOrderDetail: React.FC = () => {
       const body = `Exmo.(a) Sr.(a) ${os.client?.name || 'Cliente'},\n\nSegue em anexo o relatório técnico referente à intervenção ${os.code}.\n\nMelhores cumprimentos,\nReal Frio, Lda`;
 
       if (navigator.share && navigator.canShare && navigator.canShare({ files })) {
+        if (clientEmail) {
+          try {
+            await navigator.clipboard.writeText(clientEmail);
+            alert(`Email do cliente (${clientEmail}) copiado! Cole no campo 'Para' da sua aplicação de email.`);
+          } catch (err) {
+            console.error("Erro ao copiar email:", err);
+          }
+        }
         await navigator.share({
           files,
           title: subject,
@@ -1242,7 +1250,7 @@ export const ServiceOrderDetail: React.FC = () => {
                     <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500/70 uppercase tracking-tight mt-1.5">A OS está bloqueada para edição</p>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <button onClick={handleSendEmailShortcut} className={`p-3 bg-white dark:bg-slate-800 ${storeColors.text} rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:scale-105 transition-all`} title="Enviar Relatório">
+                    <button onClick={handleSendEmail} className={`p-3 bg-white dark:bg-slate-800 ${storeColors.text} rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:scale-105 transition-all`} title="Enviar Relatório">
                        <Mail size={18} />
                     </button>
                   </div>
@@ -1255,7 +1263,7 @@ export const ServiceOrderDetail: React.FC = () => {
                   <button onClick={() => setShowReopenModal(true)} typeof="button" className="flex items-center justify-center gap-3 py-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 transition-all active:scale-95">
                     <RotateCw size={18} /> REABRIR PARA EDIÇÃO
                   </button>
-                  <button onClick={handleSendEmailShortcut} typeof="button" disabled={isExportingPDF} className={`sm:col-span-2 flex items-center justify-center gap-3 py-4 ${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text} ${storeColors.textDark} border ${storeColors.border} ${storeColors.borderDark30} rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] ${storeColors.bgHover} transition-all active:scale-95 disabled:opacity-50`}>
+                  <button onClick={handleSendEmail} typeof="button" disabled={isExportingPDF} className={`sm:col-span-2 flex items-center justify-center gap-3 py-4 ${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text} ${storeColors.textDark} border ${storeColors.border} ${storeColors.borderDark30} rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] ${storeColors.bgHover} transition-all active:scale-95 disabled:opacity-50`}>
                     {isExportingPDF ? <Loader2 size={18} className="animate-spin" /> : <Mail size={18} />} 
                     {isExportingPDF ? 'A PREPARAR...' : `ENVIAR PARA: ${os.client?.email || '(MANUAL)'}`}
                   </button>
