@@ -30,6 +30,7 @@ const QuoteDetail: React.FC = () => {
   const [expandedTechnical, setExpandedTechnical] = useState(true);
 
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState('');
   const [emailOptions, setEmailOptions] = useState({
     proposal: true,
     insurance: false
@@ -38,6 +39,12 @@ const QuoteDetail: React.FC = () => {
   useEffect(() => { 
     if (id) fetchData(); 
   }, [id]);
+
+  useEffect(() => {
+    if (quote?.client?.email) {
+      setRecipientEmail(quote.client.email);
+    }
+  }, [quote]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -407,7 +414,7 @@ const QuoteDetail: React.FC = () => {
         }
       }
 
-      const clientEmail = quote.client?.email || '';
+      const clientEmail = recipientEmail || quote.client?.email || '';
       const subject = `Proposta Comercial Real Frio - ${quote.code}`;
       const body = `Exmo.(a) Sr.(a) ${quote.client?.name},\n\nSegue em anexo a documentação referente ao orçamento ${quote.code}.\n\nMelhores cumprimentos,\nReal Frio, Lda`;
 
@@ -646,32 +653,48 @@ const QuoteDetail: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-3 mb-8">
-                <button 
-                  onClick={() => setEmailOptions(prev => ({ ...prev, proposal: !prev.proposal }))}
-                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${emailOptions.proposal ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <FileText size={18} className={emailOptions.proposal ? 'text-blue-600' : 'text-slate-400'} />
-                    <span className={`text-xs font-black uppercase tracking-tight ${emailOptions.proposal ? 'text-blue-900 dark:text-blue-100' : 'text-slate-500'}`}>Proposta Comercial</span>
+              <div className="space-y-4 mb-8">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email do Destinatário</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input 
+                      type="email" 
+                      value={recipientEmail} 
+                      onChange={(e) => setRecipientEmail(e.target.value)}
+                      placeholder="email@cliente.com"
+                      className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-xs font-black dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                    />
                   </div>
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${emailOptions.proposal ? 'border-blue-600 bg-blue-600' : 'border-slate-200 dark:border-slate-700'}`}>
-                    {emailOptions.proposal && <Check size={12} className="text-white" />}
-                  </div>
-                </button>
+                </div>
 
-                <button 
-                  onClick={() => setEmailOptions(prev => ({ ...prev, insurance: !prev.insurance }))}
-                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${emailOptions.insurance ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <InsuranceIcon size={18} className={emailOptions.insurance ? 'text-indigo-600' : 'text-slate-400'} />
-                    <span className={`text-xs font-black uppercase tracking-tight ${emailOptions.insurance ? 'text-indigo-900 dark:text-indigo-100' : 'text-slate-500'}`}>Relatório para Seguro</span>
-                  </div>
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${emailOptions.insurance ? 'border-indigo-600 bg-indigo-600' : 'border-slate-200 dark:border-slate-700'}`}>
-                    {emailOptions.insurance && <Check size={12} className="text-white" />}
-                  </div>
-                </button>
+                <div className="space-y-3">
+                  <button 
+                    onClick={() => setEmailOptions(prev => ({ ...prev, proposal: !prev.proposal }))}
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${emailOptions.proposal ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileText size={18} className={emailOptions.proposal ? 'text-blue-600' : 'text-slate-400'} />
+                      <span className={`text-xs font-black uppercase tracking-tight ${emailOptions.proposal ? 'text-blue-900 dark:text-blue-100' : 'text-slate-500'}`}>Proposta Comercial</span>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${emailOptions.proposal ? 'border-blue-600 bg-blue-600' : 'border-slate-200 dark:border-slate-700'}`}>
+                      {emailOptions.proposal && <Check size={12} className="text-white" />}
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => setEmailOptions(prev => ({ ...prev, insurance: !prev.insurance }))}
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${emailOptions.insurance ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <InsuranceIcon size={18} className={emailOptions.insurance ? 'text-indigo-600' : 'text-slate-400'} />
+                      <span className={`text-xs font-black uppercase tracking-tight ${emailOptions.insurance ? 'text-indigo-900 dark:text-indigo-100' : 'text-slate-500'}`}>Relatório para Seguro</span>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${emailOptions.insurance ? 'border-indigo-600 bg-indigo-600' : 'border-slate-200 dark:border-slate-700'}`}>
+                      {emailOptions.insurance && <Check size={12} className="text-white" />}
+                    </div>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

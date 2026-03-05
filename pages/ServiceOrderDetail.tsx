@@ -173,6 +173,8 @@ export const ServiceOrderDetail: React.FC = () => {
   const [showEditQuantityModal, setShowEditQuantityModal] = useState(false);
   const [showTimerTypeModal, setShowTimerTypeModal] = useState(false);
   const [showTagPreview, setShowTagPreview] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState('');
   
   // Estados para cancelamento
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -406,6 +408,10 @@ export const ServiceOrderDetail: React.FC = () => {
             setScheduledDate(parts[0] || '');
             setScheduledTime((parts[1] || '').substring(0, 5));
           } else { setScheduledDate(''); setScheduledTime(''); }
+          
+          if (osData.client?.email) {
+            setRecipientEmail(osData.client.email);
+          }
         }
         const [p, ph, n, act] = await Promise.all([ mockData.getOSParts(id), mockData.getOSPhotos(id), mockData.getOSNotes(id), mockData.getOSActivity(id) ]);
         setPartsUsed(p); setPhotos(ph); setNotesList(n); setActivities(act);
@@ -701,6 +707,42 @@ export const ServiceOrderDetail: React.FC = () => {
   };
 
   const handlePrintTag = () => { if (tagPdfUrl) { window.open(tagPdfUrl, '_blank'); } };
+
+  const handleSendEmail = async () => {
+    if (!os) return;
+    setActionLoading(true);
+    try {
+      const doc = await createPDFDocument();
+      if (!doc) throw new Error("Falha ao gerar PDF");
+      
+      const blob = doc.output('blob');
+      const file = new File([blob], `RELATORIO_REALFRIO_${os.code}.pdf`, { type: 'application/pdf' });
+      const files = [file];
+
+      const clientEmail = recipientEmail || os.client?.email || '';
+      const subject = `Relatório Técnico Real Frio - ${os.code}`;
+      const body = `Exmo.(a) Sr.(a) ${os.client?.name},\n\nSegue em anexo o relatório técnico referente à intervenção ${os.code}.\n\nMelhores cumprimentos,\nReal Frio, Lda`;
+
+      if (navigator.share && navigator.canShare && navigator.canShare({ files })) {
+        await navigator.share({
+          files,
+          title: subject,
+          text: body,
+        });
+      } else {
+        const mailtoLink = `mailto:${clientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailtoLink;
+        alert("O seu navegador não suporta o envio direto de ficheiros. O cliente de email foi aberto, por favor anexe o PDF manualmente.");
+      }
+      setShowEmailModal(false);
+      await mockData.addOSActivity(os.id, { description: `RELATÓRIO ENVIADO POR EMAIL PARA: ${clientEmail || '(MANUAL)'}` });
+    } catch (error) {
+      console.error("Erro ao enviar email:", error);
+      setErrorMessage("ERRO AO ENVIAR EMAIL.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const createPDFDocument = async () => {
     if (!os) return null;
@@ -1008,7 +1050,14 @@ export const ServiceOrderDetail: React.FC = () => {
               {os?.code}
             </span>
           </div>
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 flex items-center gap-2">
+             <button 
+               onClick={() => setShowEmailModal(true)} 
+               className={`p-2.5 text-emerald-600 dark:text-emerald-400 hover:${storeColors.bg50} rounded-2xl transition-all bg-slate-50 dark:bg-slate-800 border border-transparent hover:${storeColors.border}`}
+               title="Enviar por Email"
+             >
+               <Mail size={20} />
+             </button>
              {actionLoading ? (
                <RefreshCw size={14} className={`animate-spin ${storeColors.text}`} />
              ) : (
@@ -1668,6 +1717,61 @@ export const ServiceOrderDetail: React.FC = () => {
                  <button onClick={() => setShowTimerTypeModal(false)} className="mt-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] hover:text-red-500 transition-colors">CANCELAR E MANTER ATIVO</button>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* MODAL ENVIO EMAIL OS */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-200">
+            <div className="p-8">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center shadow-inner">
+                  <Mail size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Enviar Relatório</h3>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest">Envio direto para o cliente</p>
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-8">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email do Destinatário</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input 
+                      type="email" 
+                      value={recipientEmail} 
+                      onChange={(e) => setRecipientEmail(e.target.value)}
+                      placeholder="email@cliente.com"
+                      className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-xs font-black dark:text-white outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                  <FileText size={18} className="text-emerald-600" />
+                  <div className="flex-1">
+                    <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase">Relatório Técnico</p>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase">PDF Gerado Automaticamente</p>
+                  </div>
+                  <Check size={16} className="text-emerald-600" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setShowEmailModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button>
+                <button 
+                  onClick={handleSendEmail} 
+                  disabled={actionLoading || !recipientEmail} 
+                  className={`py-4 ${storeColors.bg} text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all disabled:opacity-50`}
+                >
+                  {actionLoading ? <Loader2 className="animate-spin mx-auto" size={16} /> : 'ENVIAR EMAIL'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
