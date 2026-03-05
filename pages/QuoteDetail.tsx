@@ -29,6 +29,12 @@ const QuoteDetail: React.FC = () => {
   const [expandedEquip, setExpandedEquip] = useState(false);
   const [expandedTechnical, setExpandedTechnical] = useState(true);
 
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailOptions, setEmailOptions] = useState({
+    proposal: true,
+    insurance: false
+  });
+
   useEffect(() => { 
     if (id) fetchData(); 
   }, [id]);
@@ -232,7 +238,7 @@ const QuoteDetail: React.FC = () => {
   };
 
   const generateInsurancePDF = async () => {
-    if (!quote) return;
+    if (!quote) return null;
     setIsExportingInsurance(true);
     try {
       const doc = new jsPDF();
@@ -364,12 +370,64 @@ const QuoteDetail: React.FC = () => {
       doc.setFontSize(7);
       doc.text("Este documento é um parecer técnico emitido pela Real Frio, Lda para instrução de processos de sinistro junto de seguradoras.", pageWidth / 2, 285, { align: "center" });
 
-      doc.save(`RELATORIO_PERITAGEM_${quote.code}.pdf`);
+      return doc;
     } catch (e) {
       console.error(e);
       alert("Erro ao gerar relatório de peritagem.");
+      return null;
     } finally {
       setIsExportingInsurance(false);
+    }
+  };
+
+  const handleDownloadInsurance = async () => {
+    const doc = await generateInsurancePDF();
+    if (doc) doc.save(`RELATORIO_PERITAGEM_${quote?.code}.pdf`);
+  };
+
+  const handleSendEmail = async (type: 'standard' | 'insurance' | 'both') => {
+    if (!quote) return;
+    setActionLoading(true);
+    try {
+      const files: File[] = [];
+      
+      if (type === 'standard' || type === 'both') {
+        const doc = await generateStandardPDF();
+        if (doc) {
+          const blob = doc.output('blob');
+          files.push(new File([blob], `ORCAMENTO_${quote.code}.pdf`, { type: 'application/pdf' }));
+        }
+      }
+      
+      if (type === 'insurance' || type === 'both') {
+        const doc = await generateInsurancePDF();
+        if (doc) {
+          const blob = doc.output('blob');
+          files.push(new File([blob], `RELATORIO_PERITAGEM_${quote.code}.code.pdf`, { type: 'application/pdf' }));
+        }
+      }
+
+      const clientEmail = quote.client?.email || '';
+      const subject = `Proposta Comercial Real Frio - ${quote.code}`;
+      const body = `Exmo.(a) Sr.(a) ${quote.client?.name},\n\nSegue em anexo a documentação referente ao orçamento ${quote.code}.\n\nMelhores cumprimentos,\nReal Frio, Lda`;
+
+      if (navigator.share && navigator.canShare && navigator.canShare({ files })) {
+        await navigator.share({
+          files,
+          title: subject,
+          text: body,
+        });
+      } else {
+        // Fallback para mailto
+        const mailtoLink = `mailto:${clientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailtoLink;
+        alert("O seu navegador não suporta o envio direto de ficheiros. O cliente de email foi aberto, por favor anexe os PDFs manualmente.");
+      }
+      setShowEmailModal(false);
+    } catch (error) {
+      console.error("Erro ao enviar email:", error);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -399,7 +457,10 @@ const QuoteDetail: React.FC = () => {
             <button onClick={() => navigate(`/quotes/${id}/edit`)} className="p-3.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl shadow-md border dark:border-slate-700 hover:bg-blue-50 transition-all">
               <Edit2 size={20}/>
             </button>
-            <button onClick={generateInsurancePDF} disabled={isExportingInsurance} className="p-3.5 bg-indigo-600 text-white rounded-2xl shadow-md border border-indigo-500 hover:bg-indigo-700 disabled:opacity-50 transition-all" title="Gerar Relatório de Seguro">
+            <button onClick={() => setShowEmailModal(true)} disabled={actionLoading} className="p-3.5 bg-emerald-600 text-white rounded-2xl shadow-md border border-emerald-500 hover:bg-emerald-700 disabled:opacity-50 transition-all" title="Enviar por Email">
+              {actionLoading ? <Loader2 className="animate-spin" size={20} /> : <Mail size={20}/>}
+            </button>
+            <button onClick={handleDownloadInsurance} disabled={isExportingInsurance} className="p-3.5 bg-indigo-600 text-white rounded-2xl shadow-md border border-indigo-500 hover:bg-indigo-700 disabled:opacity-50 transition-all" title="Gerar Relatório de Seguro">
               {isExportingInsurance ? <Loader2 className="animate-spin" size={20} /> : <InsuranceIcon size={20}/>}
             </button>
             <button onClick={handleDownloadStandard} disabled={isExportingPDF} className="p-3.5 bg-white dark:bg-slate-800 text-blue-600 rounded-2xl shadow-md border dark:border-slate-700 hover:bg-blue-50 disabled:opacity-50 transition-all">
@@ -564,6 +625,63 @@ const QuoteDetail: React.FC = () => {
                 <button onClick={() => setShowDeleteModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button>
                 <button onClick={handleDelete} disabled={actionLoading} className="py-4 bg-red-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all disabled:opacity-50">
                   {actionLoading ? <Loader2 className="animate-spin mx-auto" size={16} /> : 'ELIMINAR'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEmailModal && (
+        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-200">
+            <div className="p-8">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center shadow-inner">
+                  <Mail size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Enviar Documentação</h3>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest">Selecione os ficheiros para envio</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-8">
+                <button 
+                  onClick={() => setEmailOptions(prev => ({ ...prev, proposal: !prev.proposal }))}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${emailOptions.proposal ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <FileText size={18} className={emailOptions.proposal ? 'text-blue-600' : 'text-slate-400'} />
+                    <span className={`text-xs font-black uppercase tracking-tight ${emailOptions.proposal ? 'text-blue-900 dark:text-blue-100' : 'text-slate-500'}`}>Proposta Comercial</span>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${emailOptions.proposal ? 'border-blue-600 bg-blue-600' : 'border-slate-200 dark:border-slate-700'}`}>
+                    {emailOptions.proposal && <Check size={12} className="text-white" />}
+                  </div>
+                </button>
+
+                <button 
+                  onClick={() => setEmailOptions(prev => ({ ...prev, insurance: !prev.insurance }))}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${emailOptions.insurance ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <InsuranceIcon size={18} className={emailOptions.insurance ? 'text-indigo-600' : 'text-slate-400'} />
+                    <span className={`text-xs font-black uppercase tracking-tight ${emailOptions.insurance ? 'text-indigo-900 dark:text-indigo-100' : 'text-slate-500'}`}>Relatório para Seguro</span>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${emailOptions.insurance ? 'border-indigo-600 bg-indigo-600' : 'border-slate-200 dark:border-slate-700'}`}>
+                    {emailOptions.insurance && <Check size={12} className="text-white" />}
+                  </div>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setShowEmailModal(false)} className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all">CANCELAR</button>
+                <button 
+                  onClick={() => handleSendEmail(emailOptions.proposal && emailOptions.insurance ? 'both' : emailOptions.proposal ? 'standard' : 'insurance')} 
+                  disabled={actionLoading || (!emailOptions.proposal && !emailOptions.insurance)} 
+                  className="py-4 bg-blue-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {actionLoading ? <Loader2 className="animate-spin mx-auto" size={16} /> : 'ENVIAR EMAIL'}
                 </button>
               </div>
             </div>
