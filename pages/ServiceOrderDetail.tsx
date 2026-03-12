@@ -1315,29 +1315,10 @@ export const ServiceOrderDetail: React.FC = () => {
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
-               <div className="flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                 <button onClick={() => setExpandedEquip(!expandedEquip)} className="flex items-center gap-3 flex-1 text-left">
-                   <HardDrive size={18} className="text-slate-400" />
-                   <div>
-                     <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Equipamento Vinculado</h3>
-                     {!expandedEquip && os?.equipment && <p className={`text-[11px] font-bold ${storeColors.text} uppercase tracking-tight mt-0.5`}>{os.equipment.type} - {os.equipment.brand}</p>}
-                   </div>
-                 </button>
-                 <div className="flex items-center gap-2">
-                   <button 
-                     onClick={(e) => { e.stopPropagation(); handleOpenChangeEquipModal(); }} 
-                     disabled={os.status === OSStatus.CONCLUIDA} 
-                     className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-full hover:bg-blue-100 hover:text-blue-600 transition-colors disabled:opacity-50"
-                     title="Trocar Equipamento"
-                   >
-                     <RefreshCw size={14} />
-                     <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Trocar</span>
-                   </button>
-                   <button onClick={() => setExpandedEquip(!expandedEquip)} className="p-1">
-                     {expandedEquip ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
-                   </button>
-                 </div>
-               </div>
+               <button onClick={() => setExpandedEquip(!expandedEquip)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                 <div className="flex items-center gap-3"><HardDrive size={18} className="text-slate-400" /><div className="text-left"><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Equipamento Vinculado (ATUALIZADO)</h3>{!expandedEquip && os?.equipment && <p className={`text-[11px] font-bold ${storeColors.text} uppercase tracking-tight mt-0.5`}>{os.equipment.type} - {os.equipment.brand}</p>}</div></div>
+                 {expandedEquip ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
+               </button>
                {expandedEquip && (
                  <div className="px-6 pb-6 space-y-3 animate-in slide-in-from-top-2 duration-200">
                     {os?.equipment ? (
@@ -1349,6 +1330,14 @@ export const ServiceOrderDetail: React.FC = () => {
                           >
                             <HardDrive size={14} />
                             <span className="text-xs font-black uppercase tracking-tight truncate">{os.equipment.type}</span>
+                          </button>
+                          <button
+                            onClick={handleOpenChangeEquipModal}
+                            disabled={os.status === OSStatus.CONCLUIDA}
+                            className={`w-full flex items-center justify-center gap-2 py-3 bg-red-600 text-white rounded-full transition-all disabled:opacity-50 shadow-lg border-2 border-white`}
+                          >
+                            <RefreshCw size={14} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">ALTERAR EQUIPAMENTO (TESTE)</span>
                           </button>
                         </div>
                         
