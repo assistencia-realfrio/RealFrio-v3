@@ -444,8 +444,17 @@ const EquipmentDetail: React.FC = () => {
           {activeTab === 'history' && (
             <div className="space-y-3 pb-10">
                <div className="flex items-center justify-between px-4 mb-4">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Intervenções (Ativas e Histórico)</h3>
-                  <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black px-2 py-0.5 rounded-full">{history.length}</span>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Intervenções (Ativas e Histórico)</h3>
+                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black px-2 py-0.5 rounded-full">{history.length}</span>
+                  </div>
+                  <button
+                    onClick={() => navigate('/nova-os', { state: { clientId: equipment?.client_id, establishmentId: equipment?.establishment_id, equipmentId: equipment?.id } })}
+                    className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-full hover:bg-blue-700 transition-colors shadow-sm"
+                  >
+                    <Plus size={14} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Nova OS</span>
+                  </button>
                </div>
                {history.length === 0 ? ( <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-gray-100 dark:border-slate-800 mx-1"> <History size={32} className="mx-auto text-gray-200 dark:text-slate-700 mb-4" /> <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest">Sem registos para este ativo</p> </div> ) : (
                  <div className="space-y-3 px-1"> {history.map(os => ( <Link key={os.id} to={`/os/${os.id}`} className="flex items-center justify-between p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl hover:border-blue-100 hover:shadow-lg transition-all group" > <div className="flex items-center gap-5 min-w-0 flex-1"> <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex flex-col items-center justify-center font-black group-hover:bg-blue-600 group-hover:text-white transition-all flex-shrink-0 shadow-inner"> <span className="text-[10px] font-mono text-slate-400 group-hover:text-blue-100 leading-none">OS</span> <span className="text-[8px] text-slate-300 group-hover:text-blue-200 uppercase mt-0.5">{new Date(os.created_at).toLocaleDateString('pt-PT', {day: '2-digit', month: '2-digit'})}</span> </div> <div className="min-w-0 flex-1"> <div className="flex items-center gap-2 mb-1"> <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">{os.code}</p> <span className="text-[8px] font-black text-slate-300 uppercase">|</span> <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{os.type}</p> </div> <h4 className="text-base font-black text-slate-900 dark:text-white uppercase truncate mb-1">{os.description}</h4> </div> </div> <OSStatusBadge status={os.status} className="scale-90 flex-shrink-0" /> </Link> ))} </div>

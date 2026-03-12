@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Save, ArrowLeft, Calendar, AlertTriangle, FileText, 
   MapPin, User, HardDrive, Activity, Tag, ChevronDown, Clock,
@@ -13,6 +13,7 @@ import { normalizeString } from '../utils';
 
 const NewServiceOrder: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentStore } = useStore();
   const [clients, setClients] = useState<Client[]>([]);
   const [allEstablishments, setAllEstablishments] = useState<(Establishment & { client_name?: string })[]>([]);
@@ -33,9 +34,9 @@ const NewServiceOrder: React.FC = () => {
   const [existingOS, setExistingOS] = useState<ServiceOrder | null>(null);
 
   const [formData, setFormData] = useState({
-    client_id: '',
-    establishment_id: '',
-    equipment_id: '',
+    client_id: location.state?.clientId || '',
+    establishment_id: location.state?.establishmentId || '',
+    equipment_id: location.state?.equipmentId || '',
     type: OSType.AVARIA,
     priority: 'media',
     description: '',
@@ -90,7 +91,7 @@ const NewServiceOrder: React.FC = () => {
         if (ests.length === 1) {
            setFormData(prev => ({ ...prev, establishment_id: ests[0].id }));
         } else {
-           setFormData(prev => ({ ...prev, establishment_id: '' }));
+           setFormData(prev => ({ ...prev, establishment_id: prev.establishment_id || '' }));
         }
       });
     } else {
@@ -104,12 +105,38 @@ const NewServiceOrder: React.FC = () => {
       mockData.getEquipments().then(all => {
         setEquipments(all.filter(e => e.establishment_id === formData.establishment_id));
       });
-      setFormData(prev => ({ ...prev, equipment_id: '' }));
+      setFormData(prev => ({ ...prev, equipment_id: prev.equipment_id || '' }));
       setEquipmentSearch('');
     } else {
       setEquipments([]);
     }
   }, [formData.establishment_id]);
+
+  useEffect(() => {
+    if (location.state?.clientId && clients.length > 0 && !mainSearch) {
+      if (location.state?.establishmentId && allEstablishments.length > 0) {
+        const est = allEstablishments.find(e => e.id === location.state.establishmentId);
+        const client = clients.find(c => c.id === location.state.clientId);
+        if (est && client) {
+          setMainSearch(`${est.name} (${client.name})`);
+        }
+      } else {
+        const client = clients.find(c => c.id === location.state.clientId);
+        if (client) {
+          setMainSearch(client.name);
+        }
+      }
+    }
+  }, [clients, allEstablishments, location.state, mainSearch]);
+
+  useEffect(() => {
+    if (location.state?.equipmentId && equipments.length > 0 && !equipmentSearch) {
+      const eq = equipments.find(e => e.id === location.state.equipmentId);
+      if (eq) {
+        setEquipmentSearch(`${eq.type} - ${eq.brand || ''}`);
+      }
+    }
+  }, [equipments, location.state, equipmentSearch]);
 
   const fetchBaseData = async () => {
     setLoading(true);

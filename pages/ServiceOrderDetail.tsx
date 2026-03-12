@@ -175,6 +175,12 @@ export const ServiceOrderDetail: React.FC = () => {
   const [showTagPreview, setShowTagPreview] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState('');
+
+  // Change Equipment State
+  const [showChangeEquipModal, setShowChangeEquipModal] = useState(false);
+  const [availableEquipments, setAvailableEquipments] = useState<any[]>([]);
+  const [selectedNewEquipId, setSelectedNewEquipId] = useState('');
+  const [isChangingEquip, setIsChangingEquip] = useState(false);
   
   // Estados para cancelamento
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -963,6 +969,35 @@ export const ServiceOrderDetail: React.FC = () => {
 
   const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
 
+  const handleOpenChangeEquipModal = async () => {
+    if (!os?.client_id) return;
+    setShowChangeEquipModal(true);
+    setSelectedNewEquipId(os.equipment_id || '');
+    try {
+      const allEquips = await mockData.getEquipments();
+      const clientEquips = allEquips.filter(e => e.client_id === os.client_id);
+      setAvailableEquipments(clientEquips);
+    } catch (err) {
+      console.error("Erro ao carregar equipamentos:", err);
+    }
+  };
+
+  const handleConfirmChangeEquip = async () => {
+    if (!os || !selectedNewEquipId) return;
+    setIsChangingEquip(true);
+    try {
+      await mockData.updateServiceOrder(os.id, { equipment_id: selectedNewEquipId });
+      await mockData.addOSActivity(os.id, { description: `EQUIPAMENTO ALTERADO NA OS` });
+      setShowChangeEquipModal(false);
+      fetchOSDetails(false);
+    } catch (err) {
+      console.error("Erro ao alterar equipamento:", err);
+      setErrorMessage("ERRO AO ALTERAR EQUIPAMENTO.");
+    } finally {
+      setIsChangingEquip(false);
+    }
+  };
+
   const openSourceSelector = (type: 'antes' | 'depois' | 'peca' | 'geral') => {
     if (os?.status === OSStatus.CONCLUIDA) return;
     setPendingUploadType(type);
@@ -1280,21 +1315,42 @@ export const ServiceOrderDetail: React.FC = () => {
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
-               <button onClick={() => setExpandedEquip(!expandedEquip)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                 <div className="flex items-center gap-3"><HardDrive size={18} className="text-slate-400" /><div className="text-left"><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Equipamento Vinculado</h3>{!expandedEquip && os?.equipment && <p className={`text-[11px] font-bold ${storeColors.text} uppercase tracking-tight mt-0.5`}>{os.equipment.type} - {os.equipment.brand}</p>}</div></div>
-                 {expandedEquip ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
-               </button>
+               <div className="flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                 <button onClick={() => setExpandedEquip(!expandedEquip)} className="flex items-center gap-3 flex-1 text-left">
+                   <HardDrive size={18} className="text-slate-400" />
+                   <div>
+                     <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Equipamento Vinculado</h3>
+                     {!expandedEquip && os?.equipment && <p className={`text-[11px] font-bold ${storeColors.text} uppercase tracking-tight mt-0.5`}>{os.equipment.type} - {os.equipment.brand}</p>}
+                   </div>
+                 </button>
+                 <div className="flex items-center gap-2">
+                   <button 
+                     onClick={(e) => { e.stopPropagation(); handleOpenChangeEquipModal(); }} 
+                     disabled={os.status === OSStatus.CONCLUIDA} 
+                     className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-full hover:bg-blue-100 hover:text-blue-600 transition-colors disabled:opacity-50"
+                     title="Trocar Equipamento"
+                   >
+                     <RefreshCw size={14} />
+                     <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Trocar</span>
+                   </button>
+                   <button onClick={() => setExpandedEquip(!expandedEquip)} className="p-1">
+                     {expandedEquip ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
+                   </button>
+                 </div>
+               </div>
                {expandedEquip && (
                  <div className="px-6 pb-6 space-y-3 animate-in slide-in-from-top-2 duration-200">
                     {os?.equipment ? (
                       <>
-                        <button 
-                          onClick={() => navigate(`/equipments/${os.equipment_id}`)}
-                          className={`flex items-center gap-2 ${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text700} ${storeColors.textDark} border ${storeColors.border} ${storeColors.borderDark30} px-4 py-2.5 rounded-full transition-all hover:${storeColors.bg100} dark:hover:${storeColors.bgDark40} w-full`}
-                        >
-                          <HardDrive size={14} />
-                          <span className="text-xs font-black uppercase tracking-tight truncate">{os.equipment.type}</span>
-                        </button>
+                        <div className="flex flex-col gap-2 mb-3">
+                          <button 
+                            onClick={() => navigate(`/equipments/${os.equipment_id}`)}
+                            className={`w-full flex items-center justify-center gap-2 bg-orange-500 text-white border border-orange-600 px-4 py-3 rounded-full transition-all hover:bg-orange-600 shadow-md`}
+                          >
+                            <HardDrive size={14} />
+                            <span className="text-xs font-black uppercase tracking-tight truncate">{os.equipment.type}</span>
+                          </button>
+                        </div>
                         
                         <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 space-y-2.5">
                           <div className="flex items-baseline gap-2">
@@ -2010,6 +2066,57 @@ export const ServiceOrderDetail: React.FC = () => {
         </div>
       )}
       
+      {/* MODAL TROCAR EQUIPAMENTO */}
+      {showChangeEquipModal && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                 <div className={`w-16 h-16 ${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text} ${storeColors.textDark} rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner`}><RefreshCw size={32}/></div>
+                 <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Trocar Equipamento</h3>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-6 uppercase">Selecione o equipamento correto para esta OS:</p>
+                 
+                 <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar mb-6 text-left">
+                    {availableEquipments.length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-4">Nenhum equipamento encontrado para este cliente.</p>
+                    ) : (
+                      availableEquipments.map(eq => (
+                        <button
+                          key={eq.id}
+                          onClick={() => setSelectedNewEquipId(eq.id)}
+                          className={`w-full p-4 rounded-2xl border-2 transition-all text-left ${selectedNewEquipId === eq.id ? `border-${storeColors.text.split('-')[1]}-500 bg-${storeColors.bg.split('-')[1]}-50 dark:bg-${storeColors.bg.split('-')[1]}-900/20` : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-black text-slate-900 dark:text-white uppercase">{eq.type} - {eq.brand}</p>
+                              <p className="text-[10px] text-slate-500 uppercase mt-1">S/N: {eq.serial_number || 'N/A'}</p>
+                            </div>
+                            {selectedNewEquipId === eq.id && <CheckCircle2 size={18} className={storeColors.text} />}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      onClick={() => setShowChangeEquipModal(false)} 
+                      className="py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase rounded-2xl active:scale-95 transition-all"
+                    >
+                      CANCELAR
+                    </button>
+                    <button 
+                      onClick={handleConfirmChangeEquip}
+                      disabled={!selectedNewEquipId || selectedNewEquipId === os?.equipment_id || isChangingEquip}
+                      className={`py-4 ${storeColors.bg} text-white font-black text-[10px] uppercase rounded-2xl shadow-xl active:scale-95 transition-all disabled:opacity-50`}
+                    >
+                      {isChangingEquip ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'CONFIRMAR'}
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
       {selectedPhotoForView && (
         <div className="fixed inset-0 z-[300] bg-slate-950 flex flex-col animate-in fade-in duration-300">
            <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 z-[310] bg-gradient-to-b from-black/80 to-transparent"><span className={`text-[10px] font-black ${storeColors.text400} uppercase tracking-[0.3em]`}>{selectedPhotoForView.type}</span><button onClick={() => setSelectedPhotoForView(null)} className="p-4 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all active:scale-90 backdrop-blur-lg"><X size={24} /></button></div>
