@@ -1,4 +1,5 @@
 
+// ServiceOrderDetail.tsx - Updated to force rebuild
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
@@ -1323,10 +1324,10 @@ export const ServiceOrderDetail: React.FC = () => {
                  <div className="px-6 pb-6 space-y-3 animate-in slide-in-from-top-2 duration-200">
                     {os?.equipment ? (
                       <>
-                        <div className="flex flex-col gap-2 mb-3">
+                        <div className="flex items-center gap-2 mb-3">
                           <button 
                             onClick={() => navigate(`/equipments/${os.equipment_id}`)}
-                            className={`w-full flex items-center justify-center gap-2 bg-orange-500 text-white border border-orange-600 px-4 py-3 rounded-full transition-all hover:bg-orange-600 shadow-md`}
+                            className={`flex-1 flex items-center justify-center gap-2 bg-orange-500 text-white border border-orange-600 px-4 py-3 rounded-full transition-all hover:bg-orange-600 shadow-md h-12`}
                           >
                             <HardDrive size={14} />
                             <span className="text-xs font-black uppercase tracking-tight truncate">{os.equipment.type}</span>
@@ -1334,10 +1335,10 @@ export const ServiceOrderDetail: React.FC = () => {
                           <button
                             onClick={handleOpenChangeEquipModal}
                             disabled={os.status === OSStatus.CONCLUIDA}
-                            className={`w-full flex items-center justify-center gap-2 py-3 bg-red-600 text-white rounded-full transition-all disabled:opacity-50 shadow-lg border-2 border-white`}
+                            className={`flex-none w-12 h-12 flex items-center justify-center bg-red-600 text-white rounded-full transition-all disabled:opacity-50 shadow-lg border-2 border-white active:scale-95`}
+                            title="Alterar Equipamento"
                           >
-                            <RefreshCw size={14} />
-                            <span className="text-[10px] font-black uppercase tracking-widest">ALTERAR EQUIPAMENTO (TESTE)</span>
+                            <RefreshCw size={18} />
                           </button>
                         </div>
                         

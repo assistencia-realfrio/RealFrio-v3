@@ -449,7 +449,7 @@ const EquipmentDetail: React.FC = () => {
                     <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black px-2 py-0.5 rounded-full">{history.length}</span>
                   </div>
                   <button
-                    onClick={() => navigate('/nova-os', { state: { clientId: equipment?.client_id, establishmentId: equipment?.establishment_id, equipmentId: equipment?.id } })}
+                    onClick={() => navigate('/os/new', { state: { clientId: equipment?.client_id, establishmentId: equipment?.establishment_id, equipmentId: equipment?.id } })}
                     className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-full hover:bg-blue-700 transition-colors shadow-sm"
                   >
                     <Plus size={14} />

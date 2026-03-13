@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'realfrio-tech-v10.3';
+const CACHE_NAME = 'realfrio-tech-v10.4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -34,18 +34,19 @@ self.addEventListener('activate', (event) => {
   return self.clients.claim();
 });
 
-// Fetch handler is REQUIRED for PWA installation
+// Fetch handler: Network First strategy to ensure updates are visible
 self.addEventListener('fetch', (event) => {
-  // Ignorar pedidos de API e Supabase para não quebrar o tempo real
-  if (event.request.url.includes('supabase.co') || 
-      event.request.url.includes('googleapis.com') ||
-      event.request.method !== 'GET') {
+  // Ignore non-GET requests and specific domains
+  if (event.request.method !== 'GET' || 
+      event.request.url.includes('supabase.co') || 
+      event.request.url.includes('googleapis.com')) {
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request).then((networkResponse) => {
+    fetch(event.request)
+      .then((networkResponse) => {
+        // If network request is successful, clone it and update cache
         if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -53,13 +54,19 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      });
-    }).catch(() => {
-      // Fallback offline se necessário
-      if (event.request.mode === 'navigate') {
-        return caches.match('/');
-      }
-    })
+      })
+      .catch(() => {
+        // If network fails, try to serve from cache
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // Fallback for navigation requests
+          if (event.request.mode === 'navigate') {
+            return caches.match('/');
+          }
+        });
+      })
   );
 });
 

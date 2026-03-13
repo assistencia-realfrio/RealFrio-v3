@@ -53,6 +53,16 @@ const NewServiceOrder: React.FC = () => {
   const eqContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (location.state?.clientId && !formData.store) {
+      mockData.getClientById(location.state.clientId).then(client => {
+        if (client && client.store) {
+          setFormData(prev => ({ ...prev, store: client.store as any }));
+        }
+      });
+    }
+  }, [location.state]);
+
+  useEffect(() => {
     const loadClients = async () => {
       if (!formData.store) {
         setClients([]);
@@ -113,7 +123,7 @@ const NewServiceOrder: React.FC = () => {
   }, [formData.establishment_id]);
 
   useEffect(() => {
-    if (location.state?.clientId && clients.length > 0 && !mainSearch) {
+    if (location.state?.clientId && clients.length > 0) {
       if (location.state?.establishmentId && allEstablishments.length > 0) {
         const est = allEstablishments.find(e => e.id === location.state.establishmentId);
         const client = clients.find(c => c.id === location.state.clientId);
@@ -127,16 +137,16 @@ const NewServiceOrder: React.FC = () => {
         }
       }
     }
-  }, [clients, allEstablishments, location.state, mainSearch]);
+  }, [clients, allEstablishments, location.state]);
 
   useEffect(() => {
-    if (location.state?.equipmentId && equipments.length > 0 && !equipmentSearch) {
+    if (location.state?.equipmentId && equipments.length > 0) {
       const eq = equipments.find(e => e.id === location.state.equipmentId);
       if (eq) {
         setEquipmentSearch(`${eq.type} - ${eq.brand || ''}`);
       }
     }
-  }, [equipments, location.state, equipmentSearch]);
+  }, [equipments, location.state]);
 
   const fetchBaseData = async () => {
     setLoading(true);

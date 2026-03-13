@@ -149,10 +149,10 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          // Atualizado para v10.3 para forçar cache refresh e nova lógica de ativação
-          navigator.serviceWorker.register('/sw.js?v=10.3')
+          // Atualizado para v10.4 para forçar cache refresh e nova lógica de ativação
+          navigator.serviceWorker.register('/sw.js?v=10.4')
             .then(registration => {
-              console.log('SW v10.3 Active');
+              console.log('SW v10.4 Active');
             }).catch(err => {
               console.log('SW registration failed', err);
             });
