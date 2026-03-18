@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Save, ArrowLeft, Building, User, Phone, Mail, 
-  MapPin, ChevronDown, FileText, Info, Cloud, Hash
+  MapPin, ChevronDown, FileText, Info, Cloud, Hash,
+  ShieldAlert
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { useStore } from '../contexts/StoreContext';
@@ -23,6 +24,7 @@ const NewClient: React.FC = () => {
     nif: '',
     notes: '',
     google_drive_link: '',
+    has_debt: false,
     store: currentStore === 'Todas' ? 'Caldas da Rainha' : currentStore as string
   });
 
@@ -194,6 +196,27 @@ const NewClient: React.FC = () => {
                 <p className="text-[9px] font-black text-blue-700 uppercase leading-relaxed">
                   Nota: Ao guardar, será criado automaticamente um local de intervenção com esta morada denominado "SEDE / PRINCIPAL".
                 </p>
+              </div>
+            </div>
+
+            <div className="md:col-span-2 bg-red-50/30 p-6 rounded-3xl border border-red-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${formData.has_debt ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
+                    <ShieldAlert size={24} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-slate-900 uppercase tracking-widest">Aviso de Dívida Ativo</p>
+                    <p className="text-[10px] font-medium text-slate-500 uppercase">Avisar técnico ao criar OS</p>
+                  </div>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setFormData({...formData, has_debt: !formData.has_debt})}
+                  className={`w-16 h-9 rounded-full relative transition-all duration-300 ${formData.has_debt ? 'bg-red-600' : 'bg-slate-300'}`}
+                >
+                  <div className={`absolute top-1 w-7 h-7 bg-white rounded-full transition-all duration-300 ${formData.has_debt ? 'left-8' : 'left-1'}`} />
+                </button>
               </div>
             </div>
           </div>

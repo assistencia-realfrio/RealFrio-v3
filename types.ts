@@ -77,6 +77,8 @@ export interface Client {
   notes?: string;
   store: string;
   google_drive_link?: string;
+  has_debt?: boolean;
+  debt_amount?: number;
 }
 
 export interface Establishment {

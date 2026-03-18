@@ -4,7 +4,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Save, ArrowLeft, Calendar, AlertTriangle, FileText, 
   MapPin, User, HardDrive, Activity, Tag, ChevronDown, Clock,
-  Search, Plus, X, Building2, Phone, Mail, CheckCircle2, Loader2
+  Search, Plus, X, Building2, Phone, Mail, CheckCircle2, Loader2,
+  ShieldAlert
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { Client, Equipment, Establishment, OSType, OSStatus, ServiceOrder } from '../types';
@@ -31,6 +32,8 @@ const NewServiceOrder: React.FC = () => {
   const [showClientModal, setShowClientModal] = useState(false);
   const [showEqModal, setShowEqModal] = useState(false);
   const [showExistingOSModal, setShowExistingOSModal] = useState(false);
+  const [showDebtWarning, setShowDebtWarning] = useState(false);
+  const [debtClient, setDebtClient] = useState<Client | null>(null);
   const [existingOS, setExistingOS] = useState<ServiceOrder | null>(null);
 
   const [formData, setFormData] = useState({
@@ -57,6 +60,10 @@ const NewServiceOrder: React.FC = () => {
       mockData.getClientById(location.state.clientId).then(client => {
         if (client && client.store) {
           setFormData(prev => ({ ...prev, store: client.store as any }));
+          if (client.has_debt) {
+            setDebtClient(client);
+            setShowDebtWarning(true);
+          }
         }
       });
     }
@@ -197,6 +204,10 @@ const NewServiceOrder: React.FC = () => {
   }, [equipments, equipmentSearch]);
 
   const handleSelectClient = (client: Client) => {
+    if (client.has_debt) {
+      setDebtClient(client);
+      setShowDebtWarning(true);
+    }
     setFormData({ 
       ...formData, 
       client_id: client.id, 
@@ -210,6 +221,10 @@ const NewServiceOrder: React.FC = () => {
 
   const handleSelectEstablishment = (est: Establishment & { client_name?: string }) => {
     const client = clients.find(c => c.id === est.client_id);
+    if (client?.has_debt) {
+      setDebtClient(client);
+      setShowDebtWarning(true);
+    }
     setFormData({ 
       ...formData, 
       client_id: est.client_id, 
@@ -602,6 +617,45 @@ const NewServiceOrder: React.FC = () => {
                 className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
               >
                 Continuar com Nova OS
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDebtWarning && debtClient && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden border-4 border-red-500/20 p-8 text-center space-y-6">
+            <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <ShieldAlert size={40} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-red-600 dark:text-red-500 uppercase tracking-tight mb-2">Atenção: Cliente com Dívida</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                O cliente <span className="font-black text-slate-900 dark:text-white uppercase">{debtClient.name}</span> possui dívidas pendentes no valor de <span className="text-red-600 font-black">{debtClient.debt_amount?.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}</span>.
+              </p>
+              <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/20">
+                <p className="text-[10px] font-black text-red-700 dark:text-red-400 uppercase tracking-widest">
+                  ⚠️ NÃO DEVE REALIZAR REPARAÇÕES SEM AUTORIZAÇÃO SUPERIOR
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => setShowDebtWarning(false)}
+                className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-red-500/20 hover:bg-red-700 active:scale-95 transition-all"
+              >
+                Compreendido
+              </button>
+              <button 
+                onClick={() => {
+                  setShowDebtWarning(false);
+                  setFormData(prev => ({ ...prev, client_id: '', establishment_id: '', equipment_id: '' }));
+                  setMainSearch('');
+                }}
+                className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+              >
+                Cancelar Seleção
               </button>
             </div>
           </div>

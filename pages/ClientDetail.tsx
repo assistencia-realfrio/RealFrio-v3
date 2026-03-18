@@ -144,6 +144,22 @@ const ClientDetail: React.FC = () => {
     }
   };
 
+  const handleToggleDebt = async () => {
+    if (!client || !id) return;
+    const newStatus = !client.has_debt;
+    try {
+      const updates = {
+        has_debt: newStatus
+      };
+      await mockData.updateClient(id, updates);
+      const updatedClient = { ...client, ...updates };
+      setClient(updatedClient);
+      setEditForm(JSON.parse(JSON.stringify(updatedClient)));
+    } catch (err: any) {
+      alert("Erro ao atualizar estado de dívida: " + err.message);
+    }
+  };
+
   const isDirty = useMemo(() => {
     if (!client || !editForm) return false;
     return JSON.stringify(client) !== JSON.stringify(editForm);
@@ -392,6 +408,25 @@ const ClientDetail: React.FC = () => {
                     </div>
                   </a>
                 )}
+
+                <div className={`flex items-center gap-4 p-4.5 sm:p-5 border-l-4 transition-colors ${client.has_debt ? 'bg-red-50/50 dark:bg-red-900/10 border-red-500' : 'bg-slate-50/30 dark:bg-slate-800/20 border-slate-200 dark:border-slate-700'}`}>
+                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 ${client.has_debt ? 'bg-red-100 dark:bg-red-900/20 text-red-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                    <ShieldAlert size={20} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${client.has_debt ? 'text-red-600' : 'text-slate-400'}`}>Estado de Conta / Dívida</p>
+                    <p className={`text-[13px] font-black uppercase truncate leading-none ${client.has_debt ? 'text-red-700 dark:text-red-400' : 'text-slate-500'}`}>
+                      {client.has_debt ? 'Aviso de Dívida Ativo' : 'Sem Dívidas Pendentes'}
+                    </p>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={handleToggleDebt}
+                    className={`w-12 h-7 rounded-full relative transition-all duration-300 flex-shrink-0 ${client.has_debt ? 'bg-red-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                  >
+                    <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 shadow-sm ${client.has_debt ? 'left-6' : 'left-1'}`} />
+                  </button>
+                </div>
               </div>
 
               <div className="pt-4">
@@ -672,6 +707,26 @@ const ClientDetail: React.FC = () => {
                 <div className="md:col-span-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Link Google Drive</label>
                   <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-medium text-slate-800 dark:text-slate-200 outline-none" value={editForm.google_drive_link || ''} onChange={e => setEditForm({...editForm, google_drive_link: e.target.value})} placeholder="https://drive.google.com/..." />
+                </div>
+                <div className="md:col-span-2 bg-red-50/30 dark:bg-red-900/10 p-4 rounded-2xl border border-red-100 dark:border-red-900/20">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${editForm.has_debt ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
+                        <ShieldAlert size={20} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Aviso de Dívida Ativo</p>
+                        <p className="text-[9px] font-medium text-slate-500 uppercase">Avisar técnico ao criar OS</p>
+                      </div>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setEditForm({...editForm, has_debt: !editForm.has_debt})}
+                      className={`w-14 h-8 rounded-full relative transition-all duration-300 ${editForm.has_debt ? 'bg-red-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                    >
+                      <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all duration-300 ${editForm.has_debt ? 'left-7' : 'left-1'}`} />
+                    </button>
+                  </div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Notas Gerais</label>

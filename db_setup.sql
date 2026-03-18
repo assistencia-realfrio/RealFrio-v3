@@ -128,3 +128,10 @@ COMMENT ON COLUMN public.parts_used.unit_price IS 'Preço unitário do material 
 -- Adicionar campo zone à tabela de equipamentos
 ALTER TABLE public.equipments ADD COLUMN IF NOT EXISTS zone TEXT;
 COMMENT ON COLUMN public.equipments.zone IS 'Zona ou área do estabelecimento onde o equipamento está instalado (ex: Cozinha, Bar)';
+
+-- Adicionar campos de dívida à tabela de clientes
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS has_debt BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS debt_amount DECIMAL(10, 2) DEFAULT 0;
+
+COMMENT ON COLUMN public.clients.has_debt IS 'Indica se o cliente possui dívidas pendentes';
+COMMENT ON COLUMN public.clients.debt_amount IS 'Valor total da dívida do cliente';

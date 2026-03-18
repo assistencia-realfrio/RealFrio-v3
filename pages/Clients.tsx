@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Users as UsersIcon, Search, Plus, Building2, ChevronRight, MapPin, ChevronDown } from 'lucide-react';
+import { Users as UsersIcon, Search, Plus, Building2, ChevronRight, MapPin, ChevronDown, ShieldAlert } from 'lucide-react';
 import { mockData } from '../services/mockData';
 import { Client } from '../types';
 import { useStore } from '../contexts/StoreContext';
@@ -95,7 +95,14 @@ const Clients: React.FC = () => {
                        <Building2 size={18} />
                     </div>
                     <div className="flex flex-col min-w-0">
-                       <span className="text-[13px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight truncate group-hover:text-blue-600 transition-colors">{client.name}</span>
+                       <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight truncate group-hover:text-blue-600 transition-colors">{client.name}</span>
+                          {client.has_debt && (
+                             <div className="flex-shrink-0 w-4 h-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600" title="Aviso de Dívida Ativo">
+                                <ShieldAlert size={10} />
+                             </div>
+                          )}
+                       </div>
                        <span className="text-[9px] font-bold text-slate-400 truncate uppercase">{client.billing_name || client.address}</span>
                     </div>
                  </div>
