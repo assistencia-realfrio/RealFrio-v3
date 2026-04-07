@@ -52,23 +52,25 @@ const Inventory: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.reference) return;
+    if (!formData.name) return;
     setIsSubmitting(true);
     try {
       const numericStock = parseFloat(formData.stock.replace(',', '.'));
       const numericLastPrice = formData.last_price ? parseFloat(formData.last_price.replace(',', '.')) : 0;
       
+      const finalReference = formData.reference.trim() || Math.floor(100000 + Math.random() * 900000).toString();
+
       if (editingItem) {
         await mockData.updateCatalogItem(editingItem.id, {
           name: formData.name.toUpperCase(),
-          reference: formData.reference.toUpperCase(),
+          reference: finalReference.toUpperCase(),
           stock: numericStock || 0,
           last_price: numericLastPrice
         });
       } else {
         await mockData.addCatalogItem({
           name: formData.name.toUpperCase(),
-          reference: formData.reference.toUpperCase(),
+          reference: finalReference.toUpperCase(),
           stock: numericStock || 0,
           last_price: numericLastPrice
         });
@@ -189,14 +191,14 @@ const Inventory: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Referência / Código *</label>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Referência / Código</label>
                 <div className="relative">
                   <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                   <input 
-                    required type="text" 
+                    type="text" 
                     className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-sm font-mono font-bold dark:text-white focus:ring-4 focus:ring-blue-500/10 outline-none transition-all uppercase"
                     value={formData.reference} onChange={e => setFormData({...formData, reference: e.target.value})}
-                    placeholder="EX: 102030"
+                    placeholder="EX: 102030 (GERADO AUTOMATICAMENTE SE VAZIO)"
                   />
                 </div>
               </div>
