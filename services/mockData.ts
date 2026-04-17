@@ -631,6 +631,10 @@ export const mockData = {
     if (error) throw error;
     return data;
   },
+  updateFuelRecord: async (id: string, updates: any) => {
+    const { error } = await supabase.from('vehicle_fuel_records').update(updates).eq('id', id);
+    if (error) throw error;
+  },
   deleteFuelRecord: async (id: string) => {
     const { error } = await supabase.from('vehicle_fuel_records').delete().eq('id', id);
     if (error) throw error;

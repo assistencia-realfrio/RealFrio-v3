@@ -29,6 +29,7 @@ const FleetManagement: React.FC = () => {
   const [bulkFuelData, setBulkFuelData] = useState<Partial<FuelRecord>[]>([]);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [editingMaintenance, setEditingMaintenance] = useState<MaintenanceRecord | null>(null);
+  const [editingFuel, setEditingFuel] = useState<FuelRecord | null>(null);
 
   useEffect(() => {
     fetchVehicles();
@@ -135,9 +136,14 @@ const FleetManagement: React.FC = () => {
     };
 
     try {
-      await mockData.createFuelRecord(fuelData);
+      if (editingFuel) {
+        await mockData.updateFuelRecord(editingFuel.id, fuelData);
+      } else {
+        await mockData.createFuelRecord(fuelData);
+      }
       setIsFuelModalOpen(false);
       setPrefilledFuelData(null);
+      setEditingFuel(null);
       fetchFuelRecords(selectedVehicle.id);
       
       // Se a quilometragem do abastecimento for maior que a atual do veículo, atualizar veículo
@@ -151,7 +157,7 @@ const FleetManagement: React.FC = () => {
   };
 
   const handleDeleteFuel = async (id: string) => {
-    if (!confirm("Tem a certeza que deseja eliminar este registo?")) return;
+    if (!window.confirm("Tem a certeza que deseja eliminar este registo?")) return;
     try {
       await mockData.deleteFuelRecord(id);
       if (selectedVehicle) fetchFuelRecords(selectedVehicle.id);
@@ -697,34 +703,55 @@ const FleetManagement: React.FC = () => {
                           <p className="text-xs text-slate-400 font-medium uppercase">Sem registos de combustível</p>
                         </div>
                       ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left">
-                            <thead>
-                              <tr className="border-b border-slate-100 dark:border-slate-800">
-                                <th className="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</th>
-                                <th className="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">KM</th>
-                                <th className="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Litros</th>
-                                <th className="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor</th>
-                                <th className="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {fuelRecords.map(record => (
-                                <tr key={record.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                                  <td className="py-3 text-xs font-bold text-slate-700 dark:text-slate-300">{new Date(record.date).toLocaleDateString()}</td>
-                                  <td className="py-3 text-xs font-mono text-slate-600">{record.mileage.toLocaleString()}</td>
-                                  <td className="py-3 text-xs font-bold text-slate-700 dark:text-slate-300">{record.liters.toFixed(2)} L</td>
-                                  <td className="py-3 text-xs font-black text-emerald-600">{record.total_value.toFixed(2)} €</td>
-                                  <td className="py-3 text-right">
-                                    <button onClick={() => handleDeleteFuel(record.id)} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors">
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                        fuelRecords.map(record => (
+                          <div key={record.id} className="bg-white dark:bg-slate-900/40 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-lg hover:border-emerald-500/30 transition-all group">
+                             {/* Date & Total Section */}
+                             <div className="flex items-center justify-between md:items-start md:flex-col md:min-w-[120px] gap-2">
+                                <div>
+                                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Data</p>
+                                   <p className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">{new Date(record.date).toLocaleDateString()}</p>
+                                </div>
+                                <div className="md:mt-2 text-right md:text-left">
+                                   <p className="text-[9px] font-black text-emerald-500/60 uppercase tracking-widest mb-0.5 md:hidden">Total</p>
+                                   <p className="text-xl font-black text-emerald-600">{record.total_value.toFixed(2)} €</p>
+                                </div>
+                             </div>
+
+                             {/* Metrics Section */}
+                             <div className="grid grid-cols-2 gap-8 flex-1 md:pl-6 md:border-l border-slate-100 dark:border-slate-800">
+                                <div>
+                                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> KM
+                                   </p>
+                                   <p className="text-sm font-mono font-bold text-slate-600 dark:text-slate-400">{record.mileage.toLocaleString()} <span className="text-[10px] font-normal text-slate-400 ml-1">km</span></p>
+                                </div>
+                                <div>
+                                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Litros
+                                   </p>
+                                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{record.liters.toFixed(2)} <span className="text-[10px] font-normal text-slate-400 ml-1">L</span></p>
+                                </div>
+                             </div>
+
+                             {/* Actions Section */}
+                             <div className="flex items-center justify-end gap-2 pt-4 md:pt-0 border-t md:border-t-0 border-slate-50 dark:border-slate-800">
+                                <button 
+                                  onClick={() => { setEditingFuel(record); setIsFuelModalOpen(true); }} 
+                                  className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all group/btn"
+                                >
+                                  <Edit2 size={14} className="group-hover/btn:scale-110 transition-transform" />
+                                  <span className="text-[10px] font-black uppercase tracking-widest md:hidden lg:inline-block">Editar</span>
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteFuel(record.id)} 
+                                  className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all group/btn"
+                                >
+                                  <Trash2 size={14} className="group-hover/btn:scale-110 transition-transform" />
+                                  <span className="text-[10px] font-black uppercase tracking-widest md:hidden lg:inline-block">Apagar</span>
+                                </button>
+                             </div>
+                          </div>
+                        ))
                       )}
                     </div>
                   </div>
@@ -958,14 +985,16 @@ const FleetManagement: React.FC = () => {
           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
               <div>
-                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Registar Abastecimento</h3>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                  {editingFuel ? 'Editar Abastecimento' : 'Registar Abastecimento'}
+                </h3>
                 {prefilledFuelData && (
                     <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1">
                         <CheckCircle2 size={10} /> Sugestão da IA carregada
                     </span>
                 )}
               </div>
-              <button onClick={() => { setIsFuelModalOpen(false); setPrefilledFuelData(null); }}><X size={20} className="text-slate-400" /></button>
+              <button onClick={() => { setIsFuelModalOpen(false); setPrefilledFuelData(null); setEditingFuel(null); }}><X size={20} className="text-slate-400" /></button>
             </div>
             <form onSubmit={handleSaveFuel} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -975,7 +1004,7 @@ const FleetManagement: React.FC = () => {
                     name="date" 
                     type="date" 
                     required 
-                    defaultValue={prefilledFuelData?.date || new Date().toISOString().split('T')[0]} 
+                    defaultValue={editingFuel?.date || prefilledFuelData?.date || new Date().toISOString().split('T')[0]} 
                     className={`w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm ${prefilledFuelData?.date ? 'ring-2 ring-emerald-500/20' : ''}`} 
                   />
                 </div>
@@ -985,7 +1014,7 @@ const FleetManagement: React.FC = () => {
                     name="mileage" 
                     type="number" 
                     required 
-                    defaultValue={prefilledFuelData?.mileage || selectedVehicle?.current_mileage} 
+                    defaultValue={editingFuel?.mileage || prefilledFuelData?.mileage || selectedVehicle?.current_mileage} 
                     className={`w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-mono ${prefilledFuelData?.mileage ? 'ring-2 ring-emerald-500/20' : ''}`} 
                   />
                 </div>
@@ -998,7 +1027,7 @@ const FleetManagement: React.FC = () => {
                     type="number" 
                     step="0.01" 
                     required 
-                    defaultValue={prefilledFuelData?.liters}
+                    defaultValue={editingFuel?.liters || prefilledFuelData?.liters}
                     className={`w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm ${prefilledFuelData?.liters ? 'ring-2 ring-emerald-500/20' : ''}`} 
                     placeholder="0.00" 
                   />
@@ -1010,14 +1039,14 @@ const FleetManagement: React.FC = () => {
                     type="number" 
                     step="0.01" 
                     required 
-                    defaultValue={prefilledFuelData?.total_value}
+                    defaultValue={editingFuel?.total_value || prefilledFuelData?.total_value}
                     className={`w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm ${prefilledFuelData?.total_value ? 'ring-2 ring-emerald-500/20' : ''}`} 
                     placeholder="0.00" 
                   />
                 </div>
               </div>
               
-              {!prefilledFuelData && (
+              {!prefilledFuelData && !editingFuel && (
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-start gap-3">
                     <AlertCircle size={16} className="text-blue-600 mt-0.5" />
                     <p className="text-[10px] text-blue-700 leading-relaxed font-medium uppercase">DICA: PODE TAMBÉM IMPORTAR O TALÃO DIRETAMENTE ATRAVÉS DO BOTÃO "IMPORTAR PDF" NA LISTA PARA QUE O SISTEMA PREENCHA OS DADOS AUTOMATICAMENTE.</p>
@@ -1032,7 +1061,7 @@ const FleetManagement: React.FC = () => {
               )}
 
               <button type="submit" className="w-full py-4 bg-emerald-600 text-white font-bold uppercase tracking-widest rounded-xl hover:bg-emerald-700 transition-colors">
-                {prefilledFuelData ? 'Confirmar e Guardar' : 'Guardar Abastecimento'}
+                {editingFuel ? 'Atualizar Abastecimento' : (prefilledFuelData ? 'Confirmar e Guardar' : 'Guardar Abastecimento')}
               </button>
             </form>
           </div>
