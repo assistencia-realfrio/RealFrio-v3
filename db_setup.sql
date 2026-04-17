@@ -54,9 +54,21 @@ CREATE TABLE IF NOT EXISTS public.maintenance_records (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Tabela de Registos de Combustível (Gestão de Frota)
+CREATE TABLE IF NOT EXISTS public.vehicle_fuel_records (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    vehicle_id UUID REFERENCES public.vehicles(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    mileage INTEGER NOT NULL,
+    total_value DECIMAL(10, 2) NOT NULL,
+    liters DECIMAL(10, 2) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- Políticas de Segurança (RLS)
 ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.maintenance_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vehicle_fuel_records ENABLE ROW LEVEL SECURITY;
 
 -- Remover políticas antigas se existirem para evitar conflitos
 DROP POLICY IF EXISTS "Permitir acesso total a utilizadores autenticados (Veículos)" ON public.vehicles;
@@ -71,6 +83,9 @@ CREATE POLICY "Permitir tudo a todos (Veículos)" ON public.vehicles
 CREATE POLICY "Permitir tudo a todos (Manutenção)" ON public.maintenance_records
     FOR ALL USING (true) WITH CHECK (true);
 
+CREATE POLICY "Permitir tudo a todos (Combustível)" ON public.vehicle_fuel_records
+    FOR ALL USING (true) WITH CHECK (true);
+
 -- Dar permissões explícitas às tabelas
 GRANT ALL ON TABLE public.vehicles TO authenticated;
 GRANT ALL ON TABLE public.vehicles TO service_role;
@@ -79,6 +94,10 @@ GRANT ALL ON TABLE public.vehicles TO anon;
 GRANT ALL ON TABLE public.maintenance_records TO authenticated;
 GRANT ALL ON TABLE public.maintenance_records TO service_role;
 GRANT ALL ON TABLE public.maintenance_records TO anon;
+
+GRANT ALL ON TABLE public.vehicle_fuel_records TO authenticated;
+GRANT ALL ON TABLE public.vehicle_fuel_records TO service_role;
+GRANT ALL ON TABLE public.vehicle_fuel_records TO anon;
 
 -- Garantir que o público pode ver e assinar orçamentos
 ALTER TABLE public.quotes ENABLE ROW LEVEL SECURITY;

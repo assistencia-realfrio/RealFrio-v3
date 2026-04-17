@@ -65,6 +65,16 @@ export interface MaintenanceRecord {
   notes?: string;
 }
 
+export interface FuelRecord {
+  id: string;
+  vehicle_id: string;
+  date: string;
+  mileage: number;
+  total_value: number;
+  liters: number;
+  created_at?: string;
+}
+
 export interface Client {
   id: string;
   name: string;

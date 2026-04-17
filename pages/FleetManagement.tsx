@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Truck, Plus, Search, Calendar, Wrench, AlertTriangle, 
-  CheckCircle2, X, ChevronRight, Fuel, Gauge, FileText, 
-  MoreVertical, Trash2, Edit2, Car, RefreshCw
+  CheckCircle2, X, ChevronRight, Fuel, FileText, 
+  MoreVertical, Trash2, Edit2, Car, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { mockData } from '../services/mockData';
-import { Vehicle, MaintenanceRecord } from '../types';
+import { Vehicle, MaintenanceRecord, FuelRecord } from '../types';
+import { GoogleGenAI, Type } from "@google/genai";
 
 const FleetManagement: React.FC = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -13,12 +14,19 @@ const FleetManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
+  const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
   const [allMaintenance, setAllMaintenance] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'fleet' | 'schedule'>('fleet');
+  const [vehicleDetailTab, setVehicleDetailTab] = useState<'maintenance' | 'fuel'>('maintenance');
   
   // Modals
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
+  const [isFuelModalOpen, setIsFuelModalOpen] = useState(false);
+  const [isBulkFuelModalOpen, setIsBulkFuelModalOpen] = useState(false);
+  const [isParsingPdf, setIsParsingPdf] = useState(false);
+  const [prefilledFuelData, setPrefilledFuelData] = useState<Partial<FuelRecord> | null>(null);
+  const [bulkFuelData, setBulkFuelData] = useState<Partial<FuelRecord>[]>([]);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [editingMaintenance, setEditingMaintenance] = useState<MaintenanceRecord | null>(null);
 
@@ -30,6 +38,7 @@ const FleetManagement: React.FC = () => {
   useEffect(() => {
     if (selectedVehicle) {
       fetchMaintenanceRecords(selectedVehicle.id);
+      fetchFuelRecords(selectedVehicle.id);
     }
   }, [selectedVehicle]);
 
@@ -60,6 +69,15 @@ const FleetManagement: React.FC = () => {
       setMaintenanceRecords(data);
     } catch (error) {
       console.error("Erro ao carregar registos:", error);
+    }
+  };
+
+  const fetchFuelRecords = async (vehicleId: string) => {
+    try {
+      const data = await mockData.getFuelRecords(vehicleId);
+      setFuelRecords(data);
+    } catch (error) {
+      console.error("Erro ao carregar abastecimentos:", error);
     }
   };
 
@@ -95,6 +113,181 @@ const FleetManagement: React.FC = () => {
       fetchVehicles();
     } catch (error) {
       alert("Erro ao guardar veículo.");
+    }
+  };
+
+  const openFuelModalWithData = (data: Partial<FuelRecord>) => {
+    setPrefilledFuelData(data);
+    setIsFuelModalOpen(true);
+  };
+
+  const handleSaveFuel = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedVehicle) return;
+    
+    const formData = new FormData(e.currentTarget);
+    const fuelData = {
+      vehicle_id: selectedVehicle.id,
+      date: formData.get('date') as string,
+      mileage: parseInt(formData.get('mileage') as string),
+      total_value: parseFloat(formData.get('total_value') as string),
+      liters: parseFloat(formData.get('liters') as string),
+    };
+
+    try {
+      await mockData.createFuelRecord(fuelData);
+      setIsFuelModalOpen(false);
+      setPrefilledFuelData(null);
+      fetchFuelRecords(selectedVehicle.id);
+      
+      // Se a quilometragem do abastecimento for maior que a atual do veículo, atualizar veículo
+      if (fuelData.mileage > selectedVehicle.current_mileage) {
+        await mockData.updateVehicle(selectedVehicle.id, { current_mileage: fuelData.mileage });
+        fetchVehicles();
+      }
+    } catch (error) {
+      alert("Erro ao guardar abastecimento.");
+    }
+  };
+
+  const handleDeleteFuel = async (id: string) => {
+    if (!confirm("Tem a certeza que deseja eliminar este registo?")) return;
+    try {
+      await mockData.deleteFuelRecord(id);
+      if (selectedVehicle) fetchFuelRecords(selectedVehicle.id);
+    } catch (error) {
+      alert("Erro ao eliminar registo.");
+    }
+  };
+
+  const handleSaveBulkFuel = async () => {
+    if (!selectedVehicle || bulkFuelData.length === 0) return;
+    
+    try {
+      setLoading(true);
+      let successCount = 0;
+      let errorMsgs: string[] = [];
+
+      for (const record of bulkFuelData) {
+        try {
+          await mockData.createFuelRecord({
+            vehicle_id: selectedVehicle.id,
+            date: record.date || new Date().toISOString().split('T')[0],
+            mileage: record.mileage || selectedVehicle.current_mileage,
+            total_value: record.total_value || 0,
+            liters: record.liters || 0,
+          });
+          successCount++;
+        } catch (e: any) {
+          console.error("Erro ao inserir registo individual:", e);
+          errorMsgs.push(e.message || "Erro desconhecido");
+        }
+      }
+      
+      if (successCount > 0) {
+        const kms = bulkFuelData.map(r => r.mileage || 0);
+        const maxMileage = Math.max(...kms, 0);
+        if (maxMileage > selectedVehicle.current_mileage) {
+          await mockData.updateVehicle(selectedVehicle.id, { current_mileage: maxMileage });
+        }
+      }
+
+      setIsBulkFuelModalOpen(false);
+      setBulkFuelData([]);
+      if (selectedVehicle) {
+        fetchFuelRecords(selectedVehicle.id);
+        fetchVehicles();
+      }
+
+      if (errorMsgs.length > 0) {
+        if (errorMsgs.some(m => m.includes('vehicle_fuel_records') || m.includes('PGRST205'))) {
+          alert("ERRO DE SCHEMA: A tabela 'vehicle_fuel_records' não foi encontrada. Por favor, execute o script SQL de configuração no seu painel Supabase.");
+        } else {
+          alert(`Importação concluída com avisos: ${successCount} registos importados, ${errorMsgs.length} falhas.`);
+        }
+      } else {
+        alert(`${successCount} registos importados com sucesso.`);
+      }
+    } catch (error: any) {
+      console.error("Erro fatal na importação em massa:", error);
+      alert(`Erro crítico ao importar: ${error.message || "Por favor, verifique a ligação à base de dados."}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedVehicle) return;
+
+    setIsParsingPdf(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Data = (reader.result as string).split(',')[1];
+          
+          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+          const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: [
+              {
+                inlineData: {
+                  data: base64Data,
+                  mimeType: "application/pdf"
+                }
+              },
+              {
+                text: "Analise este documento (pode ser um talão individual ou uma listagem tabular de abastecimentos) e extraia todos os registos encontrados em formato JSON. Para cada registo, extraia: date (YYYY-MM-DD), mileage (número), total_value (número), liters (número). Se faltar o ano na data, assuma o ano mais provável indicado no cabeçalho ou o ano atual. Responda apenas com o JSON contendo um array 'records'."
+              }
+            ],
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  records: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        date: { type: Type.STRING },
+                        mileage: { type: Type.NUMBER },
+                        total_value: { type: Type.NUMBER },
+                        liters: { type: Type.NUMBER }
+                      },
+                      required: ["date", "total_value", "liters"]
+                    }
+                  }
+                },
+                required: ["records"]
+              }
+            }
+          });
+
+          const data = JSON.parse(response.text || '{"records":[]}');
+          const records = data.records || [];
+          
+          setIsParsingPdf(false);
+
+          if (records.length === 1) {
+            openFuelModalWithData(records[0]);
+          } else if (records.length > 1) {
+            setBulkFuelData(records);
+            setIsBulkFuelModalOpen(true);
+          } else {
+            alert("Nenhum dado de abastecimento encontrado no documento.");
+          }
+        } catch (error) {
+          console.error("Erro no processamento do Gemini:", error);
+          alert("Não foi possível extrair dados automaticamente do PDF. Por favor, preencha manualmente.");
+          setIsParsingPdf(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Erro ao ler ficheiro:", error);
+      setIsParsingPdf(false);
     }
   };
 
@@ -191,196 +384,171 @@ const FleetManagement: React.FC = () => {
     v.model.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const stats = {
-    total: vehicles.length,
-    inWorkshop: vehicles.filter(v => v.status === 'maintenance').length,
-    scheduled: allMaintenance.filter(m => m.status === 'scheduled').length,
-    alerts: vehicles.filter(v => 
-      (v.next_revision_mileage && v.current_mileage >= v.next_revision_mileage - 1000) ||
-      (v.next_inspection_date && new Date(v.next_inspection_date) <= new Date(Date.now() + 15 * 24 * 60 * 60 * 1000))
-    ).length
-  };
-
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Gestão de Frota</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Controlo de viaturas, manutenções e custos</p>
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">GESTÃO DE FROTA</h1>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Frota & Manutenção Realfrio</p>
         </div>
+        
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Procurar matrícula, marca..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none w-full md:w-64"
-            />
-          </div>
           <button 
             onClick={() => { setEditingVehicle(null); setIsVehicleModalOpen(true); }}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wide hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20"
+            className="flex items-center gap-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-xl shadow-slate-900/10 dark:shadow-none"
           >
             <Plus size={18} /> Nova Viatura
           </button>
         </div>
       </div>
 
-      {/* Stats Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Frota</p>
-          <div className="flex items-center justify-between">
-            <span className="text-2xl font-black text-slate-900 dark:text-white">{stats.total}</span>
-            <Car className="text-slate-200 dark:text-slate-800" size={24} />
-          </div>
+      {/* Navigation & Selection Block (Centered) */}
+      <div className="flex flex-col items-center gap-6 py-8 bg-slate-50/50 dark:bg-slate-900/10 rounded-[48px] mb-6 border border-slate-100 dark:border-slate-800/50">
+        {/* Tabs */}
+        <div className="flex gap-2 p-1.5 bg-slate-200/50 dark:bg-slate-800/50 rounded-2xl shadow-inner">
+          <button 
+            onClick={() => setActiveTab('fleet')}
+            className={`px-10 py-3 rounded-xl text-[11px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === 'fleet' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-md scale-105' : 'text-slate-500 hover:text-slate-700 font-bold'}`}
+          >
+            Viatura Ativa
+          </button>
+          <button 
+            onClick={() => setActiveTab('schedule')}
+            className={`px-10 py-3 rounded-xl text-[11px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === 'schedule' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-md scale-105' : 'text-slate-500 hover:text-slate-700 font-bold'}`}
+          >
+            Agenda Geral
+          </button>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-          <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">Na Oficina</p>
-          <div className="flex items-center justify-between">
-            <span className="text-2xl font-black text-amber-600">{stats.inWorkshop}</span>
-            <Wrench className="text-amber-100 dark:text-amber-900/30" size={24} />
-          </div>
-        </div>
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-          <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Agendamentos</p>
-          <div className="flex items-center justify-between">
-            <span className="text-2xl font-black text-blue-600">{stats.scheduled}</span>
-            <Calendar className="text-blue-100 dark:text-blue-900/30" size={24} />
-          </div>
-        </div>
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-          <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-1">Alertas</p>
-          <div className="flex items-center justify-between">
-            <span className="text-2xl font-black text-red-600">{stats.alerts}</span>
-            <AlertTriangle className="text-red-100 dark:text-red-900/30" size={24} />
-          </div>
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800/50 rounded-2xl w-fit">
-        <button 
-          onClick={() => setActiveTab('fleet')}
-          className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'fleet' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          Frota
-        </button>
-        <button 
-          onClick={() => setActiveTab('schedule')}
-          className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'schedule' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          Agenda & Oficina
-        </button>
+        {/* Inputs (Centered) */}
+        {activeTab === 'fleet' && (
+          <div className="flex flex-col md:flex-row items-center gap-4 w-full max-w-2xl px-6 animate-in fade-in zoom-in duration-500">
+            {/* Search */}
+            <div className="relative w-full group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
+              <input 
+                type="text" 
+                placeholder="PROCURAR MATRÍCULA..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-12 pr-4 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:ring-4 focus:ring-blue-500/10 outline-none w-full transition-all shadow-sm"
+              />
+            </div>
+
+            {/* Dropdown */}
+            <div className="relative w-full">
+              <Car className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+              <select 
+                className="pl-12 pr-10 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:ring-4 focus:ring-blue-500/10 outline-none w-full appearance-none transition-all shadow-sm hover:border-slate-300 dark:hover:border-slate-600 cursor-pointer"
+                value={selectedVehicle?.id || ''}
+                onChange={(e) => setSelectedVehicle(vehicles.find(v => v.id === e.target.value) || null)}
+              >
+                <option value="">SELECIONAR VIATURA...</option>
+                {filteredVehicles.map(v => (
+                  <option key={v.id} value={v.id}>{v.license_plate} — {v.brand} {v.model}</option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                <ChevronRight size={16} className="rotate-90" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'fleet' && selectedVehicle && (
+          <button 
+            onClick={() => { setSelectedVehicle(null); setSearchTerm(''); }}
+            className="flex items-center gap-2 group -mt-2 opacity-60 hover:opacity-100 transition-opacity"
+          >
+            <RefreshCw size={12} className="text-slate-400 group-hover:rotate-180 transition-transform duration-500" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Limpar Filtros e Seleção</span>
+          </button>
+        )}
       </div>
 
       {activeTab === 'fleet' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Lista de Veículos */}
-          <div className="lg:col-span-1 space-y-4">
-            {filteredVehicles.map(vehicle => (
-              <div 
-                key={vehicle.id}
-                onClick={() => setSelectedVehicle(vehicle)}
-                className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border transition-all cursor-pointer group ${selectedVehicle?.id === vehicle.id ? 'border-blue-500 ring-1 ring-blue-500 shadow-lg' : 'border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700'}`}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
-                      <Car size={20} />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 dark:text-white uppercase">{vehicle.license_plate}</h3>
-                      <p className="text-xs text-slate-500 font-medium uppercase">{vehicle.brand} {vehicle.model}</p>
-                    </div>
-                  </div>
-                  <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider ${
-                    vehicle.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 
-                    vehicle.status === 'maintenance' ? 'bg-amber-100 text-amber-700' : 
-                    'bg-slate-100 text-slate-500'
-                  }`}>
-                    {vehicle.status === 'active' ? 'Ativo' : vehicle.status === 'maintenance' ? 'Oficina' : 'Inativo'}
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
-                    <span className="block text-[9px] text-slate-400 uppercase font-bold">Quilometragem</span>
-                    <span className="font-mono font-medium text-slate-700 dark:text-slate-300">{vehicle.current_mileage.toLocaleString()} km</span>
-                  </div>
-                  <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
-                    <span className="block text-[9px] text-slate-400 uppercase font-bold">Próx. Revisão</span>
-                    <span className={`font-mono font-medium ${vehicle.next_revision_mileage && vehicle.current_mileage >= vehicle.next_revision_mileage ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
-                      {vehicle.next_revision_mileage?.toLocaleString() || '---'} km
-                    </span>
-                  </div>
-                </div>
+        <div className="space-y-8">
+          {!selectedVehicle ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-[40px] shadow-sm animate-in fade-in zoom-in duration-500">
+              <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 text-slate-300 dark:text-slate-600">
+                <Car size={40} />
               </div>
-            ))}
-            {filteredVehicles.length === 0 && (
-              <div className="text-center py-12 text-slate-400">
-                <Truck size={48} className="mx-auto mb-3 opacity-20" />
-                <p className="text-xs uppercase font-bold tracking-widest">Nenhuma viatura encontrada</p>
-              </div>
-            )}
-          </div>
+              <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-2">Nenhuma Viatura Selecionada</h3>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest max-w-xs">Escolha uma viatura no menu acima para começar a gerir a frota e manutenções.</p>
+            </div>
+          ) : (
+            <div className="animate-in fade-in slide-in-from-bottom-6 duration-500 border-t border-slate-100 dark:border-slate-800 pt-6">
+              <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl shadow-slate-200/50 dark:shadow-none">
+                {/* Unified Info Header */}
+                <div className="p-8 pb-4">
+                  <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                    <div className="space-y-3">
+                       <div className="flex items-center gap-4">
+                          <h2 className="text-4xl first-letter: md:text-5xl font-black bg-blue-600 text-white px-5 py-2 rounded-2xl uppercase tracking-tighter shadow-lg shadow-blue-500/20">{selectedVehicle.license_plate}</h2>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ano: {selectedVehicle.year}</span>
+                            <p className="text-xl font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight">{selectedVehicle.brand} {selectedVehicle.model}</p>
+                          </div>
+                       </div>
+                    </div>
 
-          {/* Detalhes e Histórico */}
-          <div className="lg:col-span-2">
-            {selectedVehicle ? (
-              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl">
-                {/* Header Detalhes */}
-                <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex justify-between items-start">
-                  <div>
-                     <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-1">{selectedVehicle.brand} {selectedVehicle.model}</h2>
-                     <div className="flex items-center gap-3">
-                       <span className="text-sm font-mono font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-700 dark:text-slate-200">{selectedVehicle.license_plate}</span>
-                       <span className="text-xs text-slate-500 font-medium uppercase">Ano: {selectedVehicle.year}</span>
-                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => { setEditingVehicle(selectedVehicle); setIsVehicleModalOpen(true); }} className="p-2 text-slate-400 hover:text-blue-500 transition-colors"><Edit2 size={18} /></button>
-                    <button onClick={() => handleDeleteVehicle(selectedVehicle.id)} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
+                    <div className="flex items-center gap-8">
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Quilometragem</p>
+                        <p className="text-xl font-black text-slate-900 dark:text-white">{selectedVehicle.current_mileage.toLocaleString()} <span className="text-xs text-slate-400 ml-0.5">KM</span></p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Estado</p>
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                          selectedVehicle.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {selectedVehicle.status === 'active' ? 'Operacional' : 'Em Manutenção'}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                         <button onClick={() => { setEditingVehicle(selectedVehicle); setIsVehicleModalOpen(true); }} className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-blue-500 rounded-2xl transition-all shadow-sm"><Edit2 size={20} /></button>
+                         <button onClick={() => handleDeleteVehicle(selectedVehicle.id)} className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-red-500 rounded-2xl transition-all shadow-sm"><Trash2 size={20} /></button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 border-b border-slate-100 dark:border-slate-800">
-                   <div className="space-y-1">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inspeção</p>
-                      <div className="flex items-center gap-2">
-                         <Calendar size={14} className="text-blue-500" />
-                         <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{selectedVehicle.next_inspection_date ? new Date(selectedVehicle.next_inspection_date).toLocaleDateString() : '---'}</span>
+                {/* Info Bar */}
+                <div className="px-8 py-4 bg-slate-50/50 dark:bg-slate-800/30 border-y border-slate-100 dark:border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-4">
+                   <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm"><Calendar size={16} className="text-blue-500" /></div>
+                      <div>
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Inspeção</p>
+                         <p className="text-xs font-bold text-slate-700 dark:text-white">{selectedVehicle.next_inspection_date ? new Date(selectedVehicle.next_inspection_date).toLocaleDateString() : '---'}</p>
                       </div>
                    </div>
-                   <div className="space-y-1">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seguro</p>
-                      <div className="flex items-center gap-2">
-                         <FileText size={14} className="text-emerald-500" />
-                         <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{selectedVehicle.insurance_expiry_date ? new Date(selectedVehicle.insurance_expiry_date).toLocaleDateString() : '---'}</span>
+                   <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm"><FileText size={16} className="text-emerald-500" /></div>
+                      <div>
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Seguro</p>
+                         <p className="text-xs font-bold text-slate-700 dark:text-white">{selectedVehicle.insurance_expiry_date ? new Date(selectedVehicle.insurance_expiry_date).toLocaleDateString() : '---'}</p>
                       </div>
                    </div>
-                   <div className="space-y-1">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Condutor</p>
-                      <div className="flex items-center gap-2">
-                         <Truck size={14} className="text-amber-500" />
-                         <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{selectedVehicle.assigned_to || 'Não atribuído'}</span>
+                   <div className="flex items-center gap-4">
+                      <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-100 dark:border-slate-800/50 scale-110"><Truck size={18} className="text-amber-500" /></div>
+                      <div className="truncate">
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Condutor Habitual</p>
+                         <p className="text-sm font-black text-slate-900 dark:text-white truncate uppercase tracking-tight">{selectedVehicle.assigned_to || 'N/A'}</p>
                       </div>
                    </div>
-                   <div className="space-y-1">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado</p>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                        selectedVehicle.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {selectedVehicle.status === 'active' ? 'Operacional' : 'Em Manutenção'}
-                      </span>
+                   <div className="flex items-center gap-3 justify-end">
+                      {selectedVehicle.status === 'maintenance' && (
+                        <button 
+                          onClick={() => handleReleaseFromWorkshop(selectedVehicle)}
+                          className="text-[10px] font-black text-emerald-600 uppercase tracking-widest py-2 px-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl hover:bg-emerald-100 transition-colors"
+                        >
+                          Concluir Manutenção
+                        </button>
+                      )}
                    </div>
                 </div>
-
                 {/* Next Schedule Alert */}
                 {maintenanceRecords.find(r => r.status === 'scheduled') && (
                   <div className="mx-6 mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl flex items-center justify-between">
@@ -406,76 +574,164 @@ const FleetManagement: React.FC = () => {
                   </div>
                 )}
 
-                {/* Maintenance History */}
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
-                      <Wrench size={16} className="text-slate-400" /> Histórico de Manutenção
-                    </h3>
-                    <button 
-                      onClick={() => { setEditingMaintenance(null); setIsMaintenanceModalOpen(true); }}
-                      className="text-[10px] font-bold uppercase bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
-                    >
-                      + Adicionar Registo
-                    </button>
-                  </div>
-
-                  <div className="space-y-4">
-                    {maintenanceRecords.length === 0 ? (
-                      <div className="text-center py-8 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">
-                        <p className="text-xs text-slate-400 font-medium uppercase">Sem registos de manutenção</p>
-                      </div>
-                    ) : (
-                      maintenanceRecords.map(record => (
-                        <div key={record.id} className="group relative flex flex-col sm:flex-row gap-4 p-4 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 transition-all">
-                          <div className="flex items-start gap-4 flex-1">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                              record.type === 'revision' ? 'bg-blue-100 text-blue-600' :
-                              record.type === 'repair' ? 'bg-red-100 text-red-600' :
-                              record.type === 'inspection' ? 'bg-purple-100 text-purple-600' :
-                              'bg-slate-200 text-slate-600'
-                            }`}>
-                              {record.type === 'revision' ? <RefreshCw size={18} /> : 
-                               record.type === 'repair' ? <Wrench size={18} /> :
-                               record.type === 'inspection' ? <FileText size={18} /> : <AlertTriangle size={18} />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap justify-between items-start gap-2">
-                                <h4 className="font-bold text-slate-900 dark:text-white uppercase text-sm">{record.description}</h4>
-                                <span className="text-xs font-mono font-medium text-slate-500">{new Date(record.date).toLocaleDateString()}</span>
-                              </div>
-                              <p className="text-xs text-slate-500 mt-1 uppercase">{record.provider} • {record.mileage.toLocaleString()} km</p>
-                              {record.notes && <p className="text-xs text-slate-400 mt-2 italic">"{record.notes}"</p>}
-                            </div>
-                          </div>
-                          
-                          <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-200 dark:border-slate-800">
-                            <div className="flex items-center gap-3">
-                              <p className="font-bold text-slate-900 dark:text-white">{record.cost.toFixed(2)}€</p>
-                              <div className="flex items-center gap-1">
-                                {record.status === 'scheduled' && (
-                                  <button onClick={() => handleCompleteMaintenance(record)} className="p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors" title="Concluir"><CheckCircle2 size={16} /></button>
-                                )}
-                                <button onClick={() => { setEditingMaintenance(record); setIsMaintenanceModalOpen(true); }} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Editar"><Edit2 size={16} /></button>
-                              </div>
-                            </div>
-                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
-                              record.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                            }`}>{record.status === 'completed' ? 'Concluído' : 'Agendado'}</span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                {/* View Tabs */}
+                <div className="px-8 mt-8 flex justify-center gap-2">
+                  <button 
+                    onClick={() => setVehicleDetailTab('maintenance')}
+                    className={`py-3 px-8 text-[11px] font-black uppercase tracking-[0.2em] rounded-t-2xl transition-all ${
+                      vehicleDetailTab === 'maintenance' 
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xl' 
+                        : 'bg-transparent text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    Métricas & Manutenção
+                  </button>
+                  <button 
+                    onClick={() => setVehicleDetailTab('fuel')}
+                    className={`py-3 px-8 text-[11px] font-black uppercase tracking-[0.2em] rounded-t-2xl transition-all ${
+                      vehicleDetailTab === 'fuel' 
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xl' 
+                        : 'bg-transparent text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    Registos de Abastecimento
+                  </button>
                 </div>
+
+                {/* Maintenance History View */}
+                {vehicleDetailTab === 'maintenance' && (
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                        <Wrench size={16} className="text-slate-400" /> Histórico de Manutenção
+                      </h3>
+                      <button 
+                        onClick={() => { setEditingMaintenance(null); setIsMaintenanceModalOpen(true); }}
+                        className="text-[10px] font-bold uppercase bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                      >
+                        + Adicionar Registo
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {maintenanceRecords.length === 0 ? (
+                        <div className="text-center py-8 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">
+                          <p className="text-xs text-slate-400 font-medium uppercase">Sem registos de manutenção</p>
+                        </div>
+                      ) : (
+                        maintenanceRecords.map(record => (
+                          <div key={record.id} className="group relative flex flex-col sm:flex-row gap-4 p-4 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-200 transition-all">
+                            <div className="flex items-start gap-4 flex-1">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                record.type === 'revision' ? 'bg-blue-100 text-blue-600' :
+                                record.type === 'repair' ? 'bg-red-100 text-red-600' :
+                                record.type === 'inspection' ? 'bg-purple-100 text-purple-600' :
+                                'bg-slate-200 text-slate-600'
+                              }`}>
+                                {record.type === 'revision' ? <RefreshCw size={18} /> : 
+                                 record.type === 'repair' ? <Wrench size={18} /> :
+                                 record.type === 'inspection' ? <FileText size={18} /> : <AlertTriangle size={18} />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap justify-between items-start gap-2">
+                                  <h4 className="font-bold text-slate-900 dark:text-white uppercase text-sm">{record.description}</h4>
+                                  <span className="text-xs font-mono font-medium text-slate-500">{new Date(record.date).toLocaleDateString()}</span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1 uppercase">{record.provider} • {record.mileage.toLocaleString()} km</p>
+                                {record.notes && <p className="text-xs text-slate-400 mt-2 italic">"{record.notes}"</p>}
+                              </div>
+                            </div>
+                            
+                            <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-200 dark:border-slate-800">
+                              <div className="flex items-center gap-3">
+                                <p className="font-bold text-slate-900 dark:text-white">{record.cost.toFixed(2)}€</p>
+                                <div className="flex items-center gap-1">
+                                  {record.status === 'scheduled' && (
+                                    <button onClick={() => handleCompleteMaintenance(record)} className="p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors" title="Concluir"><CheckCircle2 size={16} /></button>
+                                  )}
+                                  <button onClick={() => { setEditingMaintenance(record); setIsMaintenanceModalOpen(true); }} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Editar"><Edit2 size={16} /></button>
+                                </div>
+                              </div>
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+                                record.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                              }`}>{record.status === 'completed' ? 'Concluído' : 'Agendado'}</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Fuel History View */}
+                {vehicleDetailTab === 'fuel' && (
+                  <div className="p-6">
+                    <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                        <Fuel size={16} className="text-emerald-500" /> Registo de Consumos
+                      </h3>
+                      <div className="flex gap-2">
+                        <label className="cursor-pointer text-[10px] font-bold uppercase bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2">
+                          <FileText size={14} /> Importar PDF
+                          <input type="file" accept="application/pdf" className="hidden" onChange={handlePdfUpload} disabled={isParsingPdf} />
+                        </label>
+                        <button 
+                          onClick={() => setIsFuelModalOpen(true)}
+                          className="text-[10px] font-bold uppercase bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                        >
+                          + Novo Abastecimento
+                        </button>
+                      </div>
+                    </div>
+
+                    {isParsingPdf && (
+                        <div className="mb-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-2xl flex items-center gap-3 animate-pulse">
+                            <RefreshCw size={16} className="text-emerald-600 animate-spin" />
+                            <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">A analisar PDF com Inteligência Artificial...</span>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 gap-3">
+                      {fuelRecords.length === 0 ? (
+                        <div className="text-center py-8 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">
+                          <p className="text-xs text-slate-400 font-medium uppercase">Sem registos de combustível</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left">
+                            <thead>
+                              <tr className="border-b border-slate-100 dark:border-slate-800">
+                                <th className="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</th>
+                                <th className="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">KM</th>
+                                <th className="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Litros</th>
+                                <th className="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor</th>
+                                <th className="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {fuelRecords.map(record => (
+                                <tr key={record.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                                  <td className="py-3 text-xs font-bold text-slate-700 dark:text-slate-300">{new Date(record.date).toLocaleDateString()}</td>
+                                  <td className="py-3 text-xs font-mono text-slate-600">{record.mileage.toLocaleString()}</td>
+                                  <td className="py-3 text-xs font-bold text-slate-700 dark:text-slate-300">{record.liters.toFixed(2)} L</td>
+                                  <td className="py-3 text-xs font-black text-emerald-600">{record.total_value.toFixed(2)} €</td>
+                                  <td className="py-3 text-right">
+                                    <button onClick={() => handleDeleteFuel(record.id)} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors">
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-700 p-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
-                <Truck size={64} className="mb-4 opacity-50" />
-                <p className="text-sm font-bold uppercase tracking-widest">Selecione uma viatura para ver detalhes</p>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -625,7 +881,7 @@ const FleetManagement: React.FC = () => {
                    <option value="inactive">Inativo</option>
                  </select>
               </div>
-              <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-colors">
+              <button type="submit" className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-opacity mt-4 shadow-xl shadow-slate-900/10 dark:shadow-none">
                 Guardar Viatura
               </button>
             </form>
@@ -689,10 +945,159 @@ const FleetManagement: React.FC = () => {
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Notas Adicionais</label>
                   <textarea name="notes" rows={3} defaultValue={editingMaintenance?.notes} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm" placeholder="Observações..." />
               </div>
-              <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-colors">
+              <button type="submit" className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-opacity mt-2 shadow-xl shadow-slate-900/10 dark:shadow-none">
                 {editingMaintenance ? 'Atualizar Registo' : 'Registar Manutenção'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Combustível */}
+      {isFuelModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Registar Abastecimento</h3>
+                {prefilledFuelData && (
+                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1">
+                        <CheckCircle2 size={10} /> Sugestão da IA carregada
+                    </span>
+                )}
+              </div>
+              <button onClick={() => { setIsFuelModalOpen(false); setPrefilledFuelData(null); }}><X size={20} className="text-slate-400" /></button>
+            </div>
+            <form onSubmit={handleSaveFuel} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Data</label>
+                  <input 
+                    name="date" 
+                    type="date" 
+                    required 
+                    defaultValue={prefilledFuelData?.date || new Date().toISOString().split('T')[0]} 
+                    className={`w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm ${prefilledFuelData?.date ? 'ring-2 ring-emerald-500/20' : ''}`} 
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">KM Atual</label>
+                  <input 
+                    name="mileage" 
+                    type="number" 
+                    required 
+                    defaultValue={prefilledFuelData?.mileage || selectedVehicle?.current_mileage} 
+                    className={`w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm font-mono ${prefilledFuelData?.mileage ? 'ring-2 ring-emerald-500/20' : ''}`} 
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Litros</label>
+                  <input 
+                    name="liters" 
+                    type="number" 
+                    step="0.01" 
+                    required 
+                    defaultValue={prefilledFuelData?.liters}
+                    className={`w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm ${prefilledFuelData?.liters ? 'ring-2 ring-emerald-500/20' : ''}`} 
+                    placeholder="0.00" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Valor Total (€)</label>
+                  <input 
+                    name="total_value" 
+                    type="number" 
+                    step="0.01" 
+                    required 
+                    defaultValue={prefilledFuelData?.total_value}
+                    className={`w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-sm ${prefilledFuelData?.total_value ? 'ring-2 ring-emerald-500/20' : ''}`} 
+                    placeholder="0.00" 
+                  />
+                </div>
+              </div>
+              
+              {!prefilledFuelData && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-start gap-3">
+                    <AlertCircle size={16} className="text-blue-600 mt-0.5" />
+                    <p className="text-[10px] text-blue-700 leading-relaxed font-medium uppercase">DICA: PODE TAMBÉM IMPORTAR O TALÃO DIRETAMENTE ATRAVÉS DO BOTÃO "IMPORTAR PDF" NA LISTA PARA QUE O SISTEMA PREENCHA OS DADOS AUTOMATICAMENTE.</p>
+                </div>
+              )}
+
+              {prefilledFuelData && (
+                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-2xl flex items-start gap-3">
+                    <CheckCircle2 size={16} className="text-emerald-600 mt-0.5" />
+                    <p className="text-[10px] text-emerald-700 leading-relaxed font-medium uppercase">OS DADOS ACIMA FORAM EXTRAÍDOS DO PDF PELA IA. POR FAVOR, VERIFIQUE ANTES DE GUARDAR.</p>
+                </div>
+              )}
+
+              <button type="submit" className="w-full py-4 bg-emerald-600 text-white font-bold uppercase tracking-widest rounded-xl hover:bg-emerald-700 transition-colors">
+                {prefilledFuelData ? 'Confirmar e Guardar' : 'Guardar Abastecimento'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Importação em Massa */}
+      {isBulkFuelModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-emerald-50/50 dark:bg-emerald-900/10">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Importar Listagem de Abastecimentos</h3>
+                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1">
+                    <CheckCircle2 size={10} /> {bulkFuelData.length} registos detectados pela IA
+                </span>
+              </div>
+              <button onClick={() => { setIsBulkFuelModalOpen(false); setBulkFuelData([]); }}><X size={20} className="text-slate-400" /></button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="mb-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-2xl flex items-start gap-3">
+                  <AlertCircle size={16} className="text-emerald-600 mt-0.5" />
+                  <p className="text-[10px] text-emerald-700 leading-relaxed font-medium uppercase">
+                    A IA detectou múltiplos registos neste documento. Por favor, verifique a lista abaixo antes de confirmar a importação para a viatura selecionada.
+                  </p>
+              </div>
+
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 dark:border-slate-800">
+                    <th className="py-2 font-black text-slate-400 uppercase tracking-widest">Data</th>
+                    <th className="py-2 font-black text-slate-400 uppercase tracking-widest">KM</th>
+                    <th className="py-2 font-black text-slate-400 uppercase tracking-widest">Litros</th>
+                    <th className="py-2 font-black text-slate-400 uppercase tracking-widest">Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bulkFuelData.map((record, idx) => (
+                    <tr key={idx} className="border-b border-slate-50 dark:border-slate-800/50">
+                      <td className="py-2 font-bold text-slate-700 dark:text-slate-300">{record.date}</td>
+                      <td className="py-2 font-mono text-slate-600">{record.mileage?.toLocaleString() || '---'}</td>
+                      <td className="py-2 font-bold text-slate-700 dark:text-slate-300">{record.liters?.toFixed(2)} L</td>
+                      <td className="py-2 font-black text-emerald-600">{record.total_value?.toFixed(2)} €</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-6 bg-slate-50 dark:bg-slate-800/50 flex gap-3">
+              <button 
+                onClick={() => { setIsBulkFuelModalOpen(false); setBulkFuelData([]); }}
+                className="flex-1 py-3 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold uppercase tracking-widest rounded-xl hover:bg-slate-300 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleSaveBulkFuel}
+                disabled={loading}
+                className="flex-2 py-3 bg-emerald-600 text-white font-bold uppercase tracking-widest rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+              >
+                {loading ? 'A Importar...' : `Confirmar Importação de ${bulkFuelData.length} Registos`}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -38,6 +38,9 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import StoreSelectionModal from './components/StoreSelectionModal';
 import PermissionRequestModal from './components/PermissionRequestModal';
 
+import { WifiOff, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react';
+import { testSupabaseConnection } from './supabaseClient';
+
 const AppContent: React.FC<{ 
   user: any; 
   onLogin: () => void; 
@@ -46,6 +49,35 @@ const AppContent: React.FC<{
 }> = ({ user, onLogin, onLogout, loading }) => {
   const { triggerSelectionModal, currentStore } = useStore();
   const [showPermissions, setShowPermissions] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  const [connErrorInfo, setConnErrorInfo] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkConnection = async () => {
+        const result = await testSupabaseConnection();
+        if (!result.ok) {
+            setIsOffline(true);
+            setConnErrorInfo(result.error?.message || "Servidor inacessível");
+        } else {
+            setIsOffline(false);
+            setConnErrorInfo(null);
+        }
+    };
+    
+    // Check connection initially and then every minute
+    checkConnection();
+    const interval = setInterval(checkConnection, 60000);
+    
+    // Also listen to browser online/offline events
+    window.addEventListener('online', checkConnection);
+    window.addEventListener('offline', () => setIsOffline(true));
+
+    return () => {
+        clearInterval(interval);
+        window.removeEventListener('online', checkConnection);
+        window.removeEventListener('offline', () => setIsOffline(true));
+    };
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -187,6 +219,21 @@ const AppContent: React.FC<{
     <>
       {user && <StoreSelectionModal />}
       {user && showPermissions && <PermissionRequestModal onClose={() => setShowPermissions(false)} />}
+      
+      {isOffline && (
+        <div className="fixed top-0 left-0 right-0 z-[999] bg-red-600 text-white px-4 py-2 flex items-center justify-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+            <WifiOff size={16} />
+            <span className="text-[10px] font-black uppercase tracking-widest">
+                {connErrorInfo ? `ERRO DE LIGAÇÃO: ${connErrorInfo.toUpperCase()}` : "ESTÁ SEM LIGAÇÃO À INTERNET"}
+            </span>
+            <button 
+                onClick={() => window.location.reload()} 
+                className="ml-2 p-1 bg-white/20 rounded-lg hover:bg-white/30 transition-all"
+            >
+                <RefreshCw size={12} />
+            </button>
+        </div>
+      )}
 
       <Routes>
         <Route path="/proposal/:id" element={<PublicQuoteView />} />

@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'realfrio-tech-v10.4';
+const CACHE_NAME = 'realfrio-tech-v10.6';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -34,19 +34,24 @@ self.addEventListener('activate', (event) => {
   return self.clients.claim();
 });
 
-// Fetch handler: Network First strategy to ensure updates are visible
+// Fetch handler: Network First strategy with robust CORS and external domain handling
 self.addEventListener('fetch', (event) => {
-  // Ignore non-GET requests and specific domains
-  if (event.request.method !== 'GET' || 
-      event.request.url.includes('supabase.co') || 
-      event.request.url.includes('googleapis.com')) {
+  // Ignorar pedidos que não sejam GET ou que sejam para domínios externos críticos
+  // para evitar erros de CORS ou falhas de fetch no interceptor
+  const url = new URL(event.request.url);
+  const isExternal = url.hostname !== self.location.hostname;
+  
+  if (event.request.method !== 'GET' || isExternal) {
     return;
   }
+
+  // Ignorar assets do browser e extensões
+  if (!url.protocol.startsWith('http')) return;
 
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
-        // If network request is successful, clone it and update cache
+        // Se a rede responder com sucesso (200), atualizamos o cache
         if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -55,16 +60,18 @@ self.addEventListener('fetch', (event) => {
         }
         return networkResponse;
       })
-      .catch(() => {
-        // If network fails, try to serve from cache
+      .catch((err) => {
+        // Em caso de erro de rede, tentamos servir do cache
         return caches.match(event.request).then((cachedResponse) => {
           if (cachedResponse) {
             return cachedResponse;
           }
-          // Fallback for navigation requests
+          // Fallback para navegação (SPA)
           if (event.request.mode === 'navigate') {
             return caches.match('/');
           }
+          // Se não há cache nem rede, deixamos o erro propagar de forma limpa
+          throw err;
         });
       })
   );

@@ -31,7 +31,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Erro de ligação ao servidor.');
+      let msg = err.message || 'Erro de ligação ao servidor.';
+      if (msg.includes('Failed to fetch') || msg.includes('network error')) {
+        msg = 'ERRO DE LIGAÇÃO: O servidor do Supabase está inacessível ou o seu projeto foi pausado. Verifique a ligação à internet ou as variáveis de ambiente.';
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }

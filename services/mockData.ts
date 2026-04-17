@@ -617,6 +617,25 @@ export const mockData = {
     if (error) throw error;
   },
 
+  getFuelRecords: async (vehicleId: string) => {
+    const { data, error } = await supabase
+      .from('vehicle_fuel_records')
+      .select('*')
+      .eq('vehicle_id', vehicleId)
+      .order('date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+  createFuelRecord: async (record: any) => {
+    const { data, error } = await supabase.from('vehicle_fuel_records').insert([record]).select().single();
+    if (error) throw error;
+    return data;
+  },
+  deleteFuelRecord: async (id: string) => {
+    const { error } = await supabase.from('vehicle_fuel_records').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   // Profiles
   getProfiles: async () => {
     const { data, error } = await supabase.from('profiles').select('*').order('full_name');
@@ -653,7 +672,7 @@ export const mockData = {
 
   // Maintenance
   exportFullSystemData: async () => {
-    const tables = ['clients', 'establishments', 'equipments', 'service_orders', 'parts_used', 'os_photos', 'os_notes', 'os_activities', 'catalog', 'vacations', 'profiles', 'time_entries', 'quotes', 'quote_items', 'vehicles', 'maintenance_records'];
+    const tables = ['clients', 'establishments', 'equipments', 'service_orders', 'parts_used', 'os_photos', 'os_notes', 'os_activities', 'catalog', 'vacations', 'profiles', 'time_entries', 'quotes', 'quote_items', 'vehicles', 'maintenance_records', 'vehicle_fuel_records'];
     const backup: any = { date: new Date().toISOString(), data: {} };
     for (const table of tables) {
       const { data } = await supabase.from(table).select('*');
@@ -662,7 +681,7 @@ export const mockData = {
     return backup;
   },
   importFullSystemData: async (backup: any, progressCallback?: (msg: string) => void) => {
-    const tables = ['clients', 'establishments', 'equipments', 'service_orders', 'parts_used', 'os_photos', 'os_notes', 'os_activities', 'catalog', 'vacations', 'profiles', 'time_entries', 'quotes', 'quote_items', 'vehicles', 'maintenance_records'];
+    const tables = ['clients', 'establishments', 'equipments', 'service_orders', 'parts_used', 'os_photos', 'os_notes', 'os_activities', 'catalog', 'vacations', 'profiles', 'time_entries', 'quotes', 'quote_items', 'vehicles', 'maintenance_records', 'vehicle_fuel_records'];
     for (const table of tables) {
       progressCallback?.(`A apagar tabela ${table}...`);
       await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
