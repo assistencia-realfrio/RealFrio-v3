@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 
 interface BrandLogoProps {
   variant?: 'dark' | 'light';
@@ -8,8 +8,9 @@ interface BrandLogoProps {
 }
 
 const BrandLogo: React.FC<BrandLogoProps> = ({ variant = 'dark', className = '', size = 'md' }) => {
-  // Cores institucionais invertidas
-  // Agora o título principal é vermelho e o subtítulo é cinzento (ou branco no modo escuro)
+  const [hasError, setHasError] = useState(false);
+
+  // Fallback styling
   const textColor = variant === 'dark' ? 'text-[#9d1c24]' : 'text-red-400';
   const subTextColor = variant === 'dark' ? 'text-[#575756]' : 'text-white';
   
@@ -26,6 +27,26 @@ const BrandLogo: React.FC<BrandLogoProps> = ({ variant = 'dark', className = '',
     lg: 'text-[0.7rem]',
     xl: 'text-base'
   }[size];
+
+  const heightClass = {
+    sm: 'h-8 sm:h-9',
+    md: 'h-12',
+    lg: 'h-16',
+    xl: 'h-24 md:h-28'
+  }[size];
+
+  if (!hasError) {
+    return (
+      <div className={`flex items-center select-none ${className}`}>
+        <img 
+          src="/logo.png" 
+          alt="Real Frio" 
+          onError={() => setHasError(true)}
+          className={`${heightClass} w-auto object-contain block`}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={`flex flex-col items-start select-none leading-none ${className}`}>

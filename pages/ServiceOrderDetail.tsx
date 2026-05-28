@@ -21,7 +21,7 @@ import autoTable from "jspdf-autotable";
 import QRCode from 'qrcode';
 import SignatureCanvas from '../components/SignatureCanvas';
 import OSStatusBadge from '../components/OSStatusBadge';
-import { OSStatus, ServiceOrder, PartUsed, PartCatalogItem, OSPhoto, OSNote, OSActivity } from '../types';
+import { OSStatus, ServiceOrder, PartUsed, PartCatalogItem, OSPhoto, OSNote, OSActivity, OSVisit } from '../types';
 import { generateOSReportSummary } from '../services/geminiService';
 import { mockData } from '../services/mockData';
 import { normalizeString, compressImage } from '../utils';
@@ -102,6 +102,23 @@ const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => 
       )}
     </div>
   );
+};
+
+const parseObservations = (observationsStr: string | null | undefined): { plain_text: string; visits: OSVisit[] } => {
+  const defaultResult = { plain_text: '', visits: [] };
+  if (!observationsStr) return defaultResult;
+  try {
+    const parsed = JSON.parse(observationsStr);
+    if (parsed && typeof parsed === 'object') {
+      const visits = Array.isArray(parsed.visits) ? parsed.visits : [];
+      const plain_text = typeof parsed.plain_text === 'string' ? parsed.plain_text : '';
+      return { plain_text, visits };
+    }
+  } catch (e) {
+    // Non-JSON format is treated as a simple observations text
+    return { plain_text: observationsStr, visits: [] };
+  }
+  return defaultResult;
 };
 
 const getStatusLabelText = (status: string) => {
@@ -212,6 +229,7 @@ export const ServiceOrderDetail: React.FC = () => {
   const [expandedWarranty, setExpandedWarranty] = useState(false);
   const [expandedPlanning, setExpandedPlanning] = useState(false);
   const [expandedLog, setExpandedLog] = useState(false);
+  const [expandedVisits, setExpandedVisits] = useState(true);
 
   // Estados para Upload Seletivo
   const [showSourceModal, setShowSourceModal] = useState(false);
@@ -444,6 +462,10 @@ export const ServiceOrderDetail: React.FC = () => {
     return { subtotal, iva, total, hasValues: partsUsed.length > 0 };
   }, [partsUsed]);
 
+  const { plain_text: observationsText, visits: historicalVisits } = useMemo(() => {
+    return parseObservations(os?.observations);
+  }, [os?.observations]);
+
   const storeColors = useMemo(() => {
     const store = os?.store || 'Ambas as Lojas';
     const isPM = store === 'Porto de Mós';
@@ -582,10 +604,71 @@ export const ServiceOrderDetail: React.FC = () => {
     if (!id || !os) return;
     setActionLoading(true);
     try {
-      await mockData.updateServiceOrder(id, { status: targetStatus, anomaly_detected: '', resolution_notes: '', client_signature: null, technician_signature: null });
-      await mockData.addOSActivity(id, { description: `REABERTA: ESTADO ${getStatusLabelText(targetStatus).toUpperCase()} (RESETOU DADOS DE FECHO)` });
-      setAnomaly(''); setResolutionNotes(''); setClientSignature(null); setTechnicianSignature(null); setShowReopenModal(false); fetchOSDetails(true);
-    } catch (e: any) { setErrorMessage("ERRO AO REABRIR OS."); } finally { setActionLoading(false); }
+      // 1. Verificar se há conteúdo a arquivar
+      const hasContentToArchive = anomaly.trim() !== '' || resolutionNotes.trim() !== '' || partsUsed.length > 0 || clientSignature || technicianSignature;
+      
+      let updatedObservations = os.observations || '';
+      let visitNumMsg = '';
+
+      if (hasContentToArchive) {
+        const { plain_text, visits } = parseObservations(os.observations);
+        const newVisitNumber = visits.length + 1;
+        
+        const newVisit: OSVisit = {
+          visit_number: newVisitNumber,
+          date: new Date().toLocaleDateString('pt-PT'),
+          anomaly_detected: anomaly,
+          resolution_notes: resolutionNotes,
+          materials_used: partsUsed.map(p => ({
+            name: p.name,
+            reference: p.reference,
+            quantity: p.quantity,
+            unit_price: p.unit_price
+          })),
+          client_signature: clientSignature,
+          technician_signature: technicianSignature
+        };
+        
+        updatedObservations = JSON.stringify({
+          plain_text,
+          visits: [...visits, newVisit]
+        });
+
+        visitNumMsg = `E ARQUIVOU A ${newVisitNumber}ª VISITA`;
+
+        // 2. Apagar os materiais da tabela 'parts_used' posto que já estão arquivados nesta visita
+        for (const p of partsUsed) {
+          await mockData.removeOSPart(p.id);
+        }
+      }
+
+      // 3. Atualizar a Ordem de Serviço na Base de Dados com os estados limpos
+      await mockData.updateServiceOrder(id, { 
+        status: targetStatus, 
+        anomaly_detected: '', 
+        resolution_notes: '', 
+        client_signature: null, 
+        technician_signature: null,
+        observations: updatedObservations
+      });
+
+      // 4. Registar atividade de segurança
+      const actDesc = `REABERTA: ESTADO ${getStatusLabelText(targetStatus).toUpperCase()}${visitNumMsg ? ` (${visitNumMsg})` : ' (RESETOU DADOS DE FECHO)'}`;
+      await mockData.addOSActivity(id, { description: actDesc });
+
+      // 5. Resetar estados e recarregar
+      setAnomaly(''); 
+      setResolutionNotes(''); 
+      setClientSignature(null); 
+      setTechnicianSignature(null); 
+      setShowReopenModal(false); 
+      fetchOSDetails(true);
+    } catch (e: any) { 
+      console.error("Erro ao reabrir OS:", e);
+      setErrorMessage("ERRO AO REABRIR OS."); 
+    } finally { 
+      setActionLoading(false); 
+    }
   };
 
   const getBase64ImageFromURL = (url: string): Promise<string | null> => {
@@ -781,33 +864,419 @@ export const ServiceOrderDetail: React.FC = () => {
     const logoWide = await getBase64ImageFromURL('/logo.png');
     const logoSquare = await getBase64ImageFromURL('/rf-apple-v5.png');
 
+    doc.setFillColor(248, 250, 252); doc.rect(0, 0, pageWidth, 28, 'F'); doc.setDrawColor(226, 232, 240); doc.line(0, 28, pageWidth, 28); doc.setTextColor(15, 23, 42); doc.setFontSize(16); doc.setFont("helvetica", "bold"); 
+
     if (logoWide) {
-      doc.addImage(logoWide, 'PNG', margin, 5, 50, 12);
+      doc.addImage(logoWide, 'PNG', margin, 5, 52, 13);
     } else if (logoSquare) {
       doc.addImage(logoSquare, 'PNG', margin, 5, 18, 18);
-    }
-
-    doc.setFillColor(40, 40, 40); doc.rect(0, 0, pageWidth, 28, 'F'); doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont("helvetica", "bold"); 
+    } 
     
     if (!logoWide) {
+      doc.setTextColor(15, 23, 42);
       doc.text("REAL FRIO", margin + (logoSquare ? 22 : 0), 12); 
     }
     
     doc.setFontSize(7); doc.setFont("helvetica", "normal"); 
     
     if (!logoWide) {
+      doc.setTextColor(71, 85, 105);
       doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin + (logoSquare ? 22 : 0), 18); 
     } else {
       // Com logo wide, colocar o título mais à direita ou abaixo
+      doc.setTextColor(71, 85, 105);
       doc.text("REGISTO DIGITAL DE ASSISTÊNCIA TÉCNICA", margin, 22);
     }
 
-    doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(os.code, pageWidth - margin, 12, { align: 'right' }); doc.setFontSize(6); doc.setFont("helvetica", "normal"); doc.setTextColor(180, 180, 180); doc.text(`EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 18, { align: 'right' });
-    let currentY = 32; doc.setDrawColor(241, 245, 249); doc.setFillColor(252, 252, 253); doc.roundedRect(margin, currentY, contentWidth, 22, 1, 1, 'FD'); doc.setTextColor(40, 40, 40); doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.text("DADOS DO CLIENTE", margin + 3, currentY + 5); doc.text("EQUIPAMENTO", margin + (contentWidth / 2) + 3, currentY + 5); doc.setDrawColor(226, 232, 240); doc.line(margin + 3, currentY + 7, margin + (contentWidth / 2) - 3, currentY + 7); doc.line(margin + (contentWidth / 2) + 3, currentY + 7, margin + contentWidth - 3, currentY + 7); doc.setFont("helvetica", "normal"); doc.setFontSize(6.5); doc.setTextColor(71, 85, 105); doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 3, currentY + 11); doc.text(`FIRMA: ${os.client?.billing_name || '---'}`, margin + 3, currentY + 14.5, { maxWidth: (contentWidth / 2) - 8 }); doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 3, currentY + 18); doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 3, currentY + 11); doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 3, currentY + 14.5); doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 3, currentY + 18);
-    currentY += 26; const narrativeFields = [ { label: "DESCRIÇÃO DO PEDIDO / AVARIA:", value: os.description || 'N/A' }, { label: "CAUSA DA AVARIA:", value: os.anomaly_detected || 'N/A' }, { label: "TRABALHO EFETUADO E RESOLUÇÃO:", value: os.resolution_notes || 'N/A' } ];
-    narrativeFields.forEach(field => { doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(40, 40, 40); doc.text(field.label, margin, currentY); currentY += 3; doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(51, 65, 85); const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth); doc.text(splitText, margin, currentY); currentY += (splitText.length * 4) + 3; if (currentY > 275) { doc.addPage(); currentY = 15; } });
-    if (partsUsed.length > 0) { doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(15, 23, 42); doc.text("MATERIAL APLICADO:", margin, currentY); currentY += 2; autoTable(doc, { startY: currentY, margin: { left: margin, right: margin }, theme: 'plain', head: [['ARTIGO / DESIGNAÇÃO', 'REFERÊNCIA', 'QTD']], body: partsUsed.map(p => [p.name.toUpperCase(), p.reference.toUpperCase(), `${p.quantity.toLocaleString('pt-PT')} UN`]), headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontSize: 6, fontStyle: 'bold', halign: 'left' }, styles: { fontSize: 7, cellPadding: 1, textColor: [51, 65, 85], lineWidth: 0.05, lineColor: [241, 245, 249] }, columnStyles: { 2: { halign: 'right' } } }); currentY = (doc as any).lastAutoTable.finalY + 8; }
-    if (currentY > 250) { doc.addPage(); currentY = 15; } doc.setDrawColor(226, 232, 240); doc.line(margin, currentY, pageWidth - margin, currentY); currentY += 5; doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.text("VALIDAÇÃO E CONFORMIDADE", margin, currentY); currentY += 3; const sigBoxWidth = (contentWidth / 2) - 5; if (clientSignature) { try { doc.addImage(clientSignature, 'JPEG', margin, currentY, 40, 15, undefined, 'FAST'); } catch (e) {} } doc.setDrawColor(203, 213, 225); doc.line(margin, currentY + 16, margin + sigBoxWidth, currentY + 16); doc.setFontSize(5.5); doc.setFont("helvetica", "normal"); doc.setTextColor(148, 163, 184); doc.text("ASSINATURA CLIENTE", margin + (sigBoxWidth / 2), currentY + 20, { align: 'center' }); if (technicianSignature) { try { doc.addImage(technicianSignature, 'JPEG', margin + (contentWidth / 2) + 5, currentY, 40, 15, undefined, 'FAST'); } catch (e) {} } doc.line(margin + (contentWidth / 2) + 5, currentY + 16, margin + contentWidth, currentY + 16); doc.text("ASSINATURA TÉCNICO", margin + (contentWidth / 2) + 5 + (sigBoxWidth / 2), currentY + 20, { align: 'center' }); doc.setFontSize(5); doc.setTextColor(148, 163, 184); doc.text("Documento oficial Real Frio. Emitido via Plataforma Cloud Técnica.", pageWidth / 2, 290, { align: 'center' }); return doc;
+    doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(15, 23, 42); doc.text(os.code, pageWidth - margin, 12, { align: 'right' }); doc.setFontSize(6.5); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 116, 139); doc.text(`EMISSÃO: ${new Date().toLocaleString('pt-PT')}`, pageWidth - margin, 18, { align: 'right' });
+    
+    // 1. Dados do Cliente / Equipamento (Fundo leve, cantos arredondados, tamanho maior de fontes)
+    let currentY = 29.5; 
+    const customerCardHeight = 25;
+    doc.setDrawColor(226, 232, 240); 
+    doc.setFillColor(250, 250, 250); 
+    doc.roundedRect(margin, currentY, contentWidth, customerCardHeight, 1.2, 1.2, 'FD'); 
+    
+    doc.setTextColor(15, 23, 42); 
+    doc.setFontSize(7.5); 
+    doc.setFont("helvetica", "bold"); 
+    doc.text("DADOS DO CLIENTE", margin + 3.5, currentY + 5); 
+    doc.text("EQUIPAMENTO", margin + (contentWidth / 2) + 3.5, currentY + 5); 
+    
+    // Linha divisória fina sob títulos
+    doc.setDrawColor(226, 232, 240); 
+    doc.line(margin + 3.5, currentY + 6.5, margin + (contentWidth / 2) - 3.5, currentY + 6.5); 
+    doc.line(margin + (contentWidth / 2) + 3.5, currentY + 6.5, margin + contentWidth - 3.5, currentY + 6.5); 
+    
+    // Dados de texto com fontes maiores e corretas
+    doc.setFont("helvetica", "normal"); 
+    doc.setFontSize(7.5); 
+    doc.setTextColor(51, 65, 85); 
+    doc.text(`CLIENTE: ${os.client?.name || '---'}`, margin + 3.5, currentY + 11); 
+    doc.text(`FIRMA: ${os.client?.billing_name || '---'}`, margin + 3.5, currentY + 15.5, { maxWidth: (contentWidth / 2) - 7 }); 
+    doc.text(`LOCAL: ${os.establishment?.name || '---'}`, margin + 3.5, currentY + 20); 
+    
+    doc.text(`TIPO: ${os.equipment?.type || '---'}`, margin + (contentWidth / 2) + 3.5, currentY + 11); 
+    doc.text(`MARCA/MOD: ${os.equipment?.brand || '---'} / ${os.equipment?.model || '---'}`, margin + (contentWidth / 2) + 3.5, currentY + 15.5, { maxWidth: (contentWidth / 2) - 7 }); 
+    doc.text(`S/N: ${os.equipment?.serial_number || '---'}`, margin + (contentWidth / 2) + 3.5, currentY + 20);
+
+    // 2. Campos Narrativos (Cada um num card elegante e bem estruturado)
+    currentY += customerCardHeight + 3.5; 
+    const narrativeFields = [ 
+      { label: "DESCRIÇÃO DO PEDIDO / AVARIA:", value: os.description || 'N/A' }, 
+      { label: "CAUSA DA AVARIA:", value: os.anomaly_detected || 'N/A' }, 
+      { label: "TRABALHO EFETUADO E RESOLUÇÃO:", value: os.resolution_notes || 'N/A' } 
+    ];
+
+    narrativeFields.forEach(field => { 
+      const splitText = doc.splitTextToSize(field.value.toUpperCase(), contentWidth - 7);
+      const lineCount = splitText.length;
+      const textHeight = lineCount * 3.8;
+      const cardHeight = Math.max(15, 8.5 + textHeight); // Compactado!
+
+      // Proteção de overflow
+      if (currentY + cardHeight > 275) { 
+        doc.addPage(); 
+        currentY = 15; 
+      } 
+
+      // Renderizar o Card do campo narrativo
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(252, 252, 253);
+      doc.roundedRect(margin, currentY, contentWidth, cardHeight, 1.2, 1.2, 'FD');
+
+      // Título do campo
+      doc.setFontSize(7); 
+      doc.setFont("helvetica", "bold"); 
+      doc.setTextColor(71, 85, 105); 
+      doc.text(field.label, margin + 3.5, currentY + 4.5); 
+
+      // Linha divisória subtil sob o título
+      doc.setDrawColor(241, 245, 249);
+      doc.line(margin + 3.5, currentY + 6, margin + contentWidth - 3.5, currentY + 6);
+
+      // Conteúdo do texto
+      doc.setFont("helvetica", "normal"); 
+      doc.setFontSize(7.5); 
+      doc.setTextColor(15, 23, 42); 
+
+      let textY = currentY + 10;
+      splitText.forEach((line: string) => {
+        doc.text(line, margin + 3.5, textY);
+        textY += 3.8;
+      });
+
+      currentY += cardHeight + 3.5; 
+    });
+
+    // 3. Material Aplicado (Consolidação de todas as visitas: atual + históricas)
+    const { visits: historicalVisitsList } = parseObservations(os.observations);
+    const allMaterialsCombined: { name: string; reference: string; quantity: number; origin: string }[] = [];
+
+    // Materiais da visita atual
+    partsUsed.forEach(p => {
+      allMaterialsCombined.push({
+        name: p.name || '',
+        reference: p.reference || '',
+        quantity: p.quantity || 0,
+        origin: 'VISITA ATUAL'
+      });
+    });
+
+    // Materiais das visitas históricas
+    historicalVisitsList.forEach(v => {
+      if (v.materials_used) {
+        v.materials_used.forEach(m => {
+          allMaterialsCombined.push({
+            name: m.name || '',
+            reference: m.reference || '',
+            quantity: m.quantity || 0,
+            origin: `${v.visit_number}ª VISITA`
+          });
+        });
+      }
+    });
+
+    // Agrupar e somar todo o material aplicado de todas as visitas
+    const aggregatedProducts: { [key: string]: { name: string; reference: string; quantity: number; origins: { [visit: string]: number } } } = {};
+    allMaterialsCombined.forEach(m => {
+      const key = `${m.name.toUpperCase().trim()}||${m.reference.toUpperCase().trim()}`;
+      if (aggregatedProducts[key]) {
+        aggregatedProducts[key].quantity += m.quantity;
+        aggregatedProducts[key].origins[m.origin] = (aggregatedProducts[key].origins[m.origin] || 0) + m.quantity;
+      } else {
+        aggregatedProducts[key] = {
+          name: m.name,
+          reference: m.reference,
+          quantity: m.quantity,
+          origins: { [m.origin]: m.quantity }
+        };
+      }
+    });
+
+    const aggregatedMaterialsList = Object.values(aggregatedProducts);
+
+    if (aggregatedMaterialsList.length > 0) { 
+      if (currentY + 20 > 275) { 
+        doc.addPage(); 
+        currentY = 15; 
+      }
+      doc.setFontSize(8); 
+      doc.setFont("helvetica", "bold"); 
+      doc.setTextColor(15, 23, 42); 
+      doc.text("TOTAL DE MATERIAL APLICADO (TODAS AS VISITAS):", margin, currentY); 
+      currentY += 3; 
+      
+      autoTable(doc, { 
+        startY: currentY, 
+        margin: { left: margin, right: margin }, 
+        theme: 'striped', 
+        head: [['ARTIGO / DESIGNAÇÃO', 'REFERÊNCIA', 'QTD TOTAL']], 
+        body: aggregatedMaterialsList.map(p => {
+          const originDetails = Object.entries(p.origins)
+            .map(([orig, qty]) => `${orig}: ${qty.toLocaleString('pt-PT')} UN`)
+            .join(' | ');
+          return [
+            `${p.name.toUpperCase()}\n[APLICADO EM: ${originDetails.toUpperCase()}]`,
+            p.reference.toUpperCase(),
+            `${p.quantity.toLocaleString('pt-PT')} UN`
+          ];
+        }), 
+        headStyles: { 
+          fillColor: [241, 245, 249], 
+          textColor: [15, 23, 42], 
+          fontSize: 7, 
+          fontStyle: 'bold', 
+          halign: 'left' 
+        }, 
+        styles: { 
+          fontSize: 7.5, 
+          cellPadding: 1.8, 
+          textColor: [51, 65, 85], 
+          lineWidth: 0.05, 
+          lineColor: [226, 232, 240] 
+        }, 
+        columnStyles: { 
+          2: { halign: 'right' } 
+        } 
+      }); 
+      currentY = (doc as any).lastAutoTable.finalY + 4; 
+    }
+
+    // 4. Secção de Validação & Assinaturas (Tabela de caixas de assinatura refinadas)
+    if (currentY + 30 > 275) { 
+      doc.addPage(); 
+      currentY = 15; 
+    } 
+
+    doc.setDrawColor(226, 232, 240); 
+    doc.line(margin, currentY, pageWidth - margin, currentY); 
+    currentY += 4; 
+
+    doc.setFontSize(8); 
+    doc.setFont("helvetica", "bold"); 
+    doc.setTextColor(15, 23, 42); 
+    doc.text("VALIDAÇÃO E CONFORMIDADE", margin, currentY); 
+    currentY += 3; 
+
+    const sigBoxWidth = (contentWidth / 2) - 4; 
+    const sigBoxHeight = 22; 
+
+    // Caixa Cliente
+    doc.setDrawColor(226, 232, 240);
+    doc.setFillColor(252, 252, 253);
+    doc.roundedRect(margin, currentY, sigBoxWidth, sigBoxHeight, 1.2, 1.2, 'FD');
+
+    doc.setFontSize(6);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(100, 116, 139);
+    doc.text("ASSINATURA DO CLIENTE", margin + 3, currentY + 4.5);
+
+    if (clientSignature) { 
+      try { 
+        doc.addImage(clientSignature, 'JPEG', margin + 4, currentY + 5.5, sigBoxWidth - 8, sigBoxHeight - 8, undefined, 'FAST'); 
+      } catch (e) {} 
+    } else {
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(148, 163, 184);
+      doc.text("ÁREA DE ASSINATURA DIGITAL", margin + (sigBoxWidth / 2), currentY + (sigBoxHeight / 2) + 1, { align: 'center' });
+    }
+
+    // Caixa Técnico
+    doc.setDrawColor(226, 232, 240);
+    doc.setFillColor(252, 252, 253);
+    doc.roundedRect(margin + (contentWidth / 2) + 4, currentY, sigBoxWidth, sigBoxHeight, 1.2, 1.2, 'FD');
+
+    doc.setFontSize(6);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(100, 116, 139);
+    doc.text("ASSINATURA DO TÉCNICO", margin + (contentWidth / 2) + 7, currentY + 4.5);
+
+    if (technicianSignature) { 
+      try { 
+        doc.addImage(technicianSignature, 'JPEG', margin + (contentWidth / 2) + 8, currentY + 5.5, sigBoxWidth - 8, sigBoxHeight - 8, undefined, 'FAST'); 
+      } catch (e) {} 
+    } else {
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(148, 163, 184);
+      doc.text("ÁREA DE ASSINATURA DIGITAL", margin + (contentWidth / 2) + 4 + (sigBoxWidth / 2), currentY + (sigBoxHeight / 2) + 1, { align: 'center' });
+    }
+
+    currentY += sigBoxHeight + 5;
+
+    // 5. Histórico de Visitas no PDF (Caso existam) - CARREGADO POR BAIXO DO CAMPO DE ASSINATURAS/CONFORMIDADE
+    if (historicalVisitsList && historicalVisitsList.length > 0) {
+      if (currentY + 20 > 275) {
+        doc.addPage();
+        currentY = 15;
+      }
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text("HISTÓRICO DE VISITAS ANTERIORES:", margin, currentY);
+      currentY += 4;
+
+      historicalVisitsList.forEach((visit) => {
+        // Estimar altura necessária para a visita
+        let visitTextHeight = 9; // Título + espaçamentos
+        
+        let splitAnomaly: string[] = [];
+        if (visit.anomaly_detected) {
+          splitAnomaly = doc.splitTextToSize(`CAUSA DA AVARIA: ${visit.anomaly_detected.toUpperCase()}`, contentWidth - 6);
+          visitTextHeight += splitAnomaly.length * 3.8;
+        }
+        
+        let splitRes: string[] = [];
+        if (visit.resolution_notes) {
+          splitRes = doc.splitTextToSize(`IMPACTO / RESOLUÇÃO: ${visit.resolution_notes.toUpperCase()}`, contentWidth - 6);
+          visitTextHeight += splitRes.length * 3.8;
+        }
+
+        if (visit.materials_used && visit.materials_used.length > 0) {
+          visitTextHeight += 5 + (visit.materials_used.length * 3.8);
+        }
+
+        if (visit.client_signature || visit.technician_signature) {
+          visitTextHeight += 12; // Altura condensada para as assinaturas no histórico
+        }
+
+        const visitCardHeight = visitTextHeight;
+
+        if (currentY + visitCardHeight > 275) {
+          doc.addPage();
+          currentY = 15;
+        }
+
+        doc.setDrawColor(226, 232, 240);
+        doc.setFillColor(250, 250, 250);
+        doc.roundedRect(margin, currentY, contentWidth, visitCardHeight, 1.2, 1.2, 'FD');
+
+        // Título da Visita
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(71, 85, 105);
+        doc.text(`${visit.visit_number}ª VISITA - ${visit.date}`, margin + 3, currentY + 4);
+
+        doc.setDrawColor(241, 245, 249);
+        doc.line(margin + 3, currentY + 5.5, margin + contentWidth - 3, currentY + 5.5);
+
+        let subY = currentY + 9;
+
+        // Causa da avaria
+        if (splitAnomaly.length > 0) {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7);
+          doc.setTextColor(51, 65, 85);
+          splitAnomaly.forEach(line => {
+            doc.text(line, margin + 3, subY);
+            subY += 3.8;
+          });
+        }
+
+         // Resumo da Intervenção
+        if (splitRes.length > 0) {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7);
+          doc.setTextColor(51, 65, 85);
+          splitRes.forEach(line => {
+            doc.text(line, margin + 3, subY);
+            subY += 3.8;
+          });
+        }
+
+        // Materiais usados nesta visita
+        if (visit.materials_used && visit.materials_used.length > 0) {
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(6.5);
+          doc.setTextColor(115, 115, 115);
+          doc.text("MATERIAL APLICADO NESSA VISITA:", margin + 3, subY);
+          subY += 3.2;
+
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(6.5);
+          doc.setTextColor(73, 73, 73);
+          visit.materials_used.forEach((mat) => {
+            doc.text(`- ${mat.name.toUpperCase()} (REF: ${mat.reference.toUpperCase()}) - ${mat.quantity} UN`, margin + 5, subY);
+            subY += 3.8;
+          });
+        }
+
+        // Assinaturas arquivadas da visita anterior
+        if (visit.client_signature || visit.technician_signature) {
+          const miniBoxWidth = (contentWidth / 2) - 4;
+          const miniBoxHeight = 8;
+
+          // Assinatura Cliente
+          doc.setDrawColor(241, 245, 249);
+          doc.setFillColor(252, 252, 253);
+          doc.roundedRect(margin + 3, subY, miniBoxWidth, miniBoxHeight, 0.8, 0.8, 'FD');
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(5);
+          doc.setTextColor(163, 163, 163);
+          doc.text("ASSINATURA CLIENTE", margin + 4.5, subY + 2.5);
+
+          if (visit.client_signature) {
+            try {
+              doc.addImage(visit.client_signature, 'JPEG', margin + 4.5, subY + 3, miniBoxWidth - 3, miniBoxHeight - 4, undefined, 'FAST');
+            } catch (e) {}
+          } else {
+            doc.setFont("helvetica", "italic");
+            doc.text("NÃO EFETUADA", margin + 4.5, subY + 6);
+          }
+
+          // Assinatura Técnico
+          doc.setDrawColor(241, 245, 249);
+          doc.setFillColor(252, 252, 253);
+          doc.roundedRect(margin + (contentWidth / 2) + 1, subY, miniBoxWidth, miniBoxHeight, 0.8, 0.8, 'FD');
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(5);
+          doc.setTextColor(163, 163, 163);
+          doc.text("ASSINATURA TÉCNICO", margin + (contentWidth / 2) + 2.5, subY + 2.5);
+
+          if (visit.technician_signature) {
+            try {
+              doc.addImage(visit.technician_signature, 'JPEG', margin + (contentWidth / 2) + 2.5, subY + 3, miniBoxWidth - 3, miniBoxHeight - 4, undefined, 'FAST');
+            } catch (e) {}
+          } else {
+            doc.setFont("helvetica", "italic");
+            doc.text("NÃO EFETUADA", margin + (contentWidth / 2) + 2.5, subY + 6);
+          }
+
+          subY += miniBoxHeight + 1.5;
+        }
+
+        currentY = subY + 3;
+      });
+      currentY += 2;
+    }
+
+    doc.setFontSize(6); 
+    doc.setTextColor(148, 163, 184); 
+    doc.text("Documento oficial Real Frio. Emitido via Plataforma Cloud Técnica.", pageWidth / 2, 290, { align: 'center' }); 
+    return doc;
   };
 
   const generatePDFReport = async () => { setIsExportingPDF(true); try { const doc = await createPDFDocument(); if (doc) doc.save(`RELATORIO_${os?.code}.pdf`); } catch (err) { setErrorMessage("ERRO AO GERAR PDF."); } finally { setIsExportingPDF(false); } };
@@ -1524,6 +1993,118 @@ export const ServiceOrderDetail: React.FC = () => {
                  </div>
                )}
             </div>
+
+            {/* CARD DE HISTÓRICO DE VISITAS */}
+            {historicalVisits.length > 0 && (
+              <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
+                <button 
+                  onClick={() => setExpandedVisits(!expandedVisits)} 
+                  className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <ScrollText size={18} className={storeColors.text500} />
+                    <div className="text-left">
+                      <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                        Histórico de Visitas ({historicalVisits.length})
+                      </h3>
+                      {!expandedVisits && (
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-tight mt-0.5">
+                          Agrupado por {historicalVisits.length} visita{historicalVisits.length > 1 ? 's' : ''} efetuada{historicalVisits.length > 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {expandedVisits ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
+                </button>
+                {expandedVisits && (
+                  <div className="px-6 pb-6 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                    {historicalVisits.map((visit) => (
+                      <div 
+                        key={visit.visit_number} 
+                        className="bg-slate-50 dark:bg-slate-950 rounded-[2rem] border border-slate-100 dark:border-slate-800/80 p-5 space-y-4"
+                      >
+                        <div className="flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800 pb-3">
+                          <span className={`text-[11px] font-black ${storeColors.text} ${storeColors.bg50} ${storeColors.bgDark20} px-3 py-1 rounded-full uppercase tracking-widest`}>
+                            {visit.visit_number}ª VISITA
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider font-mono">
+                            {visit.date}
+                          </span>
+                        </div>
+
+                        <div className="space-y-3">
+                          {visit.anomaly_detected && (
+                            <div>
+                              <h4 className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 text-slate-400">Causa da Avaria</h4>
+                              <p className="text-xs font-black text-slate-900 dark:text-white uppercase leading-relaxed">
+                                {visit.anomaly_detected}
+                              </p>
+                            </div>
+                          )}
+
+                          {visit.resolution_notes && (
+                            <div>
+                              <h4 className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 text-slate-400">Resumo da Intervenção</h4>
+                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 leading-relaxed font-sans whitespace-pre-wrap">
+                                {visit.resolution_notes}
+                              </p>
+                            </div>
+                          )}
+
+                          {visit.materials_used && visit.materials_used.length > 0 && (
+                            <div>
+                              <h4 className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2 text-slate-400">Material Aplicado</h4>
+                              <div className="space-y-1.5">
+                                {visit.materials_used.map((mat, mIdx) => (
+                                  <div key={mIdx} className="flex justify-between items-center bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-100 dark:border-slate-800/50">
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase leading-tight">{mat.name}</span>
+                                      <span className="text-[8px] font-mono font-bold text-slate-400">REF: {mat.reference}</span>
+                                    </div>
+                                    <span className={`text-[10px] font-black ${storeColors.text} uppercase tracking-wider`}>
+                                      {mat.quantity.toLocaleString('pt-PT')} UN
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Assinaturas Arquivadas */}
+                          {(visit.client_signature || visit.technician_signature) && (
+                            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-200/50 dark:border-slate-800/80">
+                              {visit.client_signature ? (
+                                <div className="text-center bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-800/50">
+                                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Assinatura Cliente</p>
+                                  <img src={visit.client_signature} alt="Assinatura Cliente" className="h-8 object-contain mx-auto filter dark:invert" referrerPolicy="no-referrer" />
+                                </div>
+                              ) : (
+                                <div className="text-center bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-800/50 flex flex-col justify-center min-h-[50px]">
+                                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Assinatura Cliente</p>
+                                  <span className="text-[8px] font-bold text-slate-300 dark:text-slate-600 uppercase italic">Não efetuada</span>
+                                </div>
+                              )}
+
+                              {visit.technician_signature ? (
+                                <div className="text-center bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-800/50">
+                                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Assinatura Técnico</p>
+                                  <img src={visit.technician_signature} alt="Assinatura Técnico" className="h-8 object-contain mx-auto filter dark:invert" referrerPolicy="no-referrer" />
+                                </div>
+                              ) : (
+                                <div className="text-center bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-800/50 flex flex-col justify-center min-h-[50px]">
+                                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Assinatura Técnico</p>
+                                  <span className="text-[8px] font-bold text-slate-300 dark:text-slate-600 uppercase italic">Não efetuada</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-gray-100 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
                <button onClick={() => setExpandedLog(!expandedLog)} className="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"><div className="flex items-center gap-3"><History size={18} className="text-slate-400" /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Log de Atividade Detalhado</h3></div>{expandedLog ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}</button>

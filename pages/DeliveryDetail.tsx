@@ -223,39 +223,43 @@ const DeliveryDetail: React.FC = () => {
       const logoWide = await getBase64ImageFromURL('/logo.png');
       const logoSquare = await getBase64ImageFromURL('/rf-apple-v5.png');
 
-      // Header Background
-      doc.setFillColor(40, 40, 40);
+      // Header Background (Light theme for logo visibility)
+      doc.setFillColor(248, 250, 252);
       doc.rect(0, 0, pageWidth, 35, 'F');
+      doc.setDrawColor(226, 232, 240);
+      doc.line(0, 35, pageWidth, 35);
 
       if (logoWide) {
         doc.addImage(logoWide, 'PNG', margin, 8, 55, 15);
       } else if (logoSquare) {
         doc.addImage(logoSquare, 'PNG', margin, 8, 20, 20);
-        doc.setTextColor(255, 255, 255);
+        doc.setTextColor(15, 23, 42);
         doc.setFontSize(16);
         doc.setFont("helvetica", "bold");
         doc.text("REAL FRIO", margin + 25, 18);
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
+        doc.setTextColor(71, 85, 105);
         doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", margin + 25, 24);
       } else {
         // Fallback text if no logo is found
-        doc.setTextColor(255, 255, 255);
+        doc.setTextColor(15, 23, 42);
         doc.setFontSize(18);
         doc.setFont("helvetica", "bold");
         doc.text("REAL FRIO", margin, 18);
         doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
+        doc.setTextColor(71, 85, 105);
         doc.text("ASSISTÊNCIA TÉCNICA E REFRIGERAÇÃO", margin, 25);
       }
 
-      doc.setTextColor(255, 255, 255);
+      doc.setTextColor(15, 23, 42);
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.text("GUIA DE ENTREGA DE MATERIAL", pageWidth - margin, 18, { align: 'right' });
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(180, 180, 180);
+      doc.setTextColor(100, 116, 139);
       doc.text(`DATA: ${new Date(delivery.created_at).toLocaleDateString('pt-PT')}`, pageWidth - margin, 24, { align: 'right' });
 
       let currentY = 45;

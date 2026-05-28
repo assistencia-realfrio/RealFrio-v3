@@ -225,6 +225,21 @@ export interface ServiceOrder {
   timer_start_time?: string | null;
 }
 
+export interface OSVisit {
+  visit_number: number;
+  date: string;
+  anomaly_detected: string;
+  resolution_notes: string;
+  materials_used: {
+    name: string;
+    reference: string;
+    quantity: number;
+    unit_price?: number;
+  }[];
+  client_signature?: string | null;
+  technician_signature?: string | null;
+}
+
 export interface Profile {
   id: string;
   email: string;
