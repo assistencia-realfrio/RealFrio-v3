@@ -359,9 +359,9 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                   onChange={(e) => setStore(e.target.value as any)} 
                   className={`w-full bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white text-xs font-bold rounded-xl border ${getStoreBorderClass()} p-3 appearance-none transition-all outline-none focus:ring-2 ${currentStore === 'Caldas da Rainha' ? 'focus:ring-blue-600/50 focus:border-blue-600' : currentStore === 'Porto de Mós' ? 'focus:ring-red-600/50 focus:border-red-600' : 'focus:ring-emerald-600/50 focus:border-emerald-600'}`}
                 >
-                  <option value="Todas">Todas as Lojas</option>
-                  <option value="Caldas da Rainha">Caldas da Rainha</option>
+                  <option value="Todas">Ambas as Lojas</option>
                   <option value="Porto de Mós">Porto de Mós</option>
+                  <option value="Caldas da Rainha">Caldas da Rainha</option>
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 dark:text-slate-500"><ChevronDown size={14} /></div>
              </div>

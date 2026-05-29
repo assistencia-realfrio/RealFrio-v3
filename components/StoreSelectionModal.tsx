@@ -16,12 +16,12 @@ const StoreSelectionModal: React.FC = () => {
 
   const options = [
     { 
-      id: 'Caldas da Rainha', 
-      label: 'Caldas da Rainha', 
-      icon: Building2, 
-      color: 'bg-blue-600', 
-      light: 'bg-blue-50 dark:bg-blue-900/20',
-      text: 'text-blue-600 dark:text-blue-400'
+      id: 'Todas', 
+      label: 'Ambas as Lojas', 
+      icon: Layers, 
+      color: 'bg-emerald-600', 
+      light: 'bg-emerald-50 dark:bg-emerald-900/20',
+      text: 'text-emerald-600 dark:text-emerald-400'
     },
     { 
       id: 'Porto de Mós', 
@@ -32,12 +32,12 @@ const StoreSelectionModal: React.FC = () => {
       text: 'text-red-600 dark:text-red-400'
     },
     { 
-      id: 'Todas', 
-      label: 'Ambas as Lojas', 
-      icon: Layers, 
-      color: 'bg-emerald-600', 
-      light: 'bg-emerald-50 dark:bg-emerald-900/20',
-      text: 'text-emerald-600 dark:text-emerald-400'
+      id: 'Caldas da Rainha', 
+      label: 'Caldas da Rainha', 
+      icon: Building2, 
+      color: 'bg-blue-600', 
+      light: 'bg-blue-50 dark:bg-blue-900/20',
+      text: 'text-blue-600 dark:text-blue-400'
     }
   ];
 
