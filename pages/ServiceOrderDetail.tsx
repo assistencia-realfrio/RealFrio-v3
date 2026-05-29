@@ -229,7 +229,7 @@ export const ServiceOrderDetail: React.FC = () => {
   const [expandedWarranty, setExpandedWarranty] = useState(false);
   const [expandedPlanning, setExpandedPlanning] = useState(false);
   const [expandedLog, setExpandedLog] = useState(false);
-  const [expandedVisits, setExpandedVisits] = useState(true);
+  const [expandedVisits, setExpandedVisits] = useState(false);
 
   // Estados para Upload Seletivo
   const [showSourceModal, setShowSourceModal] = useState(false);
@@ -1565,7 +1565,16 @@ export const ServiceOrderDetail: React.FC = () => {
       <div className="space-y-2 mb-4">
         <div className="bg-white dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-gray-200 dark:border-slate-800 p-3 flex items-center justify-between transition-colors overflow-hidden">
           <div className="flex-shrink-0">
-            <button onClick={() => navigate('/os')} className={`p-2.5 text-slate-500 dark:text-slate-400 hover:${storeColors.text} rounded-2xl transition-all bg-slate-50 dark:bg-slate-800 border border-transparent hover:${storeColors.border}`}>
+            <button 
+              onClick={() => {
+                if (window.history.state && window.history.state.idx > 0) {
+                  navigate(-1);
+                } else {
+                  navigate('/os');
+                }
+              }} 
+              className={`p-2.5 text-slate-500 dark:text-slate-400 hover:${storeColors.text} rounded-2xl transition-all bg-slate-50 dark:bg-slate-800 border border-transparent hover:${storeColors.border}`}
+            >
               <ArrowLeft size={20} />
             </button>
           </div>
@@ -1575,13 +1584,6 @@ export const ServiceOrderDetail: React.FC = () => {
             </span>
           </div>
           <div className="flex-shrink-0 flex items-center gap-2">
-             <button 
-               onClick={() => setShowEmailModal(true)} 
-               className={`p-2.5 text-emerald-600 dark:text-emerald-400 hover:${storeColors.bg50} rounded-2xl transition-all bg-slate-50 dark:bg-slate-800 border border-transparent hover:${storeColors.border}`}
-               title="Enviar por Email"
-             >
-               <Mail size={20} />
-             </button>
              {actionLoading ? (
                <RefreshCw size={14} className={`animate-spin ${storeColors.text}`} />
              ) : (
@@ -1755,8 +1757,8 @@ export const ServiceOrderDetail: React.FC = () => {
                     <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500/70 uppercase tracking-tight mt-1.5">A OS está bloqueada para edição</p>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <button onClick={handleSendEmail} className={`p-3 bg-white dark:bg-slate-800 ${storeColors.text} rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:scale-105 transition-all`} title="Enviar Relatório">
-                       <Mail size={18} />
+                    <button onClick={() => setShowReopenModal(true)} className="p-3 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:scale-105 transition-all" title="Reabrir para Edição">
+                       <RotateCw size={18} />
                     </button>
                   </div>
                 </div>
@@ -1765,12 +1767,8 @@ export const ServiceOrderDetail: React.FC = () => {
                     {isExportingPDF ? <Loader2 size={18} className="animate-spin" /> : <FileDown size={18} />} 
                     {isExportingPDF ? 'A GERAR PDF...' : 'VER RELATÓRIO PDF'}
                   </button>
-                  <button onClick={() => setShowReopenModal(true)} typeof="button" className="flex items-center justify-center gap-3 py-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 transition-all active:scale-95">
-                    <RotateCw size={18} /> REABRIR PARA EDIÇÃO
-                  </button>
-                  <button onClick={handleSendEmail} typeof="button" disabled={isExportingPDF} className={`sm:col-span-2 flex items-center justify-center gap-3 py-4 ${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text} ${storeColors.textDark} border ${storeColors.border} ${storeColors.borderDark30} rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] ${storeColors.bgHover} transition-all active:scale-95 disabled:opacity-50`}>
-                    {isExportingPDF ? <Loader2 size={18} className="animate-spin" /> : <Mail size={18} />} 
-                    {isExportingPDF ? 'A PREPARAR...' : `ENVIAR PARA: ${os.client?.email || '(MANUAL)'}`}
+                  <button onClick={() => setShowEmailModal(true)} typeof="button" className="flex items-center justify-center gap-3 py-4 bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border border-slate-200 dark:border-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 transition-all active:scale-95">
+                    <Mail size={18} /> ENVIAR POR EMAIL
                   </button>
                 </div>
               </div>

@@ -471,7 +471,16 @@ const QuoteDetail: React.FC = () => {
     <div className="max-w-4xl mx-auto space-y-6 pb-20 px-2 animate-in slide-in-from-bottom-2 duration-500">
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <button onClick={() => navigate('/quotes')} className="p-3 bg-white dark:bg-slate-900 text-slate-500 rounded-2xl shadow-sm border dark:border-slate-800 transition-all hover:bg-slate-50 active:scale-95">
+          <button 
+            onClick={() => {
+              if (window.history.state && window.history.state.idx > 0) {
+                navigate(-1);
+              } else {
+                navigate('/quotes');
+              }
+            }} 
+            className="p-3 bg-white dark:bg-slate-900 text-slate-500 rounded-2xl shadow-sm border dark:border-slate-800 transition-all hover:bg-slate-50 active:scale-95"
+          >
             <ArrowLeft size={22} />
           </button>
           <div className="flex gap-2">

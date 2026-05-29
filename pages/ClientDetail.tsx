@@ -312,7 +312,13 @@ const ClientDetail: React.FC = () => {
         {/* CABEÇALHO */}
         <div className="flex items-stretch gap-3 px-1 mb-2">
           <button 
-            onClick={() => navigate('/clients')} 
+            onClick={() => {
+              if (window.history.state && window.history.state.idx > 0) {
+                navigate(-1);
+              } else {
+                navigate('/clients');
+              }
+            }} 
             className="flex-shrink-0 flex items-center justify-center w-14 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:text-blue-600 rounded-[1.5rem] transition-all border border-gray-200 dark:border-slate-800 shadow-sm active:scale-95 active:bg-slate-50"
           >
             <ArrowLeft size={24} />
