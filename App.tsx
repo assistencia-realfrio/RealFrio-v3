@@ -15,7 +15,6 @@ import Quotes from './pages/Quotes';
 import QuoteDetail from './pages/QuoteDetail';
 import PublicQuoteView from './pages/PublicQuoteView';
 import Appointments from './pages/Appointments';
-import Vacations from './pages/Vacations';
 import Clients from './pages/Clients';
 import ClientDetail from './pages/ClientDetail';
 import NewClient from './pages/NewClient';
@@ -24,14 +23,9 @@ import EditEquipment from './pages/EditEquipment';
 import EquipmentDetail from './pages/EquipmentDetail';
 import Equipments from './pages/Equipments';
 import Inventory from './pages/Inventory';
-import Deliveries from './pages/Deliveries';
-import NewDelivery from './pages/NewDelivery';
-import EditDelivery from './pages/EditDelivery';
-import DeliveryDetail from './pages/DeliveryDetail';
 import Profile from './pages/Profile';
 import Users from './pages/Users';
 import Maintenance from './pages/Maintenance';
-import FleetManagement from './pages/FleetManagement';
 import { UserRole, OSStatus } from './types';
 import { StoreProvider, useStore } from './contexts/StoreContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -250,7 +244,6 @@ const AppContent: React.FC<{
         <Route path="/quotes/:id/edit" element={user ? <Layout user={user} onLogout={onLogout}><NewQuote /></Layout> : <Navigate to="/login" />} />
 
         <Route path="/appointments" element={user ? <Layout user={user} onLogout={onLogout}><Appointments /></Layout> : <Navigate to="/login" />} />
-        <Route path="/vacations" element={user ? <Layout user={user} onLogout={onLogout}><Vacations /></Layout> : <Navigate to="/login" />} />
         
         <Route path="/clients" element={user ? <Layout user={user} onLogout={onLogout}><Clients /></Layout> : <Navigate to="/login" />} />
         <Route path="/clients/new" element={user ? <Layout user={user} onLogout={onLogout}><NewClient /></Layout> : <Navigate to="/login" />} />
@@ -262,11 +255,6 @@ const AppContent: React.FC<{
         <Route path="/equipments/:id/edit" element={user ? <Layout user={user} onLogout={onLogout}><EditEquipment /></Layout> : <Navigate to="/login" />} />
         
         <Route path="/inventory" element={user ? <Layout user={user} onLogout={onLogout}><Inventory /></Layout> : <Navigate to="/login" />} />
-        <Route path="/deliveries" element={user ? <Layout user={user} onLogout={onLogout}><Deliveries /></Layout> : <Navigate to="/login" />} />
-        <Route path="/deliveries/new" element={user ? <Layout user={user} onLogout={onLogout}><NewDelivery /></Layout> : <Navigate to="/login" />} />
-        <Route path="/deliveries/:id/edit" element={user ? <Layout user={user} onLogout={onLogout}><EditDelivery /></Layout> : <Navigate to="/login" />} />
-        <Route path="/deliveries/:id" element={user ? <Layout user={user} onLogout={onLogout}><DeliveryDetail /></Layout> : <Navigate to="/login" />} />
-        <Route path="/fleet" element={user ? <Layout user={user} onLogout={onLogout}><FleetManagement /></Layout> : <Navigate to="/login" />} />
         <Route path="/users" element={user && user.role === UserRole.ADMIN ? <Layout user={user} onLogout={onLogout}><Users /></Layout> : <Navigate to="/" />} />
         <Route path="/maintenance" element={user && user.role === UserRole.ADMIN ? <Layout user={user} onLogout={onLogout}><Maintenance /></Layout> : <Navigate to="/" />} />
         <Route path="/profile" element={user ? <Layout user={user} onLogout={onLogout}><Profile /></Layout> : <Navigate to="/login" />} />

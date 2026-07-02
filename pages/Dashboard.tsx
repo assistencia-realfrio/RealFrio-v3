@@ -9,9 +9,7 @@ import { useStore } from '../contexts/StoreContext';
 const Dashboard: React.FC = () => {
   const [scheduledCount, setScheduledCount] = useState(0);
   const [activeCount, setActiveCount] = useState(0);
-  const [vacationCount, setVacationCount] = useState(0);
   const [unverifiedQuotesCount, setUnverifiedQuotesCount] = useState(0);
-  const [scheduledFleetCount, setScheduledFleetCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const { currentStore, setStore } = useStore();
@@ -24,11 +22,9 @@ const Dashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [allOS, allVacations, allQuotes, allMaintenance] = await Promise.all([
+      const [allOS, allQuotes] = await Promise.all([
         mockData.getServiceOrders(),
-        mockData.getVacations(),
         mockData.getQuotes(),
-        mockData.getAllMaintenanceRecords()
       ]);
       
       setDbStatus('connected');
@@ -58,28 +54,6 @@ const Dashboard: React.FC = () => {
         (currentStore === 'Todas' || q.store === currentStore)
       ).length;
       setUnverifiedQuotesCount(unverified);
-
-      // Contagem de férias (colaboradores ausentes hoje ou nos próximos 21 dias)
-      // ALTERAÇÃO: As férias são globais, ignoramos o currentStore
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const limit = new Date();
-      limit.setDate(today.getDate() + 21);
-      const todayStr = today.toISOString().split('T')[0];
-      const limitStr = limit.toISOString().split('T')[0];
-
-      const storeVacations = allVacations; // Global
-
-      const ongoingOrUpcomingVacations = storeVacations.filter(v => {
-        return v.start_date <= limitStr && v.end_date >= todayStr;
-      });
-
-      const uniqueCollaborators = new Set(ongoingOrUpcomingVacations.map(v => v.user_name));
-      setVacationCount(uniqueCollaborators.size);
-
-      // Contagem de Manutenções de Frota Agendadas
-      const scheduledFleet = allMaintenance.filter(m => m.status === 'scheduled').length;
-      setScheduledFleetCount(scheduledFleet);
 
     } catch (e) {
       console.error("Erro dashboard", e);
@@ -209,58 +183,6 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
             <ArrowRight size={14} className={`sm:hidden ${unverifiedQuotesCount > 0 ? 'text-indigo-200' : 'text-slate-300'}`} />
-          </button>
-
-          {/* AUSÊNCIAS */}
-          <button 
-            onClick={() => navigate('/vacations')}
-            className="group bg-white dark:bg-slate-900 p-3.5 rounded-[1.2rem] border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 text-left relative overflow-hidden active:scale-95 flex items-center justify-between sm:block"
-          >
-            <div className="relative z-10 flex items-center gap-3 sm:block">
-              <div className="flex items-center gap-2.5 sm:mb-2">
-                <div className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Palmtree size={16} />
-                </div>
-                <h2 className="text-[12px] sm:text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tighter">Ausências</h2>
-              </div>
-              <div className="flex items-center gap-3 sm:items-baseline sm:gap-2 ml-auto sm:ml-0">
-                <span className="text-2xl font-black text-slate-900 dark:text-white leading-none">{vacationCount}</span>
-                <div className="hidden sm:flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                  <span className="text-[7px] font-black uppercase tracking-widest">Equipa</span>
-                  <ArrowRight size={8} />
-                </div>
-              </div>
-            </div>
-            <ArrowRight size={14} className="sm:hidden text-slate-300" />
-          </button>
-
-          {/* GESTÃO DE FROTA */}
-          <button 
-            onClick={() => navigate('/fleet')}
-            className={`group p-3.5 rounded-[1.2rem] border shadow-sm transition-all duration-300 text-left relative overflow-hidden active:scale-95 flex items-center justify-between sm:block ${
-              scheduledFleetCount > 0 
-              ? 'bg-amber-500 border-amber-400 text-white shadow-amber-200 dark:shadow-amber-900/20' 
-              : 'bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800 text-slate-900 dark:text-white'
-            }`}
-          >
-            <div className="relative z-10 flex items-center gap-3 sm:block">
-              <div className="flex items-center gap-2.5 sm:mb-2">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  scheduledFleetCount > 0 ? 'bg-white text-amber-600' : 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400'
-                }`}>
-                  <Car size={16} />
-                </div>
-                <h2 className="text-[12px] sm:text-[11px] font-black uppercase tracking-tighter">Frota</h2>
-              </div>
-              <div className="flex items-center gap-3 sm:items-baseline sm:gap-2 ml-auto sm:ml-0">
-                <span className="text-2xl font-black leading-none">{scheduledFleetCount}</span>
-                <div className={`hidden sm:flex items-center gap-1 ${scheduledFleetCount > 0 ? 'text-amber-50' : 'text-amber-600'}`}>
-                  <span className="text-[7px] font-black uppercase tracking-widest">Agenda</span>
-                  <ArrowRight size={8} className="group-hover:translate-x-1 transition-transform" />
-                </div>
-              </div>
-            </div>
-            <ArrowRight size={14} className={`sm:hidden ${scheduledFleetCount > 0 ? 'text-amber-200' : 'text-slate-300'}`} />
           </button>
         </div>
       )}

@@ -83,20 +83,7 @@ const NewClient: React.FC = () => {
               </div>
             </div>
 
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Nome para Faturação / Firma</label>
-              <div className="relative">
-                <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                <input 
-                  type="text"
-                  name="billing_name"
-                  className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
-                  value={formData.billing_name}
-                  onChange={handleChange}
-                  placeholder="Ex: Hotel Avenida Soc. Unip. Lda"
-                />
-              </div>
-            </div>
+
 
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">NIF (Contribuinte)</label>

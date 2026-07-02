@@ -146,7 +146,8 @@ export const generateOSReportSummary = async (
   anomaly: string,
   notes: string,
   parts: string[],
-  type: string
+  type: string,
+  style: 'formal' | 'simple' = 'formal'
 ): Promise<string> => {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -155,25 +156,48 @@ export const generateOSReportSummary = async (
     }
     const ai = new GoogleGenAI({ apiKey });
     
-    const prompt = `
-      Atua como um técnico sénior de refrigeração e climatização da empresa Real Frio.
-      Gera um resumo técnico, profissional e extremamente conciso para o relatório de uma Ordem de Serviço (OS).
-      O texto deve be escrito obrigatoriamente em Português de Portugal (PT-PT).
+    let prompt = '';
+    
+    if (style === 'simple') {
+      prompt = `
+        Atua como um técnico de refrigeração e climatização da empresa Real Frio.
+        Gera um resumo da intervenção de fácil leitura e entendimento para o cliente final.
+        O texto deve ser escrito obrigatoriamente em Português de Portugal (PT-PT).
 
-      DADOS DA INTERVENÇÃO:
-      - Tipo de Serviço: ${type}
-      - Pedido Original: ${description}
-      - Anomalia Detetada: ${anomaly || 'Não especificada'}
-      - Notas de Resolução/Trabalho: ${notes}
-      - Material Aplicado: ${parts.join(', ') || 'Nenhum material registado'}
+        DADOS DA INTERVENÇÃO:
+        - Tipo de Serviço: ${type}
+        - Pedido Original: ${description}
+        - Anomalia Detetada: ${anomaly || 'Não especificada'}
+        - Notas de Resolução/Trabalho: ${notes}
+        - Material Aplicado: ${parts.join(', ') || 'Nenhum material registado'}
 
-      REGRAS DO RESUMO:
-      1. Usa terminologia técnica correta (ex: fluido frigorigéneo, evaporador, condensadora, vácuo, carga, etc).
-      2. Escreve na terceira pessoa ou infinitivo (ex: "Efetuada a substituição..." ou "Procedeu-se à limpeza...").
-      3. Sê direto. Elimina "Olá", "Aqui está o resumo" ou qualquer introdução.
-      4. Garante que o tom é formal e adequado para um relatório oficial que o cliente irá ler.
-      5. RETORNA APENAS O TEXTO DO RESUMO.
-    `;
+        REGRAS DO RESUMO:
+        1. Evita jargões técnicos excessivamente complexos. Explica o que foi feito de forma simples, direta e transparente.
+        2. Usa uma linguagem clara que qualquer cliente consiga compreender facilmente (ex: em vez de termos demasiado teóricos, explica que o equipamento foi limpo, reparado ou carregado).
+        3. Sê direto e conciso. Elimina "Olá", "Aqui está o resumo" ou qualquer introdução.
+        4. RETORNA APENAS O TEXTO DO RESUMO.
+      `;
+    } else {
+      prompt = `
+        Atua como um técnico sénior de refrigeração e climatização da empresa Real Frio.
+        Gera um resumo técnico, profissional, detalhado e elaborado para o relatório de uma Ordem de Serviço (OS).
+        O texto deve be escrito obrigatoriamente em Português de Portugal (PT-PT).
+
+        DADOS DA INTERVENÇÃO:
+        - Tipo de Serviço: ${type}
+        - Pedido Original: ${description}
+        - Anomalia Detetada: ${anomaly || 'Não especificada'}
+        - Notas de Resolução/Trabalho: ${notes}
+        - Material Aplicado: ${parts.join(', ') || 'Nenhum material registado'}
+
+        REGRAS DO RESUMO:
+        1. Usa terminologia técnica correta e profissional (ex: fluido frigorigéneo, evaporador, condensadora, vácuo, carga, etc).
+        2. Escreve de forma elaborada e na terceira pessoa ou infinitivo (ex: "Efetuada a substituição..." ou "Procedeu-se à limpeza...").
+        3. Sê direto e focado no aspeto técnico. Elimina "Olá", "Aqui está o resumo" ou qualquer introdução.
+        4. Garante que o tom é formal, completo e adequado para um relatório oficial que o cliente irá ler.
+        5. RETORNA APENAS O TEXTO DO RESUMO.
+      `;
+    }
 
     const response: GenerateContentResponse = await callGeminiWithRetry(ai, {
       model: 'gemini-3-flash-preview',

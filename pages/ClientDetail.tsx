@@ -341,15 +341,7 @@ const ClientDetail: React.FC = () => {
           {activeTab === 'info' && !isEditing && (
             <div className="space-y-4 px-1">
               <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden divide-y divide-slate-50 dark:divide-slate-800 transition-colors">
-                <div className="flex items-center gap-4 p-4.5 sm:p-5">
-                  <div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500 flex-shrink-0">
-                    <FileText size={20} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Nome de Faturação / Firma</p>
-                    <p className="text-[13px] font-black text-slate-900 dark:text-slate-100 uppercase truncate leading-none">{client.billing_name || '---'}</p>
-                  </div>
-                </div>
+
 
                 <div className="flex items-center gap-4 p-4.5 sm:p-5">
                   <div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500 flex-shrink-0">
@@ -376,7 +368,7 @@ const ClientDetail: React.FC = () => {
                     <Mail size={20} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Email Faturação</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Email</p>
                     <p className="text-[13px] font-black text-blue-600 truncate leading-none uppercase tracking-tight">{client.email || '---'}</p>
                   </div>
                 </a>
@@ -679,10 +671,6 @@ const ClientDetail: React.FC = () => {
                   <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1 mb-1 block">Entidade Comercial (Nome Público)</label>
                   <input className="w-full bg-blue-50/50 dark:bg-slate-950 border-none rounded-2xl px-6 py-4 text-lg font-black text-slate-900 dark:text-white uppercase outline-none" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
                 </div>
-                <div className="md:col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Nome de Faturação / Firma</label>
-                  <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold text-slate-800 dark:text-slate-200 outline-none" value={editForm.billing_name} onChange={e => setEditForm({...editForm, billing_name: e.target.value})} />
-                </div>
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">NIF (Contribuinte)</label>
                   <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-black text-slate-800 dark:text-slate-200 outline-none" value={editForm.nif || ''} onChange={e => setEditForm({...editForm, nif: e.target.value})} />
@@ -692,7 +680,7 @@ const ClientDetail: React.FC = () => {
                   <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold text-slate-800 dark:text-slate-200 outline-none" value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Email Faturação</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Email</label>
                   <input className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-5 py-3 text-sm font-bold text-slate-800 dark:text-slate-200 outline-none lowercase-container" style={{textTransform: 'none'}} value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} />
                 </div>
                 <div className="md:col-span-2">

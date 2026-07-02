@@ -218,6 +218,8 @@ export const ServiceOrderDetail: React.FC = () => {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showAiDropdown, setShowAiDropdown] = useState(false);
+  const aiDropdownRef = useRef<HTMLDivElement>(null);
 
   const [partSearchTerm, setPartSearchTerm] = useState('');
   const [selectedPartId, setSelectedPartId] = useState('');
@@ -284,6 +286,20 @@ export const ServiceOrderDetail: React.FC = () => {
       fetchOSDetails(); 
     }
   }, [id]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (aiDropdownRef.current && !aiDropdownRef.current.contains(event.target as Node)) {
+        setShowAiDropdown(false);
+      }
+    };
+    if (showAiDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showAiDropdown]);
 
   useEffect(() => {
     if (os?.client?.email && !recipientEmail) {
@@ -1391,7 +1407,7 @@ export const ServiceOrderDetail: React.FC = () => {
 
   const handleDeletePart = async () => { if (!partToDelete) return; setActionLoading(true); try { await mockData.removeOSPart(partToDelete.id); await mockData.addOSActivity(id!, { description: `REMOVEU MATERIAL: ${partToDelete.name}` }); setShowDeletePartModal(false); setPartToDelete(null); fetchOSDetails(false); } finally { setActionLoading(false); } };
 
-  const handleGenerateAISummary = async () => { if (!anomaly?.trim()) { setErrorMessage("DESCREVA A CAUSA PRIMEIRO."); return; } setIsGenerating(true); try { const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity.toLocaleString('pt-PT')}x ${p.name}`), os?.type || "INTERVENÇÃO"); if (summary) { setResolutionNotes(summary.toUpperCase()); await mockData.addOSActivity(id!, { description: "GEROU RESUMO VIA IA" }); } } catch (e: any) { setErrorMessage("ERRO IA."); } finally { setIsGenerating(false); } };
+  const handleGenerateAISummary = async (style: 'formal' | 'simple') => { if (!anomaly?.trim()) { setErrorMessage("DESCREVA A CAUSA PRIMEIRO."); return; } setIsGenerating(true); try { const summary = await generateOSReportSummary(description, anomaly, resolutionNotes, partsUsed.map(p => `${p.quantity.toLocaleString('pt-PT')}x ${p.name}`), os?.type || "INTERVENÇÃO", style); if (summary) { setResolutionNotes(summary.toUpperCase()); await mockData.addOSActivity(id!, { description: `GEROU RESUMO VIA IA (${style === 'formal' ? 'FORMAL' : 'SIMPLES'})` }); } } catch (e: any) { setErrorMessage("ERRO IA."); } finally { setIsGenerating(false); } };
 
   const handleDeleteQuote = () => {
     if (!os) return;
@@ -2276,7 +2292,44 @@ export const ServiceOrderDetail: React.FC = () => {
                    <div className={`flex items-center gap-3 ${storeColors.text500}`}><Sparkles size={18} /><h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Resumo da Intervenção (IA)</h3></div>
                    <div className="flex items-center gap-2">
                      <button type="button" onClick={handleResetResolution} disabled={os?.status === OSStatus.CONCLUIDA} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors p-2"><RotateCcw size={12} /> <span className="text-[9px] font-black uppercase">LIMPAR</span></button>
-                     <button type="button" onClick={handleGenerateAISummary} disabled={isGenerating || os?.status === OSStatus.CONCLUIDA} className={`${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text} ${storeColors.textDark} px-4 py-2 rounded-xl text-[9px] font-black uppercase ${storeColors.bgHover} transition-all disabled:opacity-50`}>{isGenerating ? <RefreshCw size={12} className="animate-spin" /> : <Sparkle size={12} />} GERAR IA</button>
+                     <div className="relative" ref={aiDropdownRef}>
+                        <button type="button" onClick={() => setShowAiDropdown(!showAiDropdown)} disabled={isGenerating || os?.status === OSStatus.CONCLUIDA} className={`${storeColors.bg50} ${storeColors.bgDark20} ${storeColors.text} ${storeColors.textDark} px-4 py-2 rounded-xl text-[9px] font-black uppercase ${storeColors.bgHover} transition-all disabled:opacity-50 flex items-center gap-1.5`}>{isGenerating ? <RefreshCw size={12} className="animate-spin" /> : <Sparkle size={12} />} <span>GERAR IA</span><ChevronDown size={10} className={`transition-transform duration-200 ${showAiDropdown ? 'rotate-180' : ''}`} /></button>
+                        {showAiDropdown && (
+                          <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="px-3 py-1.5 border-b border-slate-50 dark:border-slate-900 mb-1">
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Estilo do Resumo</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleGenerateAISummary('formal');
+                                setShowAiDropdown(false);
+                              }}
+                              className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex flex-col gap-0.5 cursor-pointer"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                <span className="text-[10px] font-black text-slate-800 dark:text-slate-100 uppercase">Formal e Elaborado</span>
+                              </div>
+                              <p className="text-[9px] text-slate-400 dark:text-slate-500 font-medium pl-3.5 text-left leading-normal normal-case">Relatório técnico com termos de engenharia e tom profissional.</p>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleGenerateAISummary('simple');
+                                setShowAiDropdown(false);
+                              }}
+                              className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex flex-col gap-0.5 cursor-pointer"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                <span className="text-[10px] font-black text-slate-800 dark:text-slate-100 uppercase">Simples e Direto</span>
+                              </div>
+                              <p className="text-[9px] text-slate-400 dark:text-slate-500 font-medium pl-3.5 text-left leading-normal normal-case">Fácil leitura e entendimento, ideal para explicar ao cliente.</p>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                    </div>
                 </div>
                 <textarea className={`w-full bg-slate-50 dark:bg-slate-900 border-none rounded-[2rem] px-6 py-5 text-sm text-slate-800 dark:text-slate-200 leading-relaxed outline-none focus:ring-4 ${storeColors.ring} transition-all min-h-[160px] resize-none`} value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} readOnly={os?.status === OSStatus.CONCLUIDA} placeholder="..." />

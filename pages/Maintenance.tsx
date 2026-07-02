@@ -692,15 +692,6 @@ const Maintenance: React.FC = () => {
                               <div className="mt-4 pt-4 border-t border-slate-50 dark:border-slate-700 space-y-3 animate-in slide-in-from-top-2 duration-300">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                   <div>
-                                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Nome Faturação / Firma</label>
-                                    <input 
-                                      type="text" 
-                                      className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold uppercase outline-none focus:ring-2 focus:ring-blue-500/20"
-                                      value={quickEditForm.billing_name}
-                                      onChange={e => setQuickEditForm({...quickEditForm, billing_name: e.target.value})}
-                                    />
-                                  </div>
-                                  <div>
                                     <label className="text-[8px] font-black text-slate-400 uppercase ml-1">NIF (Contribuinte)</label>
                                     <input 
                                       type="text" 
@@ -719,7 +710,7 @@ const Maintenance: React.FC = () => {
                                     />
                                   </div>
                                   <div className="lowercase-container">
-                                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Email Faturação</label>
+                                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Email</label>
                                     <input 
                                       type="email" 
                                       className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
